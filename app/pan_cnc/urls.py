@@ -23,5 +23,6 @@ urlpatterns = [
     path('', TemplateView.as_view(template_name='base/welcome.html'), name='base'),
     path('login', auth_views.LoginView.as_view(template_name='base/login.html'), name='login'),
     path('logout', auth_views.LogoutView.as_view(next_page='login')),
-    path('dynamic_content/', include('dynamic_content.urls'))
+    path('dynamic_content/', include('dynamic_content.urls')),
+    path('pan_tort/', include('pan_tort.urls'))
 ]
