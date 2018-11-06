@@ -25,8 +25,8 @@ def load_template_snippets():
     return services
 
 
-def load_all_snippets():
-    services = load_snippets_of_type()
+def load_all_snippets(app_dir):
+    services = load_snippets_of_type(snippet_type=None, app_dir=app_dir)
     return services
 
 
@@ -59,13 +59,13 @@ def load_snippets_of_type(snippet_type=None, app_dir=None):
     return services
 
 
-def load_snippet_with_name(snippet_name):
+def load_snippet_with_name(snippet_name, app_dir):
     """
     Returns a service (dict) that has a 'name' attribute matching 'snippet_name'. Service is a dict containing keys:
     'name (str)', 'description (str)', 'label (str)', 'variables (list)', and 'snippets (list)'.
     :return: Service dict or None if none found
     """
-    services = load_all_snippets()
+    services = load_all_snippets(app_dir)
     for service in services:
         if service['name'] == snippet_name:
             return service

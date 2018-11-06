@@ -22,10 +22,11 @@ class CNCBaseFormView(FormView):
     header = 'Pan-OS Utils'
     title = 'Title'
     action = '/'
+    app_dir = 'pan_cnc'
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        service = snippet_utils.load_snippet_with_name(self.snippet)
+        service = snippet_utils.load_snippet_with_name(self.snippet, self.app_dir)
         form = self.generate_dynamic_form(service)
         context['form'] = form
         context['header'] = self.header
