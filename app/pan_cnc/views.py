@@ -60,6 +60,13 @@ class CNCBaseFormView(FormView):
                 dynamic_form.fields[field_name] = forms.GenericIPAddressField()
             elif type_hint == "password":
                 dynamic_form.fields[field_name] = forms.CharField(widget=forms.PasswordInput)
+            elif type_hint == "radio" and "rad_list":
+                rad_list = variable['rad_list']
+                choices_list = list()
+                for item in rad_list:
+                    choice = (item['value'], item['key'])
+                    choices_list.append(choice)
+                dynamic_form.fields[field_name]= forms.ChoiceField(widget=forms.RadioSelect, choices=choices_list)
             else:
                 dynamic_form.fields[field_name] = forms.CharField(label=description, initial=default)
 

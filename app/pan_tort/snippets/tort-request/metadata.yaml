@@ -33,6 +33,15 @@ variables:
         value: text
       - key: Elasticsearch
         value: elasticsearch
+  - name: radio test
+    description: Output Format
+    default: text
+    type_hint: radio
+    rad_list:
+      - key: Text
+        value: text
+      - key: Elasticsearch
+        value: elasticsearch
   - name: hash_type
     description: Format of Hashes
     default: "md5"
