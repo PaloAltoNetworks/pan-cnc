@@ -39,8 +39,17 @@ class CNCBaseFormView(FormView):
             type_hint = variable['type_hint']
             description = variable['description']
             default = variable['default']
-            # FIXME - set form field type based on type_hint
-            dynamic_form.fields[field_name] = forms.CharField(label=description, initial=default)
+            if type_hint == 'dropdown' and 'dd_list' in variable:
+                dd_list = variable['dd_list']
+                choices_list = list()
+                for item in dd_list:
+                    choice = (item['key'], item['value'])
+                    choices_list.append(choice)
+
+                dynamic_form.fields[field_name] = forms.ChoiceField(choices=tuple(choices_list))
+            else:
+                # FIXME - handle other form types
+                dynamic_form.fields[field_name] = forms.CharField(label=description, initial=default)
 
         return dynamic_form
 
