@@ -78,6 +78,7 @@ def get_panorama_credentials():
 
 def push_service(service, context):
     xapi = panorama_login()
+    # FIXME - needs app_dir here instead of hard coded mssp
     snippets_dir = Path(os.path.join(settings.BASE_DIR, 'mssp', 'snippets'))
 
     try:
