@@ -2,6 +2,8 @@ import oyaml
 import os
 from django.conf import settings
 from pathlib import Path
+from jinja2 import Environment
+from jinja2.loaders import BaseLoader
 
 
 def load_service_snippets():
@@ -73,3 +75,20 @@ def load_snippet_with_name(snippet_name, app_dir):
     print('Could not find service with name: %s' % snippet_name)
     return None
 
+
+def render_snippet_template(service, app_dir, context):
+    snippets_dir = Path(os.path.join(settings.BASE_DIR, app_dir, 'snippets'))
+
+    try:
+        template_name = service['snippets'][0]['file']
+
+        template_full_path = os.path.join(snippets_dir, service['name'], template_name)
+        with open(template_full_path, 'r') as template:
+            template_string = template.read()
+            template_template = Environment(loader=BaseLoader()).from_string(template_string)
+            rendered_template = template_template.render(context)
+            return rendered_template
+    except Exception as e:
+        print(e)
+        print('Caught an error deploying service')
+        return None

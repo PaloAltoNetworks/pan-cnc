@@ -1,6 +1,6 @@
 
 from django.core.cache import cache
-from .pan_utils import load_panrc
+from .cnc_utils import load_panrc
 
 if not cache.get('panrc'):
     panrc = load_panrc()

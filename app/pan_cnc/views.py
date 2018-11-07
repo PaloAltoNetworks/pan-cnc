@@ -23,6 +23,7 @@ class CNCBaseFormView(FormView):
     title = 'Title'
     action = '/'
     app_dir = 'pan_cnc'
+    parsed_context = dict()
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -31,6 +32,18 @@ class CNCBaseFormView(FormView):
         context['form'] = form
         context['header'] = self.header
         return context
+
+    def render_snippet_template(self):
+        jinja_context = dict()
+        service = snippet_utils.load_snippet_with_name(self.snippet, self.app_dir)
+
+        for v in service['variables']:
+            if self.request.POST.get(v['name']):
+                jinja_context[v['name']] = self.request.POST.get(v['name'])
+
+        self.parsed_context = jinja_context
+        template = snippet_utils.render_snippet_template(service, self.app_dir, jinja_context)
+        return template
 
     @staticmethod
     def generate_dynamic_form(service):

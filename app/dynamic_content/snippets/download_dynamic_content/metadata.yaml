@@ -5,20 +5,26 @@ type: template
 extends:
 variables:
   - name: username
-    description: Username for the Palo Alto Networks Support Site
+    description: Username
     default: user@paloaltonetworks.com
     type_hint: text
   - name: password
-    description: Password for the support site3
+    description: Password
     default:
     type_hint: password
   - name: package
-    description: Package type to download
+    description: Package Type
     default: appthreat
     type_hint: dropdown
     dd_list:
-      - key: Application Thread
+      - key: Application Threat
         value: appthreat
+      - key: Application
+        value: app
+      - key: Antivirus
+        value: antivirus
+      - key: Wildfire
+        value: wildfire2
   - name: force_update
     description: Force pulling new package
     default: yes
@@ -31,6 +37,6 @@ variables:
 
 snippets:
   - name: cd_payload
-    file: payload.j2
-
+    path: download_content
+    file: conf.j2
 
