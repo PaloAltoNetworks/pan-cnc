@@ -30,8 +30,10 @@ def load_panrc():
             for line in rcs.split('\n'):
                 if not re.match(r'^\s*$', line) and not re.match(r'^#', line):
                     (k, v) = map(str.strip, line.split('='))
-                    print('setting config to %s: %s' % (k, v))
-                    config[k] = v
+                    cleaned_k = str(k).replace('"', '')
+                    cleaned_v = str(v).replace('"', '')
+                    print('setting config to %s: %s' % (cleaned_k, cleaned_v))
+                    config[cleaned_k] = cleaned_v
 
             cache.set('panrc', config)
             return config
