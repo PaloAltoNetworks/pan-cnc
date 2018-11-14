@@ -22,12 +22,12 @@ handler = logging.StreamHandler()
 logger.addHandler(handler)
 
 
-def panorama_login():
+def panorama_login(panorama_ip=None, panorama_username=None, panorama_password=None):
     global xapi_obj
     try:
         if xapi_obj is None:
             print('xapi not init yet')
-            credentials = get_panorama_credentials()
+            credentials = get_panorama_credentials(panorama_ip, panorama_username, panorama_password)
             xapi_obj = pan.xapi.PanXapi(**credentials)
             if 'api_key' not in credentials:
                 print('Setting API KEY')
@@ -50,10 +50,12 @@ def test_panorama():
     print(xapi.xml_result())
 
 
-def get_panorama_credentials():
-    panorama_ip = os.environ.get('PANORAMA_IP', '0.0.0.0')
-    panorama_username = os.environ.get('PANORAMA_USERNAME', 'admin')
-    panorama_password = os.environ.get('PANORAMA_PASSWORD', 'admin')
+def get_panorama_credentials(panorama_ip, panorama_username, panorama_password):
+    if panorama_ip is None or panorama_username is None or panorama_password is None:
+        # check the env for it if not here
+        panorama_ip = os.environ.get('PANORAMA_IP', '0.0.0.0')
+        panorama_username = os.environ.get('PANORAMA_USERNAME', 'admin')
+        panorama_password = os.environ.get('PANORAMA_PASSWORD', 'admin')
 
     credentials = dict()
     credentials["hostname"] = panorama_ip
