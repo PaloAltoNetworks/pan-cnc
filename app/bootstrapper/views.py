@@ -1,33 +1,57 @@
-import json
+from django import forms
+from django.shortcuts import render, HttpResponseRedirect
 
-import requests
-from django.shortcuts import render
-
-from pan_cnc.lib import cnc_utils
 from pan_cnc.views import CNCBaseAuth, CNCBaseFormView
 
 
-class ExecTortView(CNCBaseAuth, CNCBaseFormView):
-    snippet = 'tort-request'
-    header = 'Analyze Hashes'
-    title = 'Where is this title?'
-    action = 'what is this action?'
-    app_dir = 'pan_tort'
+class BootstrapWorkflowView(CNCBaseAuth, CNCBaseFormView):
+    snippet = 'bootstrap-payload'
+    header = 'Build Bootsrap Archive'
+    title = 'Hostname of VM-Series to bootstrap'
+    app_dir = 'bootstrapper'
+    fields_to_render = ['vm_name']
 
     def form_valid(self, form):
-        pan_tort_host = cnc_utils.get_config_value('PAN_TORT_HOST', '')
-        pan_tort_port = cnc_utils.get_config_value('PAN_TORT_PORT', '')
-        pan_tort_url = f'http://{pan_tort_host}:{pan_tort_port}/process_hashes'
+        return HttpResponseRedirect('step02')
 
-        print(f'Using pan-tort url of {pan_tort_url}')
 
-        payload = self.render_snippet_template()
+class BootstrapStep02View(BootstrapWorkflowView):
+    title = 'Include Panorama Support?'
+    fields_to_render = []
 
-        print(payload)
+    def generate_dynamic_form(self):
+        dynamic_form = forms.Form()
+        choices_list = (('yes', 'Include Panorama'), ('no', 'Do not include Panorama'))
+        dynamic_form.fields['panorama_support'] = forms.ChoiceField(label='Include Panorama',
+                                                                    choices=tuple(choices_list))
+        return dynamic_form
 
-        payload_json = json.loads(payload)
-        res = requests.post(pan_tort_url, json=payload_json)
+    def form_valid(self, form):
+        if self.request.POST['panorama_support'] == 'yes':
+            return HttpResponseRedirect('step03')
+        else:
+            return HttpResponseRedirect('step04')
 
+
+class BootstrapStep03View(BootstrapWorkflowView):
+    title = 'Configure Panorama Server'
+    fields_to_render = ['panorama_ip']
+
+    def form_valid(self, form):
+        return HttpResponseRedirect('step04')
+
+
+class BootstrapStep04View(BootstrapWorkflowView):
+    title = 'Configure Authentication'
+    fields_to_render = ['admin_username', 'admin_password']
+
+    def form_valid(self, form):
         context = dict()
-        context['results'] = res.text
+        if self.app_dir in self.request.session:
+            session_cache = self.request.session[self.app_dir]
+            for v in session_cache:
+                print(v)
+                print(session_cache[v])
+
+        context['results'] = self.render_snippet_template()
         return render(self.request, 'base/results.html', context=context)
