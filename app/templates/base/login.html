@@ -19,14 +19,14 @@
 {% endif %}
 {% endif %}
 
-<div class="card border-primary mb-3">
-    <div class="card-header"> Login</div>
+<div class="card border-secondary mb-1 shadow-lg rounded">
+    <div class="card-header bg-secondary text-white">Login</div>
     <div class="card-body">
         <h4 class="card-title">Enter Authentication</h4>
         <p class="card-text">
         <form method="post" action="{% url 'login' %}">
             {% csrf_token %}
-            <table>
+            <table class="table">
                 <tr>
                     <td>{{ form.username.label_tag }}</td>
                     <td>{{ form.username }}</td>
@@ -36,9 +36,8 @@
                     <td>{{ form.password }}</td>
                 </tr>
             </table>
-
-            <input type="submit" value="login">
-            <input type="hidden" name="next" value="/">
+            <button type="submit" class="btn btn-secondary">Login</button>
+            <input type="hidden" name="next" value="{{ next }}">
         </form>
     </div>
 </div>
