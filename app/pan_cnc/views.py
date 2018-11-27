@@ -160,7 +160,7 @@ class CNCBaseFormView(FormView):
                 for item in rad_list:
                     choice = (item['value'], item['key'])
                     choices_list.append(choice)
-                dynamic_form.fields[field_name]= forms.ChoiceField(widget=forms.RadioSelect, choices=choices_list)
+                dynamic_form.fields[field_name] = forms.ChoiceField(widget=forms.RadioSelect, choices=choices_list)
             else:
                 dynamic_form.fields[field_name] = forms.CharField(label=description, initial=default)
 
