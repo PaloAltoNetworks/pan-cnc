@@ -31,7 +31,7 @@ for app in settings.INSTALLED_APPS:
     app_dir = os.path.join(settings.SRC_PATH, app)
     print('Checking app_dir %s' % app_dir)
     if os.path.exists(os.path.join(app_dir, 'urls.py')):
-        print('ADDING URL')
+        print('Adding src app %s to urlpatterns' % app)
         urlpatterns += [path('%s/' % app, include('%s.urls' % app))]
 
 print(urlpatterns)
