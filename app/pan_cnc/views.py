@@ -26,7 +26,6 @@ class CNCBaseFormView(FormView):
     snippet = ''
     # Head to show on the rendered dynamic form
     header = 'Pan-OS Utils'
-    # FIXME - where does this go again?
     title = 'Title'
     # the action of the form if it needs to differ
     action = '/'
@@ -41,6 +40,12 @@ class CNCBaseFormView(FormView):
     service = dict()
 
     def get_context_data(self, **kwargs):
+        """
+        Called by all children, always generate the dynamic form and set on the context
+        also set header and title on the context as well
+        :param kwargs: calling kwargs
+        :return: context with extra items added (form, header, title)
+        """
         context = super().get_context_data(**kwargs)
         form = self.generate_dynamic_form()
         context['form'] = form
@@ -49,7 +54,10 @@ class CNCBaseFormView(FormView):
         return context
 
     def get(self, request, *args, **kwargs):
-        """Handle GET requests: instantiate a blank version of the form."""
+        """
+        Handle GET requests: instantiate a blank version of the form.
+        Always load the desired service for use in subsequent actions
+        """
         # load the snippet into the class attribute here so it's available to all other methods throughout the
         # call chain in the child classes
         self.service = snippet_utils.load_snippet_with_name(self.snippet, self.app_dir)
@@ -75,6 +83,10 @@ class CNCBaseFormView(FormView):
             return self.form_invalid(form)
 
     def render_snippet_template(self):
+        """
+        convenience function to render the snippet using values that may have been saved in the session
+        :return:
+        """
         jinja_context = dict()
 
         if 'variables' not in self.service:
@@ -97,11 +109,10 @@ class CNCBaseFormView(FormView):
         return template
 
     def save_workflow_to_session(self):
-        '''
+        """
         Save the current user input to the session
-        :param service: desired service
         :return: None
-        '''
+        """
 
         if self.app_dir in self.request.session:
             current_workflow = self.request.session[self.app_dir]

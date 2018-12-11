@@ -143,9 +143,6 @@ class DockerAction(AbstractAction):
         instance_path = os.path.join(self.persistent_dir, self.storage_dir)
         print('Using instance_dir of: %s' % instance_path)
 
-        print(self.environment)
-        print(type(self.environment))
-
         if type(self.environment) is str:
             if self.environment == "":
                 env = ["CNC=True"]
