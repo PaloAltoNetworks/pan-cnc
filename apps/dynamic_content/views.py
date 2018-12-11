@@ -29,4 +29,4 @@ class DownloadDynamicContentView(CNCBaseAuth, CNCBaseFormView):
         context = dict()
         context['results'] = results
 
-        return render(self.request, 'base/results.html', context=context)
+        return render(self.request, 'pan_cnc/results.html', context=context)

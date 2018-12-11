@@ -1,17 +1,12 @@
 import logging
 import os
 from pathlib import Path
+from xml.etree import ElementTree as et
 
 import pan.xapi
-from pan import rc
-from pan.xapi import PanXapiError
-
 from django.conf import settings
 from django.core.cache import cache
 from jinja2 import Environment, BaseLoader
-from xml.etree import ElementTree as et
-import configparser
-import re
 
 xapi_obj = None
 
@@ -41,7 +36,7 @@ def panorama_login(panorama_ip=None, panorama_username=None, panorama_password=N
     except pan.xapi.PanXapiError as pxe:
         print('Got error logging in to Panorama')
         print(pxe)
-        return False
+        return None
 
 
 def test_panorama():
@@ -73,24 +68,35 @@ def get_panorama_credentials(panorama_ip, panorama_username, panorama_password):
 
 def push_service(service, context):
     xapi = panorama_login()
-    # FIXME - needs app_dir here instead of hard coded mssp
-    snippets_dir = Path(os.path.join(settings.BASE_DIR, 'mssp', 'snippets'))
+
+    if xapi is None:
+        print('Could not login in to Panorama')
+        return False
+
+    if 'snippet_path' in service:
+        snippets_dir = service['snippet_path']
+    else:
+        snippets_dir = Path(os.path.join(settings.BASE_DIR, 'mssp', 'snippets', service['name']))
 
     try:
         for snippet in service['snippets']:
             xpath = snippet['xpath']
             xml_file_name = snippet['file']
 
-            xml_full_path = os.path.join(snippets_dir, service['name'], xml_file_name)
+            xml_full_path = os.path.join(snippets_dir, xml_file_name)
             with open(xml_full_path, 'r') as xml_file:
                 xml_string = xml_file.read()
                 xml_template = Environment(loader=BaseLoader()).from_string(xml_string)
                 xpath_template = Environment(loader=BaseLoader()).from_string(xpath)
                 xml_snippet = xml_template.render(context).replace('\n', '')
                 xpath_string = xpath_template.render(context)
-                print('Pushing xpath: %s' % xpath)
-                print('Pushing element: %s' % xml_snippet)
+                print('Pushing xpath: %s' % xpath_string)
                 xapi.set(xpath=xpath_string, element=xml_snippet)
+                if xapi.status_code == '19' or xapi.status_code == '20':
+                    print('xpath is already present')
+                elif xapi.status_code == '7':
+                    print('xpath was NOT found')
+                    return False
 
         xapi.commit('<commit/>', sync=True)
         print(xapi.xml_result())
@@ -117,6 +123,9 @@ def validate_snippet_present(service, context):
     :return: boolean True if found, false if any xpath is not found
     """
     xapi = panorama_login()
+    if xapi is None:
+        raise Exception('Could not login to Panorama')
+
     try:
         for snippet in service['snippets']:
             xpath = snippet['xpath']
@@ -135,6 +144,7 @@ def validate_snippet_present(service, context):
     except pan.xapi.PanXapiError as pxe:
         print('Could not validate snippet was present!')
         print(pxe)
+        raise
 
 
 def get_device_groups_from_panorama():
@@ -157,10 +167,11 @@ def get_device_groups_from_panorama():
             service = dict()
             for tag in dg.findall('./tag/entry'):
                 if 'name' in tag.attrib and ':' in tag.attrib['name']:
-                    k,v = tag.attrib['name'].split(':')
+                    k, v = tag.attrib['name'].split(':')
                     service[k] = v
                     service['name'] = dg.attrib['name']
 
             services.append(service)
 
     return services
+

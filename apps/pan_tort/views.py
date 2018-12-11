@@ -29,4 +29,4 @@ class ExecTortView(CNCBaseAuth, CNCBaseFormView):
 
         context = dict()
         context['results'] = res.text
-        return render(self.request, 'base/results.html', context=context)
+        return render(self.request, 'pan_cnc/results.html', context=context)

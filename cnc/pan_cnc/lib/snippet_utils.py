@@ -32,6 +32,17 @@ def load_all_snippets(app_dir):
     return services
 
 
+def load_snippets_by_label(label_name, label_value, app_dir):
+    services = load_snippets_of_type(snippet_type=None, app_dir=app_dir)
+    filtered_services = list()
+    for service in services:
+        if 'labels' in service and label_name in service['labels']:
+            if service['labels'][label_name] == label_value:
+                filtered_services.append(service)
+
+    return filtered_services
+
+
 def load_snippets_of_type(snippet_type=None, app_dir=None):
     """
     Loads a list of snippets of the given type, or all snippets of snippet_type is None
@@ -39,14 +50,16 @@ def load_snippets_of_type(snippet_type=None, app_dir=None):
     :param app_dir: name of the app to load the snippets from
     :return: list of snippet dicts
     """
-    snippets_dir = Path(os.path.join(settings.BASE_DIR, app_dir, 'snippets'))
+    snippets_dir = Path(os.path.join(settings.SRC_PATH, app_dir, 'snippets'))
     services = list()
-    for d in snippets_dir.glob('./*'):
+    for d in snippets_dir.rglob('./*'):
         mdf = os.path.join(d, 'metadata.yaml')
         if os.path.isfile(mdf):
+            snippet_path = os.path.dirname(mdf)
             try:
                 with open(mdf, 'r') as sc:
                     service_config = oyaml.load(sc.read())
+                    service_config['snippet_path'] = snippet_path
                     if snippet_type is not None:
                         if 'type' in service_config and service_config['type'] == snippet_type:
                             services.append(service_config)
@@ -82,7 +95,7 @@ def render_snippet_template(service, app_dir, context):
     try:
         template_name = service['snippets'][0]['file']
 
-        template_full_path = os.path.join(snippets_dir, service['name'], template_name)
+        template_full_path = os.path.join(service['snippet_path'], template_name)
         with open(template_full_path, 'r') as template:
             template_string = template.read()
             template_template = Environment(loader=BaseLoader()).from_string(template_string)
@@ -92,3 +105,4 @@ def render_snippet_template(service, app_dir, context):
         print(e)
         print('Caught an error deploying service')
         return None
+

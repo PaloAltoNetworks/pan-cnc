@@ -1,4 +1,4 @@
-{% extends "base/base.html" %}
+{% extends base_html %}
 {% load static %}
 
 {% block content %}
@@ -10,7 +10,7 @@
             <p class="card-text">
             <form action="{{ action }}" method="post">
                 {% csrf_token %}
-                {% include 'base/bootstrap_form.html' with form=form %}
+                {% include 'pan_cnc/bootstrap_form.html' with form=form %}
                 <button type="submit" class="btn btn-primary">Submit</button>
             </form>
             </p>

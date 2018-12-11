@@ -54,4 +54,4 @@ class BootstrapStep04View(BootstrapWorkflowView):
                 print(session_cache[v])
 
         context['results'] = self.render_snippet_template()
-        return render(self.request, 'base/results.html', context=context)
+        return render(self.request, 'pan_cnc/results.html', context=context)
