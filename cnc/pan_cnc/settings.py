@@ -11,10 +11,17 @@ https://docs.djangoproject.com/en/2.1/ref/settings/
 """
 
 import os
+import sys
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
+SITE_PATH = os.path.abspath(os.path.dirname(__file__))
+PROJECT_PATH = os.path.normpath(os.path.join(SITE_PATH, '..', '..'))
+SRC_PATH = os.path.join(PROJECT_PATH, 'apps')
+if SRC_PATH not in sys.path:
+    print('Adding path to syspath')
+    sys.path.insert(0, SRC_PATH)
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/2.1/howto/deployment/checklist/
@@ -38,6 +45,16 @@ INSTALLED_APPS = [
     'widget_tweaks',
     'django.contrib.staticfiles',
 ]
+
+# find and install any loaded apps here:
+for app in os.listdir(SRC_PATH):
+    if os.path.isdir(os.path.join(SRC_PATH, app)):
+        app_name = 'apps.%s' % app
+        if app not in INSTALLED_APPS:
+            print('ADDING APP_NAME: %s' % app_name)
+            INSTALLED_APPS += [app]
+            print(INSTALLED_APPS)
+            print(sys.path)
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
