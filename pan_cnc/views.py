@@ -51,6 +51,8 @@ class CNCBaseFormView(FormView):
         return self.snippet
 
     def get_context_data(self, **kwargs) -> dict:
+        print('GETTING CONTEXT DATA')
+        print(kwargs)
         context = super().get_context_data(**kwargs)
         form = self.generate_dynamic_form()
         context['form'] = form
@@ -175,7 +177,7 @@ class CNCBaseFormView(FormView):
         return dynamic_form
 
 
-class ChooseSnippetView(CNCBaseFormView):
+class ChooseSnippetView(CNCBaseAuth, CNCBaseFormView):
     """
     /mssp/configure
 
@@ -199,7 +201,7 @@ class ChooseSnippetView(CNCBaseFormView):
     snippet = 'cnc-conf'
     header = 'Provision Service'
     title = 'Configure Service Sales information'
-    app_dir = 'mssp'
+    app_dir = 'pan_cnc'
 
     def get_context_data(self, **kwargs):
         """
@@ -256,7 +258,7 @@ class ChooseSnippetView(CNCBaseFormView):
         return HttpResponseRedirect('provision')
 
 
-class ProvisionSnippetView(CNCBaseFormView):
+class ProvisionSnippetView(CNCBaseAuth, CNCBaseFormView):
     """
     Provision Service View - This view uses the Base Auth and Form View
     The posted view is actually a dynamically generated form so the forms.Form will actually be blank
@@ -265,9 +267,10 @@ class ProvisionSnippetView(CNCBaseFormView):
     snippet = ''
     header = 'Provision Service'
     title = 'Configure Service Sales information'
-    app_dir = 'mssp'
+    app_dir = 'pan_cnc'
 
     def get_snippet(self):
+        print('Getting snippet here in get_snippet')
         if 'snippet_name' in self.request.POST:
             return self.request.POST['snippet_name']
 
@@ -277,6 +280,7 @@ class ProvisionSnippetView(CNCBaseFormView):
                 print('returning snippet name: %s' % session_cache['snippet_name'])
                 return session_cache['snippet_name']
         else:
+            print('what happened here?')
             return self.snippet
 
     def form_valid(self, form):

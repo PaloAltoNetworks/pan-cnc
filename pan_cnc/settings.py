@@ -12,6 +12,7 @@ https://docs.djangoproject.com/en/2.1/ref/settings/
 
 import os
 import sys
+import yaml
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -43,14 +44,30 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'widget_tweaks',
     'django.contrib.staticfiles',
+    'cnc_tags',
 ]
+
+INSTALLED_APPS_CONFIG = dict()
 
 # find and install any loaded apps here:
 for app in os.listdir(SRC_PATH):
     if os.path.isdir(os.path.join(SRC_PATH, app)):
-        app_name = 'src.%s' % app
         if app not in INSTALLED_APPS:
             INSTALLED_APPS += [app]
+            app_dir = os.path.join(SRC_PATH, app)
+            if os.path.exists(os.path.join(app_dir, '.pan-cnc.yaml')):
+                try:
+                    with open(os.path.join(app_dir, '.pan-cnc.yaml')) as app_conf_file:
+                        app_conf = yaml.load(app_conf_file.read())
+                        print('Adding app config for app: %s' % app)
+                        print(app_conf)
+                        INSTALLED_APPS_CONFIG[app] = app_conf
+                except OSError as ose:
+                    print('Could not open .pan-cnc.yaml for app: %s' % app)
+                    pass
+                except ValueError as ve:
+                    print('Could not load .pan-cnc.yaml for app: %s' % app)
+                    pass
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',

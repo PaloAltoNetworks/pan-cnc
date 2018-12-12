@@ -1,5 +1,5 @@
 {% load static %}
-
+{% load build_menu %}
 <html lang="en">
 <head>
     <meta charset="utf-8">
@@ -27,52 +27,66 @@
             <li class="nav-item">
                 <a class="nav-link" href="/">Home <span class="sr-only">(current)</span></a>
             </li>
-            <!-- Dropdown -->
+            {% build_menu as menu %}
+            {% for menu_item, menu_dropdown in menu.items %}
             <li class="nav-item dropdown">
-                <a class="nav-link dropdown-toggle" href="#" id="navbardrop" data-toggle="dropdown">
-                    PanHandler
+                <a class="nav-link dropdown-toggle" href="#" id="navbardrop{{ forloop.counter }}" data-toggle="dropdown">
+                    {{ menu_item }}
                 </a>
                 <div class="dropdown-menu">
-                    <a class="dropdown-item" href="/snippets">View Snippets</a>
+                    {% for menu_option in menu_dropdown %}
+                    <a class="dropdown-item" href="{{ menu_option.value }}">{{ menu_option.label }}</a>
+                    {% endfor %}
                 </div>
             </li>
-            <li class="nav-item dropdown">
-                <a class="nav-link dropdown-toggle" href="#" id="navbardrop0" data-toggle="dropdown">
-                    TORT
-                </a>
-                <div class="dropdown-menu">
-                    <a class="dropdown-item" href="/pan_tort">Check Signatures</a>
-                </div>
-            </li>
-            <li class="nav-item dropdown">
-                <a class="nav-link dropdown-toggle" href="#" id="navbardrop2" data-toggle="dropdown">
-                    Dynamic Content
-                </a>
-                <div class="dropdown-menu">
-                    <a class="dropdown-item" href="/dynamic_content">Download Dynamic Content</a>
-                </div>
-            </li>
-            <li class="nav-item dropdown">
-                <a class="nav-link dropdown-toggle" href="#" id="navbardrop3" data-toggle="dropdown">
-                    Bootstrapper
-                </a>
-                <div class="dropdown-menu">
-                    <a class="dropdown-item" href="/bootstrapper">Create Bootstrap Archive</a>
-                </div>
-            </li>
-            <li class="nav-item dropdown">
-                <a class="nav-link dropdown-toggle" href="#" id="navbardrop4" data-toggle="dropdown">
-                    Documentation
-                </a>
-                <div class="dropdown-menu">
-                    <a class="dropdown-item" href="#">Portal User Guide</a>
-                    <a class="dropdown-item" href="#">Github Repository</a>
-                    <a class="dropdown-item" href="#">MSSP More Information</a>
-                </div>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link" href="/logout">Logout</a>
-            </li>
+            {% endfor %}
+
+            <!--&lt;!&ndash; Dropdown &ndash;&gt;-->
+            <!--<li class="nav-item dropdown">-->
+                <!--<a class="nav-link dropdown-toggle" href="#" id="navbardrop" data-toggle="dropdown">-->
+                    <!--PanHandler-->
+                <!--</a>-->
+                <!--<div class="dropdown-menu">-->
+                    <!--<a class="dropdown-item" href="/snippets">View Snippets</a>-->
+                <!--</div>-->
+            <!--</li>-->
+            <!--<li class="nav-item dropdown">-->
+                <!--<a class="nav-link dropdown-toggle" href="#" id="navbardrop0" data-toggle="dropdown">-->
+                    <!--TORT-->
+                <!--</a>-->
+                <!--<div class="dropdown-menu">-->
+                    <!--<a class="dropdown-item" href="/pan_tort">Check Signatures</a>-->
+                <!--</div>-->
+            <!--</li>-->
+            <!--<li class="nav-item dropdown">-->
+                <!--<a class="nav-link dropdown-toggle" href="#" id="navbardrop2" data-toggle="dropdown">-->
+                    <!--Dynamic Content-->
+                <!--</a>-->
+                <!--<div class="dropdown-menu">-->
+                    <!--<a class="dropdown-item" href="/dynamic_content">Download Dynamic Content</a>-->
+                <!--</div>-->
+            <!--</li>-->
+            <!--<li class="nav-item dropdown">-->
+                <!--<a class="nav-link dropdown-toggle" href="#" id="navbardrop3" data-toggle="dropdown">-->
+                    <!--Bootstrapper-->
+                <!--</a>-->
+                <!--<div class="dropdown-menu">-->
+                    <!--<a class="dropdown-item" href="/bootstrapper">Create Bootstrap Archive</a>-->
+                <!--</div>-->
+            <!--</li>-->
+            <!--<li class="nav-item dropdown">-->
+                <!--<a class="nav-link dropdown-toggle" href="#" id="navbardrop4" data-toggle="dropdown">-->
+                    <!--Documentation-->
+                <!--</a>-->
+                <!--<div class="dropdown-menu">-->
+                    <!--<a class="dropdown-item" href="#">Portal User Guide</a>-->
+                    <!--<a class="dropdown-item" href="#">Github Repository</a>-->
+                    <!--<a class="dropdown-item" href="#">MSSP More Information</a>-->
+                <!--</div>-->
+            <!--</li>-->
+            <!--<li class="nav-item">-->
+                <!--<a class="nav-link" href="/logout">Logout</a>-->
+            <!--</li>-->
         </ul>
     </div>
 </nav>
@@ -88,5 +102,6 @@
         </div>
     </div>
 </div>
+
 </body>
 </html>
