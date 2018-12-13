@@ -128,6 +128,11 @@ class CNCBaseFormView(FormView):
     def generate_dynamic_form(self) -> forms.Form:
 
         dynamic_form = forms.Form()
+
+        if self.service is None:
+            print('There is not service here :-/')
+            return dynamic_form
+
         if 'variables' not in self.service:
             print('No self.service found on this class')
             return dynamic_form
@@ -212,6 +217,10 @@ class ChooseSnippetView(CNCBaseAuth, CNCBaseFormView):
         """
 
         context = super().get_context_data(**kwargs)
+
+        if self.service is None:
+            print('Still no service around')
+            return context
 
         if 'labels' in self.service and 'customize_field' in self.service['labels']:
             labels = self.service['labels']
