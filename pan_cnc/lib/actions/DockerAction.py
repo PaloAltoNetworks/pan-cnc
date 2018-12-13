@@ -19,7 +19,7 @@ class DockerAction(AbstractAction):
     """
 
     def __init__(self):
-        self._template_name = 'cnc_template'
+        self._template_name = ''
         # self._docker_url = 'tcp://127.0.0.1:2376'
         self._docker_url = 'unix://var/run/docker.sock'
         self._docker_cmd = 'run'
@@ -164,7 +164,7 @@ class DockerAction(AbstractAction):
             print('Could not write file into docker container persistent dir')
             return
 
-    def execute_template(self, template):
+    def execute_template(self, template=''):
         """
         """
 
@@ -191,11 +191,14 @@ class DockerAction(AbstractAction):
             vols = {instance_path: {'bind': self.working_dir, 'mode': 'rw'}}
             print(vols)
             self.container = client.containers.run(self.docker_image, self.docker_cmd, volumes=vols,
-                                              working_dir=self.working_dir,
-                                              auto_remove=False, environment=env, detach=True)
+                                                   working_dir=self.working_dir,
+                                                   auto_remove=False, environment=env, detach=True)
             timer = 1
             while timer < 60:
                 time.sleep(1)
+                self.container.reload()
+                print('Checking for output')
+                print(self.container.status)
                 if self.container.status == 'exited':
                     return self.container.logs()
                 timer += 1
@@ -227,4 +230,3 @@ class DockerAction(AbstractAction):
             return self.container.logs()
 
         return 'No Container found'
-

@@ -28,14 +28,14 @@ class CNCBaseFormView(FormView):
     snippet = ''
     # Head to show on the rendered dynamic form
     header = 'Pan-OS Utils'
-    # FIXME - where does this go again?
+    # title to show on dynamic form
     title = 'Title'
-    # the action of the form if it needs to differ
+    # where to go after this? once the form has been submitted, redirect to where?
+    next_url = 'provision'
+    # the action of the form if it needs to differ (it shouldn't)
     action = '/'
     # the app dir should match the app name and is used to load app specific snippets
     app_dir = 'pan_cnc'
-    # after the jinja context is fully populated, save it here for future use in the view
-    parsed_context = dict()
     # form_fields to render, you may not want to render all the variables given in the service variables list
     # only fields that appear in the list (or all fields if list is empty) will be rendered in the dynamic form
     fields_to_render = list()
@@ -181,6 +181,14 @@ class CNCBaseFormView(FormView):
 
         return dynamic_form
 
+    def form_valid(self, form):
+        """
+        Called once the form has been submitted
+        :param form: dynamic form
+        :return: rendered html response or redirect
+        """
+        return HttpResponseRedirect(self.next_url)
+
 
 class ChooseSnippetView(CNCBaseAuth, CNCBaseFormView):
     """
@@ -260,11 +268,11 @@ class ChooseSnippetView(CNCBaseAuth, CNCBaseFormView):
 
     def form_valid(self, form):
         """
-        Called when the simple demo form is submitted
-        :param form: SimpleDemoForm
-        :return: rendered html response
+        Called when the dynamic form is submitted
+        :param form: Dynamic form
+        :return: rendered html response or redirect
         """
-        return HttpResponseRedirect('provision')
+        return HttpResponseRedirect(self.next_url)
 
 
 class ProvisionSnippetView(CNCBaseAuth, CNCBaseFormView):
