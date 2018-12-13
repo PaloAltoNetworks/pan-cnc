@@ -4,9 +4,12 @@ import time
 
 import docker
 from docker.errors import ContainerError, DockerException
-# from urllib3.connection import HTTPException
+from docker.models.containers import Container
 
 from pan_cnc.lib.actions.AbstractAction import AbstractAction
+
+
+# from urllib3.connection import HTTPException
 
 
 class DockerAction(AbstractAction):
@@ -25,6 +28,7 @@ class DockerAction(AbstractAction):
         self._persistent_dir = '/tmp/cnc/'
         self._working_dir = '/cnc'
         self._environment = list().append('CNC=True')
+        self._container = ''
 
     @property
     def template_name(self) -> str:
@@ -102,14 +106,6 @@ class DockerAction(AbstractAction):
         self._working_dir = value
 
     @property
-    def working_dir(self):
-        return self._working_dir
-
-    @working_dir.setter
-    def working_dir(self, value):
-        self._working_dir = value
-
-    @property
     def environment(self) -> list:
         return self._environment
 
@@ -123,10 +119,21 @@ class DockerAction(AbstractAction):
         """
         self._environment = value
 
-    def execute_template(self, template):
-        """
-        """
+    @property
+    def container(self) -> Container:
+        return self._container
 
+    @container.setter
+    def container(self, value) -> None:
+        self._container = value
+
+    def create_file_in_persistent_dir(self, template_name, template):
+        """
+        Creates a file in the persistent dir using the supplied template as it's contents
+        :param template_name: full path to the file to create inside the docker container persistent directory
+        :param template: contents of the template/file to create
+        :return: boolean
+        """
         if not os.path.exists(self.persistent_dir):
             print('Creating docker volume dir')
             os.makedirs(self.persistent_dir)
@@ -143,6 +150,24 @@ class DockerAction(AbstractAction):
         instance_path = os.path.join(self.persistent_dir, self.storage_dir)
         print('Using instance_dir of: %s' % instance_path)
 
+        if not os.path.exists(instance_path):
+            os.makedirs(instance_path)
+
+        try:
+            # if a template was specified then write it out into the working directory
+            cleaned_template = template.replace('\r\n', '\n')
+            path = os.path.join(instance_path, template_name)
+            with open(path, 'w+') as f:
+                f.write(cleaned_template)
+
+        except OSError as oe:
+            print('Could not write file into docker container persistent dir')
+            return
+
+    def execute_template(self, template):
+        """
+        """
+
         if type(self.environment) is str:
             if self.environment == "":
                 env = ["CNC=True"]
@@ -156,27 +181,26 @@ class DockerAction(AbstractAction):
         else:
             env = ["CNC=True"]
 
+        if self.template_name != '':
+            self.create_file_in_persistent_dir(self.template_name, template)
+
         try:
-            if not os.path.exists(instance_path):
-                os.makedirs(instance_path)
-
-            # if a template was specified then write it out into the working directory
-            if self.template_name != '':
-                cleaned_template = template.replace('\r\n', '\n')
-                path = os.path.join(instance_path, self.template_name)
-                f = open(path, "w+")
-                f.write(cleaned_template)
-                f.flush()
-                time.sleep(.5)
-                f.close()
-
             client = docker.DockerClient(base_url=self.docker_url)
             # client = docker.DockerClient()
+            instance_path = os.path.join(self.persistent_dir, self.storage_dir)
             vols = {instance_path: {'bind': self.working_dir, 'mode': 'rw'}}
             print(vols)
-            return client.containers.run(self.docker_image, self.docker_cmd, volumes=vols,
-                                         working_dir=self.working_dir,
-                                         auto_remove=False, environment=env)
+            self.container = client.containers.run(self.docker_image, self.docker_cmd, volumes=vols,
+                                              working_dir=self.working_dir,
+                                              auto_remove=False, environment=env, detach=True)
+            timer = 1
+            while timer < 60:
+                time.sleep(1)
+                if self.container.status == 'exited':
+                    return self.container.logs()
+                timer += 1
+
+            return self.container.logs()
 
         except docker.errors.APIError as ae:
             print(ae)
@@ -194,30 +218,13 @@ class DockerAction(AbstractAction):
             print('Could not run container command')
             return str(rte)
 
-    def get_config_options(self):
-        return [
-            {
-                "label": "Image",
-                "name": "docker_image",
-                "type": "text",
-                "default": "alpine"
-            },
-            {
-                "label": "Command",
-                "name": "docker_cmd",
-                "type": "text",
-                "default": "ls /"
-            },
-            {
-                "label": "Template Name",
-                "name": "template_name",
-                "type": "text",
-                "default": "CNC_template"
-            },
-            {
-                "label": "Persistent Storage Dir",
-                "name": "storage_dir",
-                "type": "text",
-                "default": "unique_value"
-            }
-        ]
+    def get_output(self):
+        """
+        Returns the complete output of the container
+        :return:
+        """
+        if self.container != '':
+            return self.container.logs()
+
+        return 'No Container found'
+
