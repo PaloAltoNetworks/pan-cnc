@@ -94,8 +94,11 @@ for app_name in settings.INSTALLED_APPS_CONFIG:
                 attributes['app_dir'] = app_name
 
         print(f'Adding src app {app_name} and view: {view_name} to urlpatterns')
-        print(context)
-        new_path = path(f'{app_name}/{view_name}', class_object.as_view(**attributes), context)
+        if 'parameter' in v:
+            param = v['parameter']
+            new_path = path(f'{app_name}/{view_name}/<{param}>', class_object.as_view(**attributes), context)
+        else:
+            new_path = path(f'{app_name}/{view_name}', class_object.as_view(**attributes), context)
         urlpatterns += [new_path]
 
 # for app in settings.INSTALLED_APPS:

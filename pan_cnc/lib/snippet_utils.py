@@ -90,8 +90,6 @@ def load_snippet_with_name(snippet_name, app_dir):
 
 
 def render_snippet_template(service, app_dir, context):
-    snippets_dir = Path(os.path.join(settings.BASE_DIR, app_dir, 'snippets'))
-
     try:
         template_name = service['snippets'][0]['file']
 

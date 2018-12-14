@@ -15,6 +15,13 @@ class CNCBaseAuth(LoginRequiredMixin):
 
 class CNCView(CNCBaseAuth, TemplateView):
     template_name = "pan_cnc/index.html"
+    # base html - allow sub apps to override this with special html base if desired
+    base_html = 'pan_cnc/base.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['base_html'] = self.base_html
+        return context
 
 
 class CNCBaseFormView(FormView):
@@ -51,8 +58,6 @@ class CNCBaseFormView(FormView):
         return self.snippet
 
     def get_context_data(self, **kwargs) -> dict:
-        print('GETTING CONTEXT DATA')
-        print(kwargs)
         context = super().get_context_data(**kwargs)
         form = self.generate_dynamic_form()
         context['form'] = form
@@ -192,7 +197,6 @@ class CNCBaseFormView(FormView):
 
 class ChooseSnippetView(CNCBaseAuth, CNCBaseFormView):
     """
-    /mssp/configure
 
     Allows the user to choose which snippet to load, configure, and provision based on a dropdown list of snippets
     with a certain label
@@ -208,7 +212,7 @@ class ChooseSnippetView(CNCBaseAuth, CNCBaseFormView):
             3. Add at least one configuration snippet with the appropriate label
             4. Create a URL entry in urls.py
                         path('configure', ChooseSnippetView.as_view(snippet='user_id_config)),
-            5. Optional - add a menu entry in the templates/mssp/base.html file
+            5. Optional - add a menu entry in the templates/pan_cnc/base.html file
 
     """
     snippet = 'cnc-conf'
@@ -289,6 +293,7 @@ class ProvisionSnippetView(CNCBaseAuth, CNCBaseFormView):
     def get_snippet(self):
         print('Getting snippet here in get_snippet')
         if 'snippet_name' in self.request.POST:
+            print('FOUND IT')
             return self.request.POST['snippet_name']
 
         elif self.app_dir in self.request.session:
@@ -319,13 +324,13 @@ class ProvisionSnippetView(CNCBaseAuth, CNCBaseFormView):
             template = snippet_utils.render_snippet_template(self.service, self.app_dir, self.get_workflow())
             context = dict()
             context['results'] = template
-            return render(self.request, 'mssp/results.html', context)
+            return render(self.request, 'pan_cnc/results.html', context)
 
         login = pan_utils.panorama_login()
         if login is None:
             context = dict()
             context['error'] = 'Could not login to Panorama'
-            return render(self.request, 'mssp/error.html', context=context)
+            return render(self.request, 'pan_cnc/error.html', context=context)
 
         # let's grab the current workflow values (values saved from ALL forms in this app
         jinja_context = self.get_workflow()
