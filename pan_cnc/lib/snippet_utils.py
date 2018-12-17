@@ -104,3 +104,33 @@ def render_snippet_template(service, app_dir, context):
         print('Caught an error deploying service')
         return None
 
+
+def resolve_dependencies(snippet, app_dir, dependencies):
+    """
+    Takes a snippet object and resolved all dependencies. Will return a list of dependencies
+
+    all_deps = snippet_utils.resolve_dependencies(snippet_object, 'app_nane', [])
+
+    :param snippet: OrderedDict Snippet Metadata
+    :param app_dir: directory in which to load all snippets
+    :param dependencies: found list of names of snippets on which this snippet depends
+    :return: list of names upon which this snippet is dependent. Each item in the list has a dependency on the item
+    that immediately after it in the list.
+    """
+
+    print('Resovling dependencies for snippet: %s' % snippet)
+    if dependencies is None or type(dependencies) is not list:
+        dependencies = list()
+
+    if 'extends' in snippet and snippet['extends'] is not None:
+        parent_snippet_name = snippet['extends']
+        print(parent_snippet_name)
+        if parent_snippet_name not in dependencies:
+            dependencies.append(parent_snippet_name)
+            parent_snippet = load_snippet_with_name(snippet['extends'], app_dir)
+            # inception time
+            return resolve_dependencies(parent_snippet, app_dir, dependencies)
+
+    # always reverse the list as we need to walk this list from deep to shallow
+    dependencies.reverse()
+    return dependencies

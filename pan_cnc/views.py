@@ -334,10 +334,9 @@ class ProvisionSnippetView(CNCBaseAuth, CNCBaseFormView):
 
         # let's grab the current workflow values (values saved from ALL forms in this app
         jinja_context = self.get_workflow()
-        # check if we need to ensure a baseline exists before hand
-        if 'extends' in self.service and self.service['extends'] is not None:
+        dependencies = snippet_utils.resolve_dependencies(self.service, self.app_dir, [])
+        for baseline in dependencies:
             # prego (it's in there)
-            baseline = self.service['extends']
             baseline_service = snippet_utils.load_snippet_with_name(baseline, self.app_dir)
             # FIX for https://github.com/nembery/vistoq2/issues/5
             if 'variables' in baseline_service and type(baseline_service['variables']) is list:
