@@ -42,3 +42,10 @@ def load_panrc():
     except Exception as msg:
         print(msg)
 
+
+def get_cached_value(key):
+    return cache.get(key)
+
+
+def set_cached_value(key, val):
+    cache.set(key, val)

@@ -53,9 +53,20 @@ class CNCBaseFormView(FormView):
     # base html - allow sub apps to override this with special html base if desired
     base_html = 'pan_cnc/base.html'
 
-    def get_snippet(self) -> str:
-        print('returning snippet name: %s' % self.snippet)
-        return self.snippet
+    def get_snippet(self):
+        print('Getting snippet here in get_snippet')
+        if 'snippet_name' in self.request.POST:
+            print('found it in the POST')
+            return self.request.POST['snippet_name']
+
+        elif self.app_dir in self.request.session:
+            session_cache = self.request.session[self.app_dir]
+            if 'snippet_name' in session_cache:
+                print('returning snippet name: %s' % session_cache['snippet_name'])
+                return session_cache['snippet_name']
+        else:
+            print('no snippet to be found')
+            return self.snippet
 
     def get_context_data(self, **kwargs) -> dict:
         context = super().get_context_data(**kwargs)
@@ -63,7 +74,6 @@ class CNCBaseFormView(FormView):
         context['form'] = form
         context['header'] = self.header
         context['title'] = self.title
-
         context['base_html'] = self.base_html
 
         return context
@@ -72,7 +82,9 @@ class CNCBaseFormView(FormView):
         """Handle GET requests: instantiate a blank version of the form."""
         # load the snippet into the class attribute here so it's available to all other methods throughout the
         # call chain in the child classes
-        self.service = snippet_utils.load_snippet_with_name(self.get_snippet(), self.app_dir)
+        snippet = self.get_snippet()
+        if snippet != '':
+            self.service = snippet_utils.load_snippet_with_name(snippet, self.app_dir)
         return self.render_to_response(self.get_context_data())
 
     def post(self, request, *args, **kwargs) -> Any:
@@ -144,7 +156,12 @@ class CNCBaseFormView(FormView):
 
         # Get all of the variables defined in the self.service
         for variable in self.service['variables']:
-            if len(self.fields_to_render) != 0:
+            if len(self.fields_to_filter) != 0:
+                if variable['name'] in self.fields_to_filter:
+                    print('Skipping render of variable %s' % variable['name'])
+                    continue
+
+            elif len(self.fields_to_render) != 0:
                 print(self.fields_to_render)
                 if variable['name'] not in self.fields_to_render:
                     print('Skipping render of variable %s' % variable['name'])
@@ -163,15 +180,15 @@ class CNCBaseFormView(FormView):
                 for item in dd_list:
                     choice = (item['value'], item['key'])
                     choices_list.append(choice)
-                dynamic_form.fields[field_name] = forms.ChoiceField(choices=tuple(choices_list))
+                dynamic_form.fields[field_name] = forms.ChoiceField(choices=tuple(choices_list), label=description)
             elif type_hint == "text_area":
-                dynamic_form.fields[field_name] = forms.CharField(widget=forms.Textarea)
+                dynamic_form.fields[field_name] = forms.CharField(widget=forms.Textarea, label=description)
             elif type_hint == "email":
-                dynamic_form.fields[field_name] = forms.CharField(widget=forms.EmailInput)
+                dynamic_form.fields[field_name] = forms.CharField(widget=forms.EmailInput, label=description)
             elif type_hint == "number":
-                dynamic_form.fields[field_name] = forms.CharField(widget=forms.NumberInput)
+                dynamic_form.fields[field_name] = forms.CharField(widget=forms.NumberInput, label=description)
             elif type_hint == "ip":
-                dynamic_form.fields[field_name] = forms.GenericIPAddressField()
+                dynamic_form.fields[field_name] = forms.GenericIPAddressField(label=description)
             elif type_hint == "password":
                 dynamic_form.fields[field_name] = forms.CharField(widget=forms.PasswordInput)
             elif type_hint == "radio" and "rad_list":
@@ -180,7 +197,8 @@ class CNCBaseFormView(FormView):
                 for item in rad_list:
                     choice = (item['value'], item['key'])
                     choices_list.append(choice)
-                dynamic_form.fields[field_name] = forms.ChoiceField(widget=forms.RadioSelect, choices=choices_list)
+                dynamic_form.fields[field_name] = forms.ChoiceField(widget=forms.RadioSelect, choices=choices_list,
+                                                                    label=description)
             else:
                 dynamic_form.fields[field_name] = forms.CharField(label=description, initial=default)
 
@@ -269,6 +287,70 @@ class ChooseSnippetView(CNCBaseAuth, CNCBaseFormView):
 
         context['form'] = form
         return context
+
+    def form_valid(self, form):
+        """
+        Called when the dynamic form is submitted
+        :param form: Dynamic form
+        :return: rendered html response or redirect
+        """
+        return HttpResponseRedirect(self.next_url)
+
+
+class ChooseSnippetByLabelView(CNCBaseAuth, CNCBaseFormView):
+    label_name = ''
+    label_value = ''
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+
+        if self.label_name == '' or self.label_value == '':
+            print('No Labels to use to filter!')
+            return context
+
+        services = snippet_utils.load_snippets_by_label(self.label_name, self.label_value, self.app_dir)
+
+        form = context['form']
+
+        # we need to construct a new ChoiceField with the following basic format
+        # snippet_name = forms.ChoiceField(choices=(('gold', 'Gold'), ('silver', 'Silver'), ('bronze', 'Bronze')))
+        choices_list = list()
+        # grab each service and construct a simple tuple with name and label, append to the list
+        for service in services:
+            choice = (service['name'], service['label'])
+            choices_list.append(choice)
+
+        # let's sort the list by the label attribute (index 1 in the tuple)
+        choices_list = sorted(choices_list, key=lambda k: k[1])
+        # convert our list of tuples into a tuple itself
+        choices_set = tuple(choices_list)
+        # make our new field
+        new_choices_field = forms.ChoiceField(choices=choices_set)
+        # set it on the original form, overwriting the hardcoded GSB version
+
+        form.fields['snippet_name'] = new_choices_field
+
+        context['form'] = form
+        return context
+
+    def post(self, request, *args, **kwargs) -> Any:
+        form = self.get_form()
+
+        if form.is_valid():
+            if self.app_dir in self.request.session:
+                current_workflow = self.request.session[self.app_dir]
+            else:
+                current_workflow = dict()
+
+            if 'snippet_name' in self.request.POST:
+                print('Adding snippet_name')
+                current_workflow['snippet_name'] = self.request.POST.get('snippet_name')
+
+            self.request.session[self.app_dir] = current_workflow
+
+            return self.form_valid(form)
+        else:
+            return self.form_invalid(form)
 
     def form_valid(self, form):
         """

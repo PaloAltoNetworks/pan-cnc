@@ -200,7 +200,9 @@ class DockerAction(AbstractAction):
                 print('Checking for output')
                 print(self.container.status)
                 if self.container.status == 'exited':
-                    return self.container.logs()
+                    logs = self.container.logs().decode("utf-8")
+                    self.container.remove()
+                    return logs
                 timer += 1
 
             return self.container.logs()

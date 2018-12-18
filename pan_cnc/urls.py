@@ -25,18 +25,20 @@ from django.views.generic import TemplateView
 app_settings = settings.INSTALLED_APPS_CONFIG
 
 urlpatterns = [
-    path('', TemplateView.as_view(template_name='pan_cnc/welcome.html'), {'app_settings': app_settings}),
     path('login', auth_views.LoginView.as_view(template_name='pan_cnc/login.html'), name='login'),
     path('logout', auth_views.LogoutView.as_view(next_page='login')),
 ]
 
 print('Configuring URLs for installed apps')
 
+indx = 0
+
 for app_name in settings.INSTALLED_APPS_CONFIG:
     app = settings.INSTALLED_APPS_CONFIG[app_name]
     if 'views' not in app:
         print('Skipping app: %s with no views configured' % app_name)
         continue
+
     for v in app['views']:
         if 'class' not in v or 'name' not in v:
             print('Skipping view with no class configured!')
@@ -99,7 +101,14 @@ for app_name in settings.INSTALLED_APPS_CONFIG:
             new_path = path(f'{app_name}/{view_name}/<{param}>', class_object.as_view(**attributes), context)
         else:
             new_path = path(f'{app_name}/{view_name}', class_object.as_view(**attributes), context)
+
+        # If this is the first app defined and the view_name is '', then add the home page entry here
+        if view_name == '' and indx == 0:
+            home_path = path('', class_object.as_view(**attributes), context)
+            urlpatterns += [home_path]
+
         urlpatterns += [new_path]
+        indx += 1
 
 # for app in settings.INSTALLED_APPS:
 #     app_dir = os.path.join(settings.SRC_PATH, app)
