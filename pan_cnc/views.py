@@ -466,7 +466,7 @@ class ProvisionSnippetView(CNCBaseAuth, CNCBaseFormView):
 
         # Always grab all the default values, then update them based on user input in the workflow
         jinja_context = dict()
-        if 'variables' in self.service and type(self.service) is dict:
+        if 'variables' in self.service and type(self.service['variables']) is list:
             for snippet_var in self.service['variables']:
                 jinja_context[snippet_var['name']] = snippet_var['default']
 
