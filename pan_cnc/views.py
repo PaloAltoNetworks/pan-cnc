@@ -25,33 +25,80 @@ class CNCView(CNCBaseAuth, TemplateView):
 
 
 class CNCBaseFormView(FormView):
+    """
+    Base class for most CNC view functions. Will find a 'snippet' from either the POST or the session cache
+    and load it into a 'service' attribute.
+    GET will create a dynamic form based on the loaded snippet
+    POST will save all user input into the session and redirect to next_url
+
+    Variables defined in __init__ are instance specific variables while variables defined immedately preceeding
+    this docstring are class specific variables and will be shared with child classes
+
+    """
     # base form class, you should not need to override this
     form_class = forms.Form
     # form to render, override if you need a specific html fragment to render the form
     template_name = 'pan_cnc/dynamic_form.html'
-    # where to forward after we've successfully acted on the submitted form data
-    success_url = '/'
-    # name of the snippet to load and use as the basis for the dynamic form
-    snippet = ''
-    # Head to show on the rendered dynamic form
+    # Head to show on the rendered dynamic form - Main header
     header = 'Pan-OS Utils'
     # title to show on dynamic form
     title = 'Title'
     # where to go after this? once the form has been submitted, redirect to where?
+    # this should match a 'view name' from the pan_cnc.yaml file
     next_url = 'provision'
     # the action of the form if it needs to differ (it shouldn't)
     action = '/'
     # the app dir should match the app name and is used to load app specific snippets
     app_dir = 'pan_cnc'
-    # form_fields to render, you may not want to render all the variables given in the service variables list
-    # only fields that appear in the list (or all fields if list is empty) will be rendered in the dynamic form
-    fields_to_render = list()
-    # form fields to NOT render
-    fields_to_filter = list()
-    # loaded snippet
-    service = dict()
     # base html - allow sub apps to override this with special html base if desired
     base_html = 'pan_cnc/base.html'
+
+    def __init__(self, **kwargs):
+        # fields to render and fields to filter should never be shared to child classes
+        # list of fields to NOT render in this instance
+        self._fields_to_filter = list()
+        # list of fields to ONLY render in this instance - only eval'd if fields_to_filter is blank or []
+        self._fields_to_render = list()
+
+        # currently loaded service should also never be shared
+        self._service = dict()
+        # name of the snippet to find and load into the service
+        self._snippet = ''
+        # call the super
+        super().__init__(**kwargs)
+
+    @property
+    def fields_to_render(self) -> list:
+        return self._fields_to_render
+
+    @fields_to_render.setter
+    def fields_to_render(self, value):
+        self._fields_to_render = value
+
+    @property
+    def fields_to_filter(self):
+        return self._fields_to_filter
+
+    @fields_to_filter.setter
+    def fields_to_filter(self, value):
+        self._fields_to_filter = value
+
+    @property
+    def service(self):
+        return self._service
+
+    @service.setter
+    def service(self, value):
+        self._service = value
+
+    @property
+    def snippet(self):
+        return self._snippet
+
+    @snippet.setter
+    def snippet(self, value):
+        self._snippet = value
+
 
     def get_snippet(self):
         print('Getting snippet here in get_snippet')
@@ -301,6 +348,10 @@ class ChooseSnippetByLabelView(CNCBaseAuth, CNCBaseFormView):
     label_name = ''
     label_value = ''
 
+    # always set a new blank snippet here
+    def get_snippet(self):
+        return ''
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
 
@@ -373,18 +424,18 @@ class ProvisionSnippetView(CNCBaseAuth, CNCBaseFormView):
     app_dir = 'pan_cnc'
 
     def get_snippet(self):
-        print('Getting snippet here in get_snippet')
+        print('Getting snippet here in ProvisionSnippetView:get_snippet')
         if 'snippet_name' in self.request.POST:
-            print('FOUND IT')
+            print('found snippet in post')
             return self.request.POST['snippet_name']
 
         elif self.app_dir in self.request.session:
             session_cache = self.request.session[self.app_dir]
             if 'snippet_name' in session_cache:
-                print('returning snippet name: %s' % session_cache['snippet_name'])
+                print('returning snippet name: %s from session cache' % session_cache['snippet_name'])
                 return session_cache['snippet_name']
         else:
-            print('what happened here?')
+            print('snippet is not set in ProvisionSnippetView:get_snippet')
             return self.snippet
 
     def form_valid(self, form):
@@ -447,3 +498,4 @@ class ProvisionSnippetView(CNCBaseAuth, CNCBaseFormView):
         #     print('This service was already configured on the server')
 
         return super().form_valid(form)
+
