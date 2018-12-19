@@ -99,7 +99,6 @@ class CNCBaseFormView(FormView):
     def snippet(self, value):
         self._snippet = value
 
-
     def get_snippet(self):
         print('Getting snippet here in get_snippet')
         if 'snippet_name' in self.request.POST:
@@ -465,8 +464,14 @@ class ProvisionSnippetView(CNCBaseAuth, CNCBaseFormView):
             context['error'] = 'Could not login to Panorama'
             return render(self.request, 'pan_cnc/error.html', context=context)
 
+        # Always grab all the default values, then update them based on user input in the workflow
+        jinja_context = dict()
+        if 'variables' in self.service and type(self.service) is dict:
+            for snippet_var in self.service['variables']:
+                jinja_context[snippet_var['name']] = snippet_var['default']
+
         # let's grab the current workflow values (values saved from ALL forms in this app
-        jinja_context = self.get_workflow()
+        jinja_context.update(self.get_workflow())
         dependencies = snippet_utils.resolve_dependencies(self.service, self.app_dir, [])
         for baseline in dependencies:
             # prego (it's in there)
