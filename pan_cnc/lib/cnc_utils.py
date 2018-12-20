@@ -1,7 +1,74 @@
 from django.core.cache import cache
-from django.conf import settings
+
 import os
 import re
+import pyAesCrypt
+import pickle
+import io
+
+
+def load_user_secrets(user_id, passphrase):
+
+    secret_dir = '/var/tmp/.pan_cnc'
+    file_path = os.path.join(secret_dir, user_id)
+
+    buffer_size = 64 * 1024
+
+    secret_input = ''
+    with open(file_path, 'rb') as fps:
+        secret_input = io.BytesIO(fps.read())
+
+    # initialize decrypted binary stream
+    secret_output = io.BytesIO()
+
+    # get ciphertext length
+    secret_len = len(secret_input.getvalue())
+
+    # go back to the start of the ciphertext stream
+    secret_input.seek(0)
+
+    try:
+        # decrypt stream
+        pyAesCrypt.decryptStream(secret_input, secret_output, passphrase, buffer_size, secret_len)
+    except ValueError as ve:
+        print(ve)
+        print('Incorrect Passphrase')
+        return None
+
+    # print decrypted data
+    secret_pickle = secret_output.getvalue()
+    secret_dict = pickle.loads(secret_pickle)
+    return secret_dict
+
+
+def save_user_secrets(user_id, secret_dict, passphrase):
+
+    secret_dir = '/var/tmp/.pan_cnc'
+    if not os.path.isdir(secret_dir):
+        os.mkdir(secret_dir)
+
+    file_path = os.path.join(secret_dir, user_id)
+    print(secret_dict)
+    pickled_data = pickle.dumps(secret_dict)
+    print(pickled_data)
+    buffer_size = 64 * 1024
+
+    # input plaintext binary stream
+    secret_input_stream = io.BytesIO(pickled_data)
+
+    # initialize ciphertext binary stream
+    secret_output_stream = io.BytesIO()
+
+    # encrypt stream
+    pyAesCrypt.encryptStream(secret_input_stream, secret_output_stream, passphrase, buffer_size)
+
+    encrypted_stuff = secret_output_stream.getvalue()
+    secret_output_stream.seek(0)
+
+    with open(file_path, 'wb+') as fps:
+        fps.write(secret_output_stream.getvalue())
+
+    return None
 
 
 def get_config_value(config_key, default=None):
