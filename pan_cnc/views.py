@@ -1,12 +1,13 @@
-from django import forms
-from django.contrib.auth.mixins import LoginRequiredMixin
-from django.views.generic import TemplateView
-from django.views.generic.edit import FormView
-from django.shortcuts import render, HttpResponseRedirect
 from typing import Any
 
-from pan_cnc.lib import snippet_utils
+from django import forms
+from django.contrib.auth.mixins import LoginRequiredMixin
+from django.shortcuts import render, HttpResponseRedirect
+from django.views.generic import TemplateView
+from django.views.generic.edit import FormView
+
 from pan_cnc.lib import pan_utils
+from pan_cnc.lib import snippet_utils
 
 
 class CNCBaseAuth(LoginRequiredMixin):
@@ -226,15 +227,17 @@ class CNCBaseFormView(FormView):
                 for item in dd_list:
                     choice = (item['value'], item['key'])
                     choices_list.append(choice)
-                dynamic_form.fields[field_name] = forms.ChoiceField(choices=tuple(choices_list), label=description)
+                dynamic_form.fields[field_name] = forms.ChoiceField(choices=tuple(choices_list), label=description,
+                                                                    initial=default)
             elif type_hint == "text_area":
-                dynamic_form.fields[field_name] = forms.CharField(widget=forms.Textarea, label=description)
+                dynamic_form.fields[field_name] = forms.CharField(widget=forms.Textarea, label=description,
+                                                                  initial=default)
             elif type_hint == "email":
-                dynamic_form.fields[field_name] = forms.CharField(widget=forms.EmailInput, label=description)
+                dynamic_form.fields[field_name] = forms.CharField(widget=forms.EmailInput, label=description,
+                                                                  initial=default)
             elif type_hint == "number":
-                dynamic_form.fields[field_name] = forms.CharField(widget=forms.NumberInput, label=description)
-            elif type_hint == "ip":
-                dynamic_form.fields[field_name] = forms.GenericIPAddressField(label=description)
+                dynamic_form.fields[field_name] = forms.GenericIPAddressField(label=description,
+                                                                              initial=default)
             elif type_hint == "password":
                 dynamic_form.fields[field_name] = forms.CharField(widget=forms.PasswordInput)
             elif type_hint == "radio" and "rad_list":
@@ -244,7 +247,7 @@ class CNCBaseFormView(FormView):
                     choice = (item['value'], item['key'])
                     choices_list.append(choice)
                 dynamic_form.fields[field_name] = forms.ChoiceField(widget=forms.RadioSelect, choices=choices_list,
-                                                                    label=description)
+                                                                    label=description, initial=default)
             else:
                 dynamic_form.fields[field_name] = forms.CharField(label=description, initial=default)
 
@@ -259,108 +262,21 @@ class CNCBaseFormView(FormView):
         return HttpResponseRedirect(self.next_url)
 
 
-class ChooseSnippetView(CNCBaseAuth, CNCBaseFormView):
-    """
-
-    Allows the user to choose which snippet to load, configure, and provision based on a dropdown list of snippets
-    with a certain label
-
-    The fields to configure are defined in the snippet given in the 'snippet' attribute
-
-    The list of snippets to choose from are defined by the 'customize_field', 'customize_label_name' and
-    'customize_label_value' labels on the snippet YAML.
-
-    For example: To present a list of snippets to configure user-id on panorama
-            1. create the initial configuration snippet with whatever values we need there
-            2. add the required labels: customize_field, customize_label_name, customize_label_value
-            3. Add at least one configuration snippet with the appropriate label
-            4. Create a URL entry in urls.py
-                        path('configure', ChooseSnippetView.as_view(snippet='user_id_config)),
-            5. Optional - add a menu entry in the templates/pan_cnc/base.html file
-
-    """
-    snippet = 'cnc-conf'
-    header = 'Provision Service'
-    title = 'Configure Service Sales information'
-    app_dir = 'pan_cnc'
-
-    def get_context_data(self, **kwargs):
-        """
-        Override get_context_data so we can modify the SimpleDemoForm as necessary.
-        We want to dynamically add all the snippets in the snippets dir as choice fields on the form
-        :param kwargs:
-        :return:
-        """
-
-        context = super().get_context_data(**kwargs)
-
-        if self.service is None:
-            print('Still no service around')
-            return context
-
-        if 'labels' in self.service and 'customize_field' in self.service['labels']:
-            labels = self.service['labels']
-            if not {'customize_label_name', 'customize_label_value'}.issubset(labels):
-                print('Malformed Configure Service Picker!')
-
-            custom_field = labels['customize_field']
-            label_name = labels['customize_label_name']
-            label_value = labels['customize_label_value']
-            services = snippet_utils.load_snippets_by_label(label_name, label_value, self.app_dir)
-        else:
-            custom_field = 'snippet_name'
-            services = snippet_utils.load_snippets_of_type('service', self.app_dir)
-
-        form = context['form']
-
-        # we need to construct a new ChoiceField with the following basic format
-        # snippet_name = forms.ChoiceField(choices=(('gold', 'Gold'), ('silver', 'Silver'), ('bronze', 'Bronze')))
-        choices_list = list()
-        # grab each service and construct a simple tuple with name and label, append to the list
-        for service in services:
-            choice = (service['name'], service['label'])
-            choices_list.append(choice)
-
-        # let's sort the list by the label attribute (index 1 in the tuple)
-        choices_list = sorted(choices_list, key=lambda k: k[1])
-        # convert our list of tuples into a tuple itself
-        choices_set = tuple(choices_list)
-        # make our new field
-        new_choices_field = forms.ChoiceField(choices=choices_set)
-        # set it on the original form, overwriting the hardcoded GSB version
-
-        form.fields[custom_field] = new_choices_field
-
-        context['form'] = form
-        return context
-
-    def form_valid(self, form):
-        """
-        Called when the dynamic form is submitted
-        :param form: Dynamic form
-        :return: rendered html response or redirect
-        """
-        return HttpResponseRedirect(self.next_url)
-
-
 class ChooseSnippetByLabelView(CNCBaseAuth, CNCBaseFormView):
     label_name = ''
     label_value = ''
 
-    # always set a new blank snippet here
-    def get_snippet(self):
+    def get_snippet(self) -> str:
         return ''
 
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
+    def generate_dynamic_form(self):
 
+        form = forms.Form()
         if self.label_name == '' or self.label_value == '':
             print('No Labels to use to filter!')
-            return context
+            return form
 
         services = snippet_utils.load_snippets_by_label(self.label_name, self.label_value, self.app_dir)
-
-        form = context['form']
 
         # we need to construct a new ChoiceField with the following basic format
         # snippet_name = forms.ChoiceField(choices=(('gold', 'Gold'), ('silver', 'Silver'), ('bronze', 'Bronze')))
@@ -380,10 +296,17 @@ class ChooseSnippetByLabelView(CNCBaseAuth, CNCBaseFormView):
 
         form.fields['snippet_name'] = new_choices_field
 
-        context['form'] = form
-        return context
+        return form
 
     def post(self, request, *args, **kwargs) -> Any:
+        """
+        Parent class assumes a snippet has been loaded as a service already and uses that to capture all user input
+        In most cases, a snippet chooser may not
+        :param request:
+        :param args:
+        :param kwargs:
+        :return:
+        """
         form = self.get_form()
 
         if form.is_valid():
@@ -402,13 +325,52 @@ class ChooseSnippetByLabelView(CNCBaseAuth, CNCBaseFormView):
         else:
             return self.form_invalid(form)
 
-    def form_valid(self, form):
-        """
-        Called when the dynamic form is submitted
-        :param form: Dynamic form
-        :return: rendered html response or redirect
-        """
-        return HttpResponseRedirect(self.next_url)
+
+class ChooseSnippetView(CNCBaseAuth, CNCBaseFormView):
+    snippet = ''
+
+    def get_snippet(self):
+        return self.snippet
+
+    def generate_dynamic_form(self):
+        print('here we go')
+        form = super().generate_dynamic_form()
+        if self.service is None:
+            print('Still no service around')
+            return form
+
+        if 'labels' in self.service and 'customize_field' in self.service['labels']:
+            labels = self.service['labels']
+            if not {'customize_label_name', 'customize_label_value'}.issubset(labels):
+                print('Malformed Configure Service Picker!')
+
+            custom_field = labels['customize_field']
+            label_name = labels['customize_label_name']
+            label_value = labels['customize_label_value']
+            services = snippet_utils.load_snippets_by_label(label_name, label_value, self.app_dir)
+        else:
+            custom_field = 'snippet_name'
+            services = snippet_utils.load_snippets_of_type('service', self.app_dir)
+
+        # we need to construct a new ChoiceField with the following basic format
+        # snippet_name = forms.ChoiceField(choices=(('gold', 'Gold'), ('silver', 'Silver'), ('bronze', 'Bronze')))
+        choices_list = list()
+        # grab each service and construct a simple tuple with name and label, append to the list
+        for service in services:
+            choice = (service['name'], service['label'])
+            choices_list.append(choice)
+
+        # let's sort the list by the label attribute (index 1 in the tuple)
+        choices_list = sorted(choices_list, key=lambda k: k[1])
+        # convert our list of tuples into a tuple itself
+        choices_set = tuple(choices_list)
+        # make our new field
+        new_choices_field = forms.ChoiceField(choices=choices_set)
+        # set it on the original form, overwriting the hardcoded GSB version
+
+        form.fields[custom_field] = new_choices_field
+
+        return form
 
 
 class ProvisionSnippetView(CNCBaseAuth, CNCBaseFormView):
@@ -420,7 +382,6 @@ class ProvisionSnippetView(CNCBaseAuth, CNCBaseFormView):
     snippet = ''
     header = 'Provision Service'
     title = 'Configure Service Sales information'
-    app_dir = 'pan_cnc'
 
     def get_snippet(self):
         print('Getting snippet here in ProvisionSnippetView:get_snippet')
@@ -503,4 +464,3 @@ class ProvisionSnippetView(CNCBaseAuth, CNCBaseFormView):
         #     print('This service was already configured on the server')
 
         return super().form_valid(form)
-
