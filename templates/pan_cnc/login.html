@@ -27,13 +27,18 @@
 
                     {% if next %}
                     {% if user.is_authenticated %}
-                    <p>Your account doesn't have access to this page. To proceed,
-                        please login with an account that has access.</p>
+                    <div class="alert alert-dismissible alert-danger shadow-lg mb-5">
+                        <button type="button" class="close" data-dismiss="alert">&times;</button>
+                       Your account doesn't have access to this page. To proceed,
+                        please login with an account that has access.
+                    </div>
                     {% else %}
-                    <p>Please login to see this page.</p>
+                     <div class="alert alert-dismissible alert-danger shadow-lg mb-5">
+                        <button type="button" class="close" data-dismiss="alert">&times;</button>
+                         Please login to see this page.
+                     </div>
                     {% endif %}
                     {% endif %}
-
                     <div class="card border-secondary mb-1 shadow-lg rounded">
                         <div class="card-header bg-secondary text-white">Login</div>
                         <div class="card-body">

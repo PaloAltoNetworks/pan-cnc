@@ -3,9 +3,21 @@
 
 {% block content %}
 <div class="card border-primary mb-6">
-    <div class="card-header">Results</div>
+    <div class="card-header">
+        {% if header %}
+        {{ header }}
+        {% else %}
+        Results
+        {% endif %}
+    </div>
     <div class="card-body">
-        <h4 class="card-title">Raw Results</h4>
+        <h4 class="card-title">
+            {% if title %}
+            {{ title }}
+            {% else %}
+            Output
+            {% endif %}
+        </h4>
         <p class="card-text"><pre>{{ results }}</pre></p>
     </div>
 </div>

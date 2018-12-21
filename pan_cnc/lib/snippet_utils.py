@@ -1,6 +1,7 @@
 import oyaml
 import os
 from django.conf import settings
+from django.core.cache import cache
 from pathlib import Path
 from jinja2 import Environment
 from jinja2.loaders import BaseLoader
@@ -28,8 +29,15 @@ def load_template_snippets():
 
 
 def load_all_snippets(app_dir):
-    services = load_snippets_of_type(snippet_type=None, app_dir=app_dir)
-    return services
+    # cache and keep all snippets when type == none
+    if cache.has_key('all_snippets'):
+        snippet_list = cache.get('all_snippets', []) 
+        if snippet_list:
+            return snippet_list
+    
+    snippet_list = load_snippets_of_type(snippet_type=None, app_dir=app_dir)
+    cache.set('all_snippets', snippet_list)
+    return snippet_list
 
 
 def load_snippets_by_label(label_name, label_value, app_dir):
@@ -50,8 +58,10 @@ def load_snippets_of_type(snippet_type=None, app_dir=None):
     :param app_dir: name of the app to load the snippets from
     :return: list of snippet dicts
     """
+ 
+    snippet_list = list() 
+   
     snippets_dir = Path(os.path.join(settings.SRC_PATH, app_dir, 'snippets'))
-    services = list()
     for d in snippets_dir.rglob('./*'):
         mdf = os.path.join(d, 'metadata.yaml')
         if os.path.isfile(mdf):
@@ -62,16 +72,16 @@ def load_snippets_of_type(snippet_type=None, app_dir=None):
                     service_config['snippet_path'] = snippet_path
                     if snippet_type is not None:
                         if 'type' in service_config and service_config['type'] == snippet_type:
-                            services.append(service_config)
+                            snippet_list.append(service_config)
                     else:
-                        services.append(service_config)
+                        snippet_list.append(service_config)
 
             except IOError as ioe:
                 print('Could not open metadata file in dir %s' % mdf)
                 print(ioe)
                 continue
 
-    return services
+    return snippet_list
 
 
 def load_snippet_with_name(snippet_name, app_dir):
@@ -86,6 +96,30 @@ def load_snippet_with_name(snippet_name, app_dir):
             return service
 
     print('Could not find service with name: %s' % snippet_name)
+    return None
+
+
+def get_snippet_metadata(snippet_name, app_dir):
+    """
+    Returns the snippet metadata as a str
+    :param snippet_name: name of the snippet
+    :param app_dir: current app
+    :return: str of metadata.yaml file
+    """
+    snippets_dir = Path(os.path.join(settings.SRC_PATH, app_dir, 'snippets'))
+    for d in snippets_dir.rglob('./*'):
+        mdf = os.path.join(d, 'metadata.yaml')
+        if os.path.isfile(mdf):
+            snippet_path = os.path.dirname(mdf)
+            print(f'Found {snippet_name} at {snippet_path}')
+            try:
+                with open(mdf, 'r') as sc:
+                    return sc.read()
+            except IOError as ioe:
+                print('Could not open metadata file in dir %s' % mdf)
+                print(ioe)
+                return None
+
     return None
 
 

@@ -19,7 +19,7 @@ import importlib
 from django.conf import settings
 from django.contrib.auth import views as auth_views
 from django.urls import path
-from django.views.generic import TemplateView
+from pan_cnc import views as pan_cnc_views
 
 # ensure every view gets this in the context, even django default views
 app_settings = settings.INSTALLED_APPS_CONFIG
@@ -27,6 +27,14 @@ app_settings = settings.INSTALLED_APPS_CONFIG
 urlpatterns = [
     path('login', auth_views.LoginView.as_view(template_name='pan_cnc/login.html'), name='login'),
     path('logout', auth_views.LogoutView.as_view(next_page='login')),
+    path('list_envs', pan_cnc_views.ListEnvironmentsView.as_view()),
+    path('load_env/<env_name>', pan_cnc_views.LoadEnvironmentView.as_view()),
+    path('edit_env/<env_name>', pan_cnc_views.EditEnvironmentsView.as_view()),
+    path('create_env', pan_cnc_views.CreateEnvironmentsView.as_view()),
+    path('clone_env/<clone>', pan_cnc_views.CreateEnvironmentsView.as_view()),
+    path('delete_env/<env_name>', pan_cnc_views.DeleteEnvironmentView.as_view()),
+    path('unlock_envs', pan_cnc_views.UnlockEnvironmentsView.as_view()),
+    path('debug/<app_dir>/<snippet_name>', pan_cnc_views.DebugMetadataView.as_view())
 ]
 
 print('Configuring URLs for installed apps')

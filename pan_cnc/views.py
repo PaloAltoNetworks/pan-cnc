@@ -1,11 +1,16 @@
 from typing import Any
+import copy
 
 from django import forms
+from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.shortcuts import render, HttpResponseRedirect
+from django.views.generic import RedirectView
 from django.views.generic import TemplateView
+from django.views.generic import View
 from django.views.generic.edit import FormView
 
+from pan_cnc.lib import cnc_utils
 from pan_cnc.lib import pan_utils
 from pan_cnc.lib import snippet_utils
 
@@ -122,6 +127,8 @@ class CNCBaseFormView(FormView):
         context['header'] = self.header
         context['title'] = self.title
         context['base_html'] = self.base_html
+        context['app_dir'] = self.app_dir
+        context['snippet_name'] = self.get_snippet()
 
         return context
 
@@ -186,8 +193,66 @@ class CNCBaseFormView(FormView):
             return dict()
 
     def get_value_from_workflow(self, var_name, default) -> Any:
+        """
+        Return the variable value either from the workflow (if it's already been saved there)
+        or from the environment, if it happens to be configured there
+        :param var_name: name of variable to find and return
+        :param default: default value if nothing has been saved to the workflow or configured in the environment
+        :return: value of variable
+        """
         session_cache = self.get_workflow()
-        return session_cache.get(var_name, default)
+        secrets = self.get_environment_secrets()
+
+        if var_name in secrets:
+            print('returning variable from environment')
+            return secrets[var_name]
+        elif var_name in session_cache:
+            print('returning var from session')
+            return session_cache[var_name]
+        else:
+            return default
+
+    def get_environment_secrets(self):
+        default = dict()
+        if 'environments' not in self.request.session or 'current_env' not in self.request.session:
+            print('environments are not unlocked and loaded')
+            return default
+
+        current_env = self.request.session['current_env']
+        if current_env not in self.request.session['environments']:
+            print('Environments are incorrectly loaded')
+            return default
+
+        e = self.request.session['environments'][current_env]
+        if 'secrets' not in e:
+            print('Environment secrets are incorrectly loaded')
+            return default
+
+        if type(e['secrets']) is not dict:
+            return default
+
+        return e['secrets']
+
+    def get_value_from_environment(self, var_name, default) -> Any:
+        if 'environments' not in self.request.session or 'current_env' not in self.request.session:
+            print('environments are not unlocked and loaded')
+            return default
+
+        current_env = self.request.session['current_env']
+        if current_env not in self.request.session['environments']:
+            print('Environments are incorrectly loaded')
+            return default
+
+        e = self.request.session['environments'][current_env]
+        if 'secrets' not in e:
+            print('Environment secrets are incorrectly loaded')
+            return default
+
+        if var_name in e['secrets']:
+            return e['secrets'][var_name]
+        else:
+            print('Not found in ENV, returning default')
+            return default
 
     def generate_dynamic_form(self) -> forms.Form:
 
@@ -209,7 +274,6 @@ class CNCBaseFormView(FormView):
                     continue
 
             elif len(self.fields_to_render) != 0:
-                print(self.fields_to_render)
                 if variable['name'] not in self.fields_to_render:
                     print('Skipping render of variable %s' % variable['name'])
                     continue
@@ -333,10 +397,8 @@ class ChooseSnippetView(CNCBaseAuth, CNCBaseFormView):
         return self.snippet
 
     def generate_dynamic_form(self):
-        print('here we go')
         form = super().generate_dynamic_form()
         if self.service is None:
-            print('Still no service around')
             return form
 
         if 'labels' in self.service and 'customize_field' in self.service['labels']:
@@ -464,3 +526,267 @@ class ProvisionSnippetView(CNCBaseAuth, CNCBaseFormView):
         #     print('This service was already configured on the server')
 
         return super().form_valid(form)
+
+
+class EnvironmentBase(CNCBaseAuth, View):
+    def __init__(self):
+        self.e = dict()
+        super().__init__()
+
+    def dispatch(self, request, *args, **kwargs):
+        self.e = request.session.get('environments', '')
+        if self.e == '':
+            return HttpResponseRedirect('/unlock_envs')
+
+        return super().dispatch(request, *args, **kwargs)
+
+
+class UnlockEnvironmentsView(CNCBaseAuth, FormView):
+    success_url = 'list_envs'
+    template_name = 'pan_cnc/dynamic_form.html'
+    # base form class, you should not need to override this
+    form_class = forms.Form
+    base_html = 'pan_cnc/base.html'
+    header = 'Unlock Environments'
+    title = 'Enter master passphrase to unlock the environments configuration'
+
+    def get_context_data(self, **kwargs) -> dict:
+        context = super().get_context_data(**kwargs)
+        form = forms.Form()
+        unlock_field = forms.CharField(widget=forms.PasswordInput, label='Master PassPhrase')
+        form.fields['password'] = unlock_field
+        context['form'] = form
+        context['base_html'] = self.base_html
+        context['header'] = self.header
+        context['title'] = self.title
+        return context
+
+    def post(self, request, *args, **kwargs) -> Any:
+        form = self.get_form()
+
+        if form.is_valid():
+            print('checking passphrase')
+            if 'password' in request.POST:
+                print('Getting environment configs')
+                user = request.user
+                if not cnc_utils.check_user_secret(str(user.id), request.POST['password']):
+                    if cnc_utils.create_new_user_environment_set(str(user.id), request.POST['password']):
+                        messages.add_message(request, messages.SUCCESS,
+                                             'Created New Env with supplied master passphrase')
+                envs = cnc_utils.load_user_secrets(str(user.id), request.POST['password'])
+                if envs is None:
+                    messages.add_message(request, messages.ERROR, 'Incorrect Password')
+                    return self.form_invalid(form)
+
+                session = request.session
+                session['environments'] = envs
+                session['passphrase'] = request.POST['password']
+                env_names = envs.keys()
+                if len(env_names) > 0:
+                    session['current_env'] = list(env_names)[0]
+
+            return self.form_valid(form)
+        else:
+            print('nope')
+            return self.form_invalid(form)
+
+
+class ListEnvironmentsView(EnvironmentBase, CNCView):
+    template_name = 'pan_cnc/list_environments.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        envs = self.request.session.get('environments')
+        context['envs'] = envs
+        return context
+
+
+class EditEnvironmentsView(EnvironmentBase, FormView):
+    success_url = '/edit_env'
+    template_name = 'pan_cnc/edit_env.html'
+    # base form class, you should not need to override this
+    form_class = forms.Form
+    base_html = 'pan_cnc/base.html'
+
+    def get_context_data(self, **kwargs) -> dict:
+        context = super().get_context_data(**kwargs)
+        env_name = self.kwargs.get('env_name')
+        form = forms.Form()
+        secret_label = forms.CharField(label='Key')
+        secret_data = forms.CharField(widget=forms.PasswordInput, label='Value')
+        env_name_field = forms.CharField(widget=forms.HiddenInput, initial=env_name)
+        form.fields['secret_label'] = secret_label
+        form.fields['secret_data'] = secret_data
+        form.fields['environment'] = env_name_field
+        context['form'] = form
+        context['base_html'] = self.base_html
+        context['env_name'] = env_name
+        environments = self.request.session.get('environments', {})
+        environment = environments.get(env_name, {})
+        context['environment'] = environment
+        return context
+
+    def form_valid(self, form):
+        current_env = self.request.POST.get('environment', '')
+        passphrase = self.request.session.get('passphrase', '')
+        if current_env == '':
+            messages.add_message(self.request, messages.ERROR, 'No Environment currently loaded!')
+            return self.form_invalid(form)
+
+        all_env = self.request.session.get('environments', '')
+        if all_env == '':
+            messages.add_message(self.request, messages.ERROR, 'Environments are locked or not present')
+            return self.form_invalid(form)
+
+        if current_env not in all_env:
+            messages.add_message(self.request, messages.ERROR,
+                                 'Environments are misconfigured! Reload a new Env to continue')
+            return self.form_invalid(form)
+
+        env = all_env[current_env]
+        if 'secrets' not in env:
+            env['secrets'] = dict()
+
+        if 'secret_label' not in self.request.POST or 'secret_data' not in self.request.POST:
+            messages.add_message(self.request, messages.ERROR, 'Incorrect data in POST')
+            return self.form_invalid(form)
+
+        secret_label = self.request.POST['secret_label']
+        secret_data = self.request.POST['secret_data']
+        env['secrets'][secret_label] = secret_data
+        all_env[current_env] = env
+        if cnc_utils.save_user_secrets(str(self.request.user.id), all_env, passphrase):
+            self.request.session['environments'] = all_env
+            messages.add_message(self.request, messages.SUCCESS, 'Updated Environment!')
+            return HttpResponseRedirect(f'/edit_env/{current_env}')
+        else:
+            messages.add_message(self.request, messages.ERROR, 'Could not save secrets!')
+            return self.form_invalid(form)
+
+
+class CreateEnvironmentsView(EnvironmentBase, FormView):
+    success_url = '/edit_env'
+    template_name = 'pan_cnc/dynamic_form.html'
+    # base form class, you should not need to override this
+    form_class = forms.Form
+    base_html = 'pan_cnc/base.html'
+
+    def get_context_data(self, **kwargs) -> dict:
+        context = super().get_context_data(**kwargs)
+        clone_name = self.kwargs.get('clone', None)
+        form = forms.Form()
+        environment_name = forms.CharField(label='Name')
+        environment_description = forms.CharField(widget=forms.Textarea, label='Description')
+        if clone_name:
+            clone_name_field = forms.CharField(widget=forms.HiddenInput, initial=clone_name)
+            form.fields['clone'] = clone_name_field
+            context['title'] = f'Clone Environment from {clone_name}'
+        else:
+            context['title'] = f'Create New Environment'
+
+        form.fields['name'] = environment_name
+        form.fields['description'] = environment_description
+        context['form'] = form
+
+        context['base_html'] = self.base_html
+        return context
+
+    def form_valid(self, form):
+        name = self.request.POST.get('name', '')
+        description = self.request.POST.get('description', '')
+        clone = self.request.POST.get('clone', '')
+        passphrase = self.request.session.get('passphrase', '')
+        if name == '' or description == '':
+            messages.add_message(self.request, messages.ERROR, 'Invalid Form Data')
+            return self.form_invalid(form)
+
+        all_env = self.request.session.get('environments', '')
+        if all_env == '':
+            messages.add_message(self.request, messages.ERROR, 'Environments are locked or not present')
+            return self.form_invalid(form)
+
+        if clone != '':
+            if clone not in all_env:
+                messages.add_message(self.request, messages.ERROR,
+                                     'Environments are misconfigured! Reload a new Env to continue')
+                return self.form_invalid(form)
+
+            new_secrets = copy.deepcopy(all_env[clone]['secrets'])
+            all_env[name] = cnc_utils.create_environment(name, description, new_secrets)
+            messages.add_message(self.request, messages.SUCCESS, 'Cloned Environment Successfully from %s' % clone)
+        else:
+            all_env[name] = cnc_utils.create_environment(name, description, {})
+            messages.add_message(self.request, messages.SUCCESS, 'Created Environment Successfully')
+
+        if not cnc_utils.save_user_secrets(str(self.request.user.id), all_env, passphrase):
+            messages.add_message(self.request, messages.ERROR, 'Could not save Environment')
+
+        self.request.session['environments'] = all_env
+        self.request.session['current_env'] = name
+        return HttpResponseRedirect(f'/edit_env/{name}')
+
+
+class LoadEnvironmentView(EnvironmentBase, RedirectView):
+
+    def get_redirect_url(self, *args, **kwargs):
+
+        env_name = self.kwargs.get('env_name')
+
+        if env_name in self.e:
+            print(f'Loading Environment {env_name}')
+            messages.add_message(self.request, messages.SUCCESS, 'Environment Loaded and ready to rock')
+            self.request.session['current_env'] = env_name
+        else:
+            print('Desired env was not found')
+            messages.add_message(self.request, messages.ERROR, 'Could not load environment!')
+
+        return '/list_envs'
+
+
+class DeleteEnvironmentView(EnvironmentBase, RedirectView):
+
+    def get_redirect_url(self, *args, **kwargs):
+
+        env_name = self.kwargs.get('env_name')
+
+        if env_name in self.e:
+            print(f'Deleting Environment {env_name}')
+            messages.add_message(self.request, messages.SUCCESS, 'Environment Deleted')
+            self.e.pop(env_name)
+            if not cnc_utils.save_user_secrets(str(self.request.user.id), self.e, self.request.session['passphrase']):
+                messages.add_message(self.request, messages.ERROR, 'Could not save secrets')
+
+            if self.request.session['current_env'] == env_name:
+                self.request.session['current_env'] = ''
+
+            self.request.session['environments'] = self.e
+        else:
+            print('Desired env was not found')
+            messages.add_message(self.request, messages.ERROR, 'Could not find environment!')
+
+        return '/list_envs'
+
+
+class DebugMetadataView(CNCView):
+    template_name = 'pan_cnc/results.html'
+
+    def __init__(self):
+        self.snippet_name = ''
+        self.app_dir = ''
+        super().__init__()
+
+    def dispatch(self, request, *args, **kwargs):
+        self.snippet_name = self.kwargs.get('snippet_name', '')
+        self.app_dir = self.kwargs.get('app_dir', '')
+        if self.snippet_name == '' or self.app_dir == '':
+            messages.add_message(self.request, messages.ERROR, 'Could not find Snippet Name')
+            return HttpResponseRedirect('')
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_context_data(self, **kwargs):
+        snippet_data = snippet_utils.get_snippet_metadata(self.snippet_name, self.app_dir)
+        context = super().get_context_data()
+        context['results'] = snippet_data
+        context['header'] = 'Debug Metadata'
+        context['title'] = 'Metadata for %s' % self.snippet_name
+        return context

@@ -10,6 +10,8 @@
     <link href="{% static 'css/bootstrap.css' %}" rel="stylesheet">
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
     <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.1.1/js/bootstrap.min.js"></script>
+    <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.6.3/css/all.css"
+          integrity="sha384-UHRtZLI+pbxtHCWp1t77Bi1L4ZtiqrqD80Kn4Z8NTSRyMA2Fd33n5dQ8lWUE00s/" crossorigin="anonymous">
 </head>
 <body>
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
@@ -41,53 +43,32 @@
                 </div>
             </li>
             {% endfor %}
-
-            <!--&lt;!&ndash; Dropdown &ndash;&gt;-->
-            <!--<li class="nav-item dropdown">-->
-            <!--<a class="nav-link dropdown-toggle" href="#" id="navbardrop" data-toggle="dropdown">-->
-            <!--PanHandler-->
-            <!--</a>-->
-            <!--<div class="dropdown-menu">-->
-            <!--<a class="dropdown-item" href="/snippets">View Snippets</a>-->
-            <!--</div>-->
-            <!--</li>-->
-            <!--<li class="nav-item dropdown">-->
-            <!--<a class="nav-link dropdown-toggle" href="#" id="navbardrop0" data-toggle="dropdown">-->
-            <!--TORT-->
-            <!--</a>-->
-            <!--<div class="dropdown-menu">-->
-            <!--<a class="dropdown-item" href="/pan_tort">Check Signatures</a>-->
-            <!--</div>-->
-            <!--</li>-->
-            <!--<li class="nav-item dropdown">-->
-            <!--<a class="nav-link dropdown-toggle" href="#" id="navbardrop2" data-toggle="dropdown">-->
-            <!--Dynamic Content-->
-            <!--</a>-->
-            <!--<div class="dropdown-menu">-->
-            <!--<a class="dropdown-item" href="/dynamic_content">Download Dynamic Content</a>-->
-            <!--</div>-->
-            <!--</li>-->
-            <!--<li class="nav-item dropdown">-->
-            <!--<a class="nav-link dropdown-toggle" href="#" id="navbardrop3" data-toggle="dropdown">-->
-            <!--Bootstrapper-->
-            <!--</a>-->
-            <!--<div class="dropdown-menu">-->
-            <!--<a class="dropdown-item" href="/bootstrapper">Create Bootstrap Archive</a>-->
-            <!--</div>-->
-            <!--</li>-->
-            <!--<li class="nav-item dropdown">-->
-            <!--<a class="nav-link dropdown-toggle" href="#" id="navbardrop4" data-toggle="dropdown">-->
-            <!--Documentation-->
-            <!--</a>-->
-            <!--<div class="dropdown-menu">-->
-            <!--<a class="dropdown-item" href="#">Portal User Guide</a>-->
-            <!--<a class="dropdown-item" href="#">Github Repository</a>-->
-            <!--<a class="dropdown-item" href="#">MSSP More Information</a>-->
-            <!--</div>-->
-            <!--</li>-->
-            <!--<li class="nav-item">-->
-            <!--<a class="nav-link" href="/logout">Logout</a>-->
-            <!--</li>-->
+        </ul>
+        <ul class="navbar-nav mr-1">
+            <li class="nav-link">
+                {% if request.session.current_env %}
+                <a href="/list_envs" title="Loaded Environment"
+                class="text-primary">
+                    <i class="fas fa-unlock"></i>
+                    {{ request.session.current_env }}
+                </a>
+                {% else %}
+                <a href="/list_envs" title="Unlock Environments">
+                    <i class="fas fa-lock"></i>
+                </a>
+                {% endif %}
+            </li>
+            <li class="nav-item dropdown">
+                <a class="nav-link dropdown-toggle text-primary" href="#" id="navbardrop-user"
+                   data-toggle="dropdown">
+                    {{ user }}
+                </a>
+                <div class="dropdown-menu dropdown-menu-right">
+                    <a class="dropdown-item" href="/list_envs">Configure Environment</a>
+                    <a class="dropdown-item" href="/create_env">Create Environment</a>
+                    <a class="dropdown-item" href="/logout">Logout</a>
+                </div>
+            </li>
         </ul>
     </div>
 </nav>

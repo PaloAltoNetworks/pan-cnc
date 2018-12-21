@@ -7,9 +7,39 @@ import pickle
 import io
 
 
+def check_user_secret(user_id, passphrase):
+    secret_dir = os.path.expanduser('~/.pan_cnc')
+    file_path = os.path.join(secret_dir, user_id)
+    if not os.path.exists(file_path):
+        return False
+
+    return True
+
+
+def create_environment(name, description, secrets={}):
+    env = dict()
+    env['meta'] = dict()
+    env['meta']['description'] = description
+    env['meta']['name'] = name
+    env['secrets'] = secrets
+    return env
+
+
+def init_environment(name, description, secrets={}):
+    secret_dict = dict()
+    secret_dict[name] = create_environment(name, description, secrets)
+    return secret_dict
+
+
+def create_new_user_environment_set(user_id, passphrase):
+
+    secret_dict = init_environment('Example Environment', 'Auto Generated', {'PANORAMA_IP': '192.168.55.7'})
+    return save_user_secrets(user_id, secret_dict, passphrase)
+
+
 def load_user_secrets(user_id, passphrase):
 
-    secret_dir = '/var/tmp/.pan_cnc'
+    secret_dir = os.path.expanduser('~/.pan_cnc')
     file_path = os.path.join(secret_dir, user_id)
 
     buffer_size = 64 * 1024
@@ -43,32 +73,37 @@ def load_user_secrets(user_id, passphrase):
 
 def save_user_secrets(user_id, secret_dict, passphrase):
 
-    secret_dir = '/var/tmp/.pan_cnc'
+    secret_dir = os.path.expanduser('~/.pan_cnc')
     if not os.path.isdir(secret_dir):
         os.mkdir(secret_dir)
 
-    file_path = os.path.join(secret_dir, user_id)
-    print(secret_dict)
-    pickled_data = pickle.dumps(secret_dict)
-    print(pickled_data)
-    buffer_size = 64 * 1024
+    try:
+        file_path = os.path.join(secret_dir, user_id)
+        pickled_data = pickle.dumps(secret_dict)
+        buffer_size = 64 * 1024
 
-    # input plaintext binary stream
-    secret_input_stream = io.BytesIO(pickled_data)
+        # input plaintext binary stream
+        secret_input_stream = io.BytesIO(pickled_data)
 
-    # initialize ciphertext binary stream
-    secret_output_stream = io.BytesIO()
+        # initialize ciphertext binary stream
+        secret_output_stream = io.BytesIO()
 
-    # encrypt stream
-    pyAesCrypt.encryptStream(secret_input_stream, secret_output_stream, passphrase, buffer_size)
+        # encrypt stream
+        pyAesCrypt.encryptStream(secret_input_stream, secret_output_stream, passphrase, buffer_size)
 
-    encrypted_stuff = secret_output_stream.getvalue()
-    secret_output_stream.seek(0)
+        encrypted_stuff = secret_output_stream.getvalue()
+        secret_output_stream.seek(0)
 
-    with open(file_path, 'wb+') as fps:
-        fps.write(secret_output_stream.getvalue())
+        with open(file_path, 'wb+') as fps:
+            fps.write(secret_output_stream.getvalue())
+    except OSError as ose:
+        print('Caught Error saving user secrets!')
+        return False
+    except BaseException as be:
+        print('Caught Error saving user secrets!')
+        return False
 
-    return None
+    return True
 
 
 def get_config_value(config_key, default=None):

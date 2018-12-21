@@ -4,7 +4,17 @@
 {% block content %}
 
     <div class="card border-primary mb-6 shadow-lg rounded">
-        <div class="card-header text-white bg-primary">{{ header }}</div>
+            <div class="card-header">
+                {{ header }}
+                {% if app_dir %}
+                <div class="float-right">
+                    <a href="/debug/{{ app_dir }}/{{ snippet_name }}" title="Debug Snippet">
+                        <i class="fas fa-cog text-muted" title="Debug Snippet"></i>
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+
         <div class="card-body">
             <h4 class="card-title">{{ title }}</h4>
             <p class="card-text">
