@@ -6,7 +6,7 @@
     <div class="card border-primary mb-6 shadow-lg rounded">
             <div class="card-header">
                 {{ header }}
-                {% if app_dir %}
+                {% if app_dir and snippet_name %}
                 <div class="float-right">
                     <a href="/debug/{{ app_dir }}/{{ snippet_name }}" title="Debug Snippet">
                         <i class="fas fa-cog text-muted" title="Debug Snippet"></i>
