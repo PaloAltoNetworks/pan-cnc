@@ -53,8 +53,10 @@
                     {{ request.session.current_env }}
                 </a>
                 {% else %}
-                <a href="/list_envs" title="Unlock Environments">
+                <a href="/list_envs" title="Unlock Environments"
+                class="text-primary">
                     <i class="fas fa-lock"></i>
+                    &nbsp;
                 </a>
                 {% endif %}
             </li>
