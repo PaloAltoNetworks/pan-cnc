@@ -5,6 +5,7 @@ from django.core.cache import cache
 from pathlib import Path
 from jinja2 import Environment
 from jinja2.loaders import BaseLoader
+from . import jinja_filters
 
 
 def load_service_snippets():
@@ -130,7 +131,13 @@ def render_snippet_template(service, app_dir, context):
         template_full_path = os.path.join(service['snippet_path'], template_name)
         with open(template_full_path, 'r') as template:
             template_string = template.read()
-            template_template = Environment(loader=BaseLoader()).from_string(template_string)
+            environment = Environment(loader=BaseLoader())
+
+            for f in jinja_filters.defined_filters:
+                if hasattr(jinja_filters, f):
+                    environment.filters[f] = getattr(jinja_filters, f)
+
+            template_template = environment.from_string(template_string)
             rendered_template = template_template.render(context)
             return rendered_template
     except Exception as e:
