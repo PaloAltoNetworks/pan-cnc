@@ -312,6 +312,14 @@ class CNCBaseFormView(FormView):
                     choices_list.append(choice)
                 dynamic_form.fields[field_name] = forms.ChoiceField(widget=forms.RadioSelect, choices=choices_list,
                                                                     label=description, initial=default)
+            elif type_hint == "checkbox" and "cbx_list":
+                cbx_list = variable['cbx_list']
+                choices_list = list()
+                for item in cbx_list:
+                    choice = (item['value'], item['key'])
+                    choices_list.append(choice)
+                dynamic_form.fields[field_name] = forms.ChoiceField(widget=forms.CheckboxSelectMultiple, choices=choices_list,
+                                                                    label=description, initial=default)
             else:
                 dynamic_form.fields[field_name] = forms.CharField(label=description, initial=default)
 
