@@ -23,10 +23,12 @@ class CNCView(CNCBaseAuth, TemplateView):
     template_name = "pan_cnc/index.html"
     # base html - allow sub apps to override this with special html base if desired
     base_html = 'pan_cnc/base.html'
+    app_dir = 'pan_cnc'
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['base_html'] = self.base_html
+        context['app_dir'] = self.app_dir
         return context
 
 
@@ -231,7 +233,6 @@ class CNCBaseFormView(FormView):
     def get_environment_secrets(self):
         default = dict()
         if 'environments' not in self.request.session or 'current_env' not in self.request.session:
-            print('environments are not unlocked and loaded')
             return default
 
         current_env = self.request.session['current_env']
@@ -251,7 +252,6 @@ class CNCBaseFormView(FormView):
 
     def get_value_from_environment(self, var_name, default) -> Any:
         if 'environments' not in self.request.session or 'current_env' not in self.request.session:
-            print('environments are not unlocked and loaded')
             return default
 
         current_env = self.request.session['current_env']

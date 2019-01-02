@@ -20,8 +20,10 @@
     <p class="lead">
         {% if documentation_link %}
         <a class="btn btn-primary btn-lg" href="{{ documentation_link }}" role="button">Learn more</a>
-        {% else %}
-        <a class="btn btn-primary btn-lg" href="/documentation" role="button">Learn more</a>
+        {% endif %}
+        &nbsp;
+        {% if next %}
+        <a class="btn btn-secondary btn-lg" href="/{{ app_dir }}/{{ next }}" role="button">Get Started</a>
         {% endif %}
     </p>
 </div>
