@@ -124,11 +124,19 @@ def get_snippet_metadata(snippet_name, app_dir):
     return None
 
 
-def render_snippet_template(service, app_dir, context):
+def render_snippet_template(service, app_dir, context, template_file=''):
     try:
-        template_name = service['snippets'][0]['file']
+        if template_file == '':
+            template_name = service['snippets'][0]['file']
+        else:
+            template_name = template_file
 
-        template_full_path = os.path.join(service['snippet_path'], template_name)
+        if 'snippet_path' in service:
+            template_full_path = os.path.join(service['snippet_path'], template_name)
+        else:
+            template_full_path = Path(os.path.join(settings.SRC_PATH, app_dir, 'snippets', template_name))
+
+        print(template_full_path)
         with open(template_full_path, 'r') as template:
             template_string = template.read()
             environment = Environment(loader=BaseLoader())
@@ -142,7 +150,7 @@ def render_snippet_template(service, app_dir, context):
             return rendered_template
     except Exception as e:
         print(e)
-        print('Caught an error deploying service')
+        print('Caught an error rendering snippet')
         return None
 
 
@@ -159,7 +167,7 @@ def resolve_dependencies(snippet, app_dir, dependencies):
     that immediately after it in the list.
     """
 
-    print('Resovling dependencies for snippet: %s' % snippet)
+    print('Resolving dependencies for snippet: %s' % snippet)
     if dependencies is None or type(dependencies) is not list:
         dependencies = list()
 
