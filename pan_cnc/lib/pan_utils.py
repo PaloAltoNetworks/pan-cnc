@@ -175,3 +175,16 @@ def get_device_groups_from_panorama():
 
     return services
 
+
+def get_vm_auth_key_from_panorama():
+    xapi = panorama_login()
+    try:
+        xapi.op(cmd='<request><bootstrap><vm-auth-key><generate>'
+                    '<lifetime>2</lifetime></generate></vm-auth-key></bootstrap></request>')
+        print(xapi.status_code)
+        print(xapi.status_detail)
+        return xapi.xml_result()
+    except pan.xapi.PanXapiError as pxe:
+        print('Could not get vm-auth-key!')
+        print(pxe)
+        raise
