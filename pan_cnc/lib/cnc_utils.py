@@ -6,6 +6,7 @@ import pyAesCrypt
 import pickle
 import io
 from pan_cnc.lib import git_utils
+from pathlib import Path
 
 
 def check_user_secret(user_id, passphrase):
@@ -169,6 +170,12 @@ def init_app(app_cnc_config):
             continue
 
         repo_dir = os.path.join(app_cnc_config['app_dir'], 'snippets', r['destination_directory'])
+        repo_path = Path(repo_dir)
+        app_dir_path = Path(app_cnc_config['app_dir'])
+        if app_dir_path not in repo_path.parents:
+            print('Will not allow destination directory to be outside of our application dir')
+            continue
+
         if not os.path.exists(repo_dir):
             try:
                 os.makedirs(repo_dir)
