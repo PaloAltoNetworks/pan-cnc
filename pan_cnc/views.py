@@ -106,19 +106,20 @@ class CNCBaseFormView(FormView):
         self._snippet = value
 
     def get_snippet(self):
-        print('Getting snippet here in get_snippet')
+        print('Getting snippet here in CNCBaseFormView:get_snippet')
         if 'snippet_name' in self.request.POST:
             print('found it in the POST')
             return self.request.POST['snippet_name']
 
         elif self.app_dir in self.request.session:
+            print('Checking session for snippet')
             session_cache = self.request.session[self.app_dir]
             if 'snippet_name' in session_cache:
                 print('returning snippet name: %s' % session_cache['snippet_name'])
                 return session_cache['snippet_name']
-        else:
-            print('no snippet to be found')
-            return self.snippet
+
+        print(f'Returning snippet: {self.snippet}')
+        return self.snippet
 
     def get_context_data(self, **kwargs) -> dict:
         context = super().get_context_data(**kwargs)
@@ -186,11 +187,26 @@ class CNCBaseFormView(FormView):
 
         self.request.session[self.app_dir] = current_workflow
 
+    def save_value_to_workflow(self, var_name, var_value) -> None:
+
+        workflow = self.get_workflow()
+        workflow[var_name] = var_value
+
     def get_workflow(self) -> dict:
         if self.app_dir in self.request.session:
             return self.request.session[self.app_dir]
         else:
             return dict()
+
+    def get_snippet_context(self) -> dict:
+        """
+        Convienence function to return the current workflow and env secrets in a single context
+        useful for rendering snippets that require values from both
+        :return: dict containing env secrets and workflow values
+        """
+        context = self.get_workflow()
+        context.update(self.get_environment_secrets())
+        return context
 
     def get_value_from_workflow(self, var_name, default) -> Any:
         """
@@ -289,6 +305,7 @@ class CNCBaseFormView(FormView):
                 dd_list = variable['dd_list']
                 choices_list = list()
                 for item in dd_list:
+                    print(item)
                     choice = (item['value'], item['key'])
                     choices_list.append(choice)
                 dynamic_form.fields[field_name] = forms.ChoiceField(choices=tuple(choices_list), label=description,
@@ -303,7 +320,8 @@ class CNCBaseFormView(FormView):
                 dynamic_form.fields[field_name] = forms.GenericIPAddressField(label=description,
                                                                               initial=default)
             elif type_hint == "password":
-                dynamic_form.fields[field_name] = forms.CharField(widget=forms.PasswordInput)
+                dynamic_form.fields[field_name] = forms.CharField(widget=forms.PasswordInput(render_value=True),
+                                                                  initial=default)
             elif type_hint == "radio" and "rad_list":
                 rad_list = variable['rad_list']
                 choices_list = list()
