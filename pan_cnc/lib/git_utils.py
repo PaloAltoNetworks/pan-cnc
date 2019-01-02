@@ -1,10 +1,39 @@
-from git import Repo
 import requests
+from git import InvalidGitRepositoryError, NoSuchPathError, GitCommandError
+from git import Repo
+
 from pan_cnc.lib import cnc_utils
 
 
-def get_repo_details(repo_name, repo_dir):
+def clone_or_update_repo(repo_dir, repo_name, repo_url, branch='master'):
+    try:
 
+        repo = Repo(repo_dir)
+        f = repo.remotes.origin.pull()
+        if len(f) > 0:
+            flags = f[0].flags
+            print(f'Updated repo with return: {flags}')
+        return True
+    except NoSuchPathError as nspe:
+        print('Directory does not exist')
+        return False
+
+    except InvalidGitRepositoryError as igre:
+        # this is not yet a git repo, let's try to clone it
+        return clone_repo(repo_dir, repo_name, repo_url, branch)
+
+
+def clone_repo(repo_dir, repo_name, repo_url, branch='master'):
+    try:
+        repo = Repo.clone_from(repo_url, repo_dir, depth=3, branch=branch, config='http.sslVerify=false')
+    except GitCommandError as gce:
+        print(gce)
+        return False
+
+    return True
+
+
+def get_repo_details(repo_name, repo_dir):
     repo = Repo(repo_dir)
 
     url = repo.remotes.origin.url
@@ -51,7 +80,6 @@ def update_repo(repo_dir):
 
 
 def get_repo_upstream_details(repo_name, repo_url):
-
     details = cnc_utils.get_cached_value(f'git_utils_upstream_{repo_name}')
     if details is not None:
         return details
@@ -69,6 +97,3 @@ def get_repo_upstream_details(repo_name, repo_url):
         cnc_utils.set_cached_value(f'git_utils_upstream_{repo_name}', details)
 
     return details
-
-
-

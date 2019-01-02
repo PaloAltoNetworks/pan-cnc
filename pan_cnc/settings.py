@@ -12,7 +12,6 @@ https://docs.djangoproject.com/en/2.1/ref/settings/
 
 import os
 import sys
-
 import yaml
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
@@ -60,9 +59,11 @@ for app in os.listdir(SRC_PATH):
                 try:
                     with open(os.path.join(app_dir, '.pan-cnc.yaml')) as app_conf_file:
                         app_conf = yaml.load(app_conf_file.read())
+                        app_conf['app_dir'] = app_dir
                         print('Adding app config for app: %s' % app)
                         print(app_conf)
                         INSTALLED_APPS_CONFIG[app] = app_conf
+
                 except OSError as ose:
                     print('Could not open .pan-cnc.yaml for app: %s' % app)
                     pass

@@ -20,6 +20,7 @@ from django.conf import settings
 from django.contrib.auth import views as auth_views
 from django.urls import path
 from pan_cnc import views as pan_cnc_views
+from pan_cnc.lib import cnc_utils
 
 # ensure every view gets this in the context, even django default views
 app_settings = settings.INSTALLED_APPS_CONFIG
@@ -43,6 +44,9 @@ indx = 0
 
 for app_name in settings.INSTALLED_APPS_CONFIG:
     app = settings.INSTALLED_APPS_CONFIG[app_name]
+    print('Performing CNC App initialization')
+    cnc_utils.init_app(app)
+
     if 'views' not in app:
         print('Skipping app: %s with no views configured' % app_name)
         continue
@@ -99,7 +103,6 @@ for app_name in settings.INSTALLED_APPS_CONFIG:
 
         # ensure the app_dir attribute is always set if it exists on the view object!
         if hasattr(class_object, 'app_dir'):
-            print('We have an App dir that needs set here!')
             if 'app_dir' not in attributes:
                 attributes['app_dir'] = app_name
 
@@ -118,11 +121,3 @@ for app_name in settings.INSTALLED_APPS_CONFIG:
         urlpatterns += [new_path]
         indx += 1
 
-# for app in settings.INSTALLED_APPS:
-#     app_dir = os.path.join(settings.SRC_PATH, app)
-#     print('Checking app_dir %s' % app_dir)
-#     if os.path.exists(os.path.join(app_dir, 'urls.py')):
-#         print('Adding src app %s to urlpatterns' % app)
-#         urlpatterns += [path('%s/' % app, include('%s.urls' % app))]
-
-print(urlpatterns)

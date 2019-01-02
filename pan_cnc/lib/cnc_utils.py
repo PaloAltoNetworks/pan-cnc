@@ -5,6 +5,7 @@ import re
 import pyAesCrypt
 import pickle
 import io
+from pan_cnc.lib import git_utils
 
 
 def check_user_secret(user_id, passphrase):
@@ -151,3 +152,34 @@ def get_cached_value(key):
 
 def set_cached_value(key, val):
     cache.set(key, val)
+
+
+def init_app(app_cnc_config):
+
+    if 'repositories' not in app_cnc_config:
+        return None
+
+    if 'app_dir' not in app_cnc_config:
+        print('Invalid app_dir in app_cnc_configuration')
+        return None
+
+    for r in app_cnc_config['repositories']:
+        if 'destination_directory' not in r:
+            print('Invalid repository app_cnc_configuration')
+            continue
+
+        repo_dir = os.path.join(app_cnc_config['app_dir'], 'snippets', r['destination_directory'])
+        if not os.path.exists(repo_dir):
+            try:
+                os.makedirs(repo_dir)
+            except IOError:
+                print('Could not make repo_dir!')
+                continue
+
+        repo_url = r['url']
+        repo_name = r['name']
+        repo_branch = r['branch']
+        print(f'Pulling / Refreshing repository: {repo_url}')
+        git_utils.clone_or_update_repo(repo_dir, repo_name, repo_url, repo_branch)
+
+    return None
