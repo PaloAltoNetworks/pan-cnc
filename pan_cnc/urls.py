@@ -34,6 +34,7 @@ urlpatterns = [
     path('create_env', pan_cnc_views.CreateEnvironmentsView.as_view()),
     path('clone_env/<clone>', pan_cnc_views.CreateEnvironmentsView.as_view()),
     path('delete_env/<env_name>', pan_cnc_views.DeleteEnvironmentView.as_view()),
+    path('delete_secret/<env_name>/<key_name>', pan_cnc_views.DeleteEnvironmentKeyView.as_view()),
     path('unlock_envs', pan_cnc_views.UnlockEnvironmentsView.as_view()),
     path('debug/<app_dir>/<snippet_name>', pan_cnc_views.DebugMetadataView.as_view())
 ]

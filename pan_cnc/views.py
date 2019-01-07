@@ -210,7 +210,7 @@ class CNCBaseFormView(FormView):
         context.update(self.get_environment_secrets())
         return context
 
-    def get_value_from_workflow(self, var_name, default) -> Any:
+    def get_value_from_workflow(self, var_name, default='') -> Any:
         """
         Return the variable value either from the workflow (if it's already been saved there)
         or from the environment, if it happens to be configured there
@@ -595,7 +595,7 @@ class UnlockEnvironmentsView(CNCBaseAuth, FormView):
             if 'password' in request.POST:
                 print('Getting environment configs')
                 user = request.user
-                if not cnc_utils.check_user_secret(str(user.id), request.POST['password']):
+                if not cnc_utils.check_user_secret(str(user.id)):
                     if cnc_utils.create_new_user_environment_set(str(user.id), request.POST['password']):
                         messages.add_message(request, messages.SUCCESS,
                                              'Created New Env with supplied master passphrase')
@@ -791,6 +791,30 @@ class DeleteEnvironmentView(EnvironmentBase, RedirectView):
             messages.add_message(self.request, messages.ERROR, 'Could not find environment!')
 
         return '/list_envs'
+
+
+class DeleteEnvironmentKeyView(EnvironmentBase, RedirectView):
+
+    def get_redirect_url(self, *args, **kwargs):
+
+        env_name = self.kwargs.get('env_name')
+        key_name = self.kwargs.get('key_name')
+
+        print(f'{env_name} {key_name}')
+        if env_name in self.e and key_name in self.e[env_name]['secrets']:
+            print(f'Deleting Secret {key_name} from {env_name}')
+            messages.add_message(self.request, messages.SUCCESS, 'Secret Deleted')
+            self.e[env_name]['secrets'].pop(key_name)
+            if not cnc_utils.save_user_secrets(str(self.request.user.id), self.e, self.request.session['passphrase']):
+                messages.add_message(self.request, messages.ERROR, 'Could not save secrets')
+
+            self.request.session['environments'] = self.e
+
+        else:
+            print('Desired secret was not found')
+            messages.add_message(self.request, messages.ERROR, 'Could not find secret!')
+
+        return f'/edit_env/{env_name}'
 
 
 class DebugMetadataView(CNCView):

@@ -13,21 +13,26 @@
             <tr>
                 <th scope="col">#</th>
                 <th scope="col">Key</th>
+                <th scope="col">Value</th>
                 <th scope="col">Options</th>
             </tr>
             </thead>
             <tbody>
-            {% for c in environment.secrets %}
+            {% for k,v in environment.secrets.items %}
             <tr>
                 <th scope="row">{{ forloop.counter }}</th>
-                <td>{{ c }}</td>
-                <td>Delete</td>
+                <td>{{ k }}</td>
+                <td>{{ v }}</td>
+                <td>
+                    <a href="/delete_secret/{{ env_name |urlencode }}/{{ k |urlencode }}">Delete Secret</a>
+                </td>
             </tr>
             {% endfor %}
             </tbody>
         </table>
         </p>
         <a href="/clone_env/{{ env_name }}" class="btn btn-primary">Clone</a>
+        <a href="/load_env/{{ env_name }}" class="btn btn-secondary">Load</a>
         <a href="/delete_env/{{ env_name }}" class="btn btn-danger">Delete</a>
     </div>
 </div>
