@@ -13,6 +13,7 @@ from django.views.generic.edit import FormView
 from pan_cnc.lib import cnc_utils
 from pan_cnc.lib import pan_utils
 from pan_cnc.lib import snippet_utils
+from pan_cnc.lib.exceptions import SnippetRequiredException
 
 
 class CNCBaseAuth(LoginRequiredMixin):
@@ -139,10 +140,15 @@ class CNCBaseFormView(FormView):
         """Handle GET requests: instantiate a blank version of the form."""
         # load the snippet into the class attribute here so it's available to all other methods throughout the
         # call chain in the child classes
-        snippet = self.get_snippet()
-        if snippet != '':
-            self.service = snippet_utils.load_snippet_with_name(snippet, self.app_dir)
-        return self.render_to_response(self.get_context_data())
+        try:
+            snippet = self.get_snippet()
+            if snippet != '':
+                self.service = snippet_utils.load_snippet_with_name(snippet, self.app_dir)
+            return self.render_to_response(self.get_context_data())
+        except SnippetRequiredException:
+            print('Snippet was not defined here!')
+            messages.add_message(self.request, messages.ERROR, 'Process Error - Snippet not found')
+            return HttpResponseRedirect('/')
 
     def post(self, request, *args, **kwargs) -> Any:
         """
@@ -484,7 +490,7 @@ class ProvisionSnippetView(CNCBaseAuth, CNCBaseFormView):
                 return session_cache['snippet_name']
         else:
             print('snippet is not set in ProvisionSnippetView:get_snippet')
-            return self.snippet
+            raise SnippetRequiredException
 
     def form_valid(self, form):
         """
@@ -510,8 +516,8 @@ class ProvisionSnippetView(CNCBaseAuth, CNCBaseFormView):
         login = pan_utils.panorama_login()
         if login is None:
             context = dict()
-            context['error'] = 'Could not login to Panorama'
-            return render(self.request, 'pan_cnc/error.html', context=context)
+            context['results'] = 'Could not login to Panorama'
+            return render(self.request, 'pan_cnc/results.html', context=context)
 
         # Always grab all the default values, then update them based on user input in the workflow
         jinja_context = dict()

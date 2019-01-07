@@ -8,6 +8,8 @@ from django.conf import settings
 from django.core.cache import cache
 from jinja2 import Environment, BaseLoader
 
+from pan_cnc.lib.exceptions import TargetConnectionException
+
 xapi_obj = None
 
 logger = logging.getLogger()
@@ -36,6 +38,8 @@ def panorama_login(panorama_ip=None, panorama_username=None, panorama_password=N
     except pan.xapi.PanXapiError as pxe:
         print('Got error logging in to Panorama')
         print(pxe)
+        # reset to None here to force re-auth next time
+        xapi_obj = None
         return None
 
 
@@ -124,7 +128,8 @@ def validate_snippet_present(service, context):
     """
     xapi = panorama_login()
     if xapi is None:
-        raise Exception('Could not login to Panorama')
+        print('Could not login to Panorama')
+        raise TargetConnectionException
 
     try:
         for snippet in service['snippets']:
@@ -144,7 +149,7 @@ def validate_snippet_present(service, context):
     except pan.xapi.PanXapiError as pxe:
         print('Could not validate snippet was present!')
         print(pxe)
-        raise
+        raise TargetConnectionException
 
 
 def get_device_groups_from_panorama():
@@ -187,4 +192,4 @@ def get_vm_auth_key_from_panorama():
     except pan.xapi.PanXapiError as pxe:
         print('Could not get vm-auth-key!')
         print(pxe)
-        raise
+        raise TargetConnectionException
