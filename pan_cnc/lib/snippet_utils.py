@@ -112,10 +112,13 @@ def get_snippet_metadata(snippet_name, app_dir):
         mdf = os.path.join(d, 'metadata.yaml')
         if os.path.isfile(mdf):
             snippet_path = os.path.dirname(mdf)
-            print(f'Found {snippet_name} at {snippet_path}')
             try:
                 with open(mdf, 'r') as sc:
-                    return sc.read()
+                    snippet_data = oyaml.load(sc.read())
+                    if 'name' in snippet_data and snippet_data['name'] == snippet_name:
+                        print(f'Found {snippet_name} at {snippet_path}')
+                        sc.seek(0)
+                        return sc.read()
             except IOError as ioe:
                 print('Could not open metadata file in dir %s' % mdf)
                 print(ioe)
