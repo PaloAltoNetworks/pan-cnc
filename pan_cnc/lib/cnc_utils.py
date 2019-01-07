@@ -1,15 +1,16 @@
-from django.core.cache import cache
-
-import os
-import re
-import pyAesCrypt
-import pickle
 import io
-from pan_cnc.lib import git_utils
+import os
+import pickle
+import re
 from pathlib import Path
 
+import pyAesCrypt
+from django.core.cache import cache
 
-def check_user_secret(user_id, passphrase):
+from pan_cnc.lib import git_utils
+
+
+def check_user_secret(user_id):
     secret_dir = os.path.expanduser('~/.pan_cnc')
     file_path = os.path.join(secret_dir, user_id)
     if not os.path.exists(file_path):
@@ -18,7 +19,7 @@ def check_user_secret(user_id, passphrase):
     return True
 
 
-def create_environment(name, description, secrets={}):
+def create_environment(name, description, secrets):
     env = dict()
     env['meta'] = dict()
     env['meta']['description'] = description
@@ -27,26 +28,39 @@ def create_environment(name, description, secrets={}):
     return env
 
 
-def init_environment(name, description, secrets={}):
+def init_environment(name, description, secrets):
     secret_dict = dict()
     secret_dict[name] = create_environment(name, description, secrets)
     return secret_dict
 
 
 def create_new_user_environment_set(user_id, passphrase):
+    secret_dict = dict()
+    secret_dict['Local Panorama'] = create_environment('Local Panorama',
+                                                       'PaloAltoNetworks Panorama',
+                                                       {
+                                                           'TARGET_IP': '192.168.55.7',
+                                                           'TARGET_USERNAME': 'admin',
+                                                           'TARGET_PASSWORD': 'admin',
+                                                       })
 
-    secret_dict = init_environment('Example Environment', 'Auto Generated', {'PANORAMA_IP': '192.168.55.7'})
+    secret_dict['Local Pan-OS'] = create_environment('Local VM-Series Pan-OS',
+                                                     'PaloAltoNetworks Pan-OS VM50',
+                                                     {
+                                                         'TARGET_IP': '192.168.55.10',
+                                                         'TARGET_USERNAME': 'admin',
+                                                         'TARGET_PASSWORD': 'admin',
+                                                     })
+
     return save_user_secrets(user_id, secret_dict, passphrase)
 
 
 def load_user_secrets(user_id, passphrase):
-
     secret_dir = os.path.expanduser('~/.pan_cnc')
     file_path = os.path.join(secret_dir, user_id)
 
     buffer_size = 64 * 1024
 
-    secret_input = ''
     with open(file_path, 'rb') as fps:
         secret_input = io.BytesIO(fps.read())
 
@@ -74,7 +88,6 @@ def load_user_secrets(user_id, passphrase):
 
 
 def save_user_secrets(user_id, secret_dict, passphrase):
-
     secret_dir = os.path.expanduser('~/.pan_cnc')
     if not os.path.isdir(secret_dir):
         os.mkdir(secret_dir)
@@ -92,8 +105,6 @@ def save_user_secrets(user_id, secret_dict, passphrase):
 
         # encrypt stream
         pyAesCrypt.encryptStream(secret_input_stream, secret_output_stream, passphrase, buffer_size)
-
-        encrypted_stuff = secret_output_stream.getvalue()
         secret_output_stream.seek(0)
 
         with open(file_path, 'wb+') as fps:
@@ -109,7 +120,6 @@ def save_user_secrets(user_id, secret_dict, passphrase):
 
 
 def get_config_value(config_key, default=None):
-
     config_val = os.environ.get(config_key, '')
     if config_val != '':
         return config_val
@@ -126,10 +136,15 @@ def get_config_value(config_key, default=None):
 
 
 def load_panrc():
+
+    config = dict()
     try:
         path = os.path.expanduser('~')
         rc_filepath = os.path.join(path, '.panrc')
-        config = dict()
+
+        if not os.path.exists(rc_filepath):
+            return config
+
         with open(rc_filepath, 'r') as rcf:
             rcs = rcf.read()
             for line in rcs.split('\n'):
@@ -145,6 +160,8 @@ def load_panrc():
 
     except Exception as msg:
         print(msg)
+        return config
+
 
 
 def get_cached_value(key):
@@ -156,7 +173,6 @@ def set_cached_value(key, val):
 
 
 def init_app(app_cnc_config):
-
     if 'repositories' not in app_cnc_config:
         return None
 
