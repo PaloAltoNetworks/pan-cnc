@@ -97,6 +97,10 @@ for app_name in settings.INSTALLED_APPS_CONFIG:
         if 'attributes' in v and type(v['attributes'] is dict):
             attributes = dict()
             for attr in v['attributes']:
+                if type(attr) is not str:
+                    print(f'Invlid attribute found in .pan-cnc.yaml for view: {v["name"]}')
+                    continue
+
                 if hasattr(class_object, attr):
                     attributes[attr] = v['attributes'][attr]
         else:
