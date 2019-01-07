@@ -4,8 +4,9 @@
 {% block content %}
 <script type="text/javascript">
     function set_cursor() {
-        let doc = jQuery(document.documentElement);
+        let doc = $(document.documentElement);
         doc.css('cursor', 'progress');
+        $('#submit_button').prop("disabled",true);
     }
 </script>
 <div class="card border-primary mb-6 shadow-lg rounded">
@@ -26,7 +27,7 @@
         <form action="{{ action }}" method="post">
             {% csrf_token %}
             {% include 'pan_cnc/bootstrap_form.html' with form=form %}
-            <button type="submit" class="btn btn-primary" onclick="set_cursor()">Submit</button>
+            <button type="submit" class="btn btn-primary" id="submit_button" onclick="set_cursor()">Submit</button>
         </form>
         </p>
     </div>
