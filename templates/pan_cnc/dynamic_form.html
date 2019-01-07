@@ -7,6 +7,7 @@
         let doc = $(document.documentElement);
         doc.css('cursor', 'progress');
         $('#submit_button').prop("disabled",true);
+        $('#dynamic_form').submit();
     }
 </script>
 <div class="card border-primary mb-6 shadow-lg rounded">
@@ -24,7 +25,7 @@
     <div class="card-body">
         <h4 class="card-title">{{ title }}</h4>
         <p class="card-text">
-        <form action="{{ action }}" method="post">
+        <form action="{{ action }}" id="dynamic_form" method="post">
             {% csrf_token %}
             {% include 'pan_cnc/bootstrap_form.html' with form=form %}
             <button type="submit" class="btn btn-primary" id="submit_button" onclick="set_cursor()">Submit</button>
