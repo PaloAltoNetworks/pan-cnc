@@ -14,21 +14,26 @@
 
 {% for field in form.visible_fields %}
   <div class="form-group">
-    {{ field.label_tag }}
-
-    {% if form.is_bound %}
-      {% if field.errors %}
-        {% render_field field class="form-control is-invalid" %}
-        {% for error in field.errors %}
-          <div class="invalid-feedback">
-            {{ error }}
-          </div>
-        {% endfor %}
-      {% else %}
-        {% render_field field class="form-control is-valid" %}
-      {% endif %}
+    <!-- checks field_type and if boolean checkbox uses different output format -->
+    {% if field|field_type == 'booleanfield' %}
+      <label>{{ field }} {{ field.label_tag }}</label>
+      <br>
     {% else %}
-      {% render_field field class="form-control" %}
+      {{ field.label_tag }}
+      {% if form.is_bound %}
+        {% if field.errors %}
+          {% render_field field class="form-control is-invalid" %}
+          {% for error in field.errors %}
+            <div class="invalid-feedback">
+              {{ error }}
+            </div>
+          {% endfor %}
+        {% else %}
+          {% render_field field class="form-control is-valid" %}
+        {% endif %}
+      {% else %}
+        {% render_field field class="form-control" %}
+      {% endif %}
     {% endif %}
 
     {% if field.help_text %}
