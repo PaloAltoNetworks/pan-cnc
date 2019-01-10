@@ -665,12 +665,14 @@ class ProvisionSnippetView(CNCBaseAuth, CNCBaseFormView):
         if self.service['type'] == 'template':
             template = snippet_utils.render_snippet_template(self.service, self.app_dir, self.get_workflow())
             context = dict()
+            context['base_html'] = self.base_html
             context['results'] = template
             return render(self.request, 'pan_cnc/results.html', context)
 
         login = pan_utils.panorama_login()
         if login is None:
             context = dict()
+            context['base_html'] = self.base_html
             context['results'] = 'Could not login to Panorama'
             return render(self.request, 'pan_cnc/results.html', context=context)
 
