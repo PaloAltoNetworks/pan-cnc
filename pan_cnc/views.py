@@ -1,6 +1,33 @@
+# Copyright (c) 2018, Palo Alto Networks
+#
+# Permission to use, copy, modify, and/or distribute this software for any
+# purpose with or without fee is hereby granted, provided that the above
+# copyright notice and this permission notice appear in all copies.
+#
+# THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+# WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+# ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+# WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+# ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+# OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+
+# Author: Nathan Embery nembery@paloaltonetworks.com
+
+"""
+Palo Alto Networks pan-cnc
+
+pan-cnc is a library to build simple GUIs and workflows primarily to interact with various APIs
+
+Please see http://github.com/PaloAltoNetworks/pan-cnc for more information
+
+This software is provided without support, warranty, or guarantee.
+Use at your own risk.
+"""
+
 from typing import Any
 import copy
-
+from collections import OrderedDict
 from django import forms
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
@@ -13,20 +40,36 @@ from django.views.generic.edit import FormView
 from pan_cnc.lib import cnc_utils
 from pan_cnc.lib import pan_utils
 from pan_cnc.lib import snippet_utils
-from pan_cnc.lib.exceptions import SnippetRequiredException
+from pan_cnc.lib.exceptions import SnippetRequiredException, CCFParserError
 
 
 class CNCBaseAuth(LoginRequiredMixin):
+    """
+    Base Authentication Mixin - This can be overrode to provide some specific authentication implementation
+    """
     login_url = '/login'
 
 
 class CNCView(CNCBaseAuth, TemplateView):
+    """
+    Base View that only renders a template. Use or override this class if you want to include a custom
+    HTML page in your app
+    """
     template_name = "pan_cnc/index.html"
     # base html - allow sub apps to override this with special html base if desired
     base_html = 'pan_cnc/base.html'
     app_dir = 'pan_cnc'
 
     def get_context_data(self, **kwargs):
+        """
+        This gets called just before the template is rendered. Use this to add any data to the context dict that will
+        be passed to the template. Any keys defined in the context dict will be directly available in the template.
+        context['test'] = '123' can be accessed like so in an HTML template:
+        <p>The value of test is {{ test }}</p>
+
+        :param kwargs:
+        :return: dict
+        """
         context = super().get_context_data(**kwargs)
         context['base_html'] = self.base_html
         context['app_dir'] = self.app_dir
@@ -40,7 +83,7 @@ class CNCBaseFormView(FormView):
     GET will create a dynamic form based on the loaded snippet
     POST will save all user input into the session and redirect to next_url
 
-    Variables defined in __init__ are instance specific variables while variables defined immedately preceeding
+    Variables defined in __init__ are instance specific variables while variables defined immediately following
     this docstring are class specific variables and will be shared with child classes
 
     """
@@ -109,23 +152,36 @@ class CNCBaseFormView(FormView):
         self._snippet = value
 
     def get_snippet(self):
+        """
+        This is always called on both GET and POST. Most of the time, the snippet attribute will be set directly
+        in the pan_cnc.yaml file. However, there are times where the snippet is dynamically chosen by the user
+        so it will only be available in the POSTed data, or possibly saved in the session previously
+        :return:
+        """
         print('Getting snippet here in CNCBaseFormView:get_snippet')
         if 'snippet_name' in self.request.POST:
-            print('found it in the POST')
+            print('found snippet defined in the POST')
             return self.request.POST['snippet_name']
 
         elif self.app_dir in self.request.session:
-            print('Checking session for snippet')
             session_cache = self.request.session[self.app_dir]
             if 'snippet_name' in session_cache:
+                print('found snippet defined in the session')
                 print('returning snippet name: %s' % session_cache['snippet_name'])
                 return session_cache['snippet_name']
 
+        # default case is to use the snippet defined directly on the class
         print(f'Returning snippet: {self.snippet}')
         return self.snippet
 
     def get_context_data(self, **kwargs) -> dict:
+        """
+        Loads relevant configuration into the context for the page render
+        :param kwargs:
+        :return:
+        """
         context = super().get_context_data(**kwargs)
+        # Generate the dynamic form based on the snippet name found and returned from get_snippet
         form = self.generate_dynamic_form()
         context['form'] = form
         context['header'] = self.header
@@ -137,7 +193,11 @@ class CNCBaseFormView(FormView):
         return context
 
     def get(self, request, *args, **kwargs) -> Any:
-        """Handle GET requests: instantiate a blank version of the form."""
+        """
+            Handle GET requests:
+            This will show the form. Get the current snippet, load and parse the snippet, get the context
+            including the dynamically generated form, then render the page
+        """
         # load the snippet into the class attribute here so it's available to all other methods throughout the
         # call chain in the child classes
         try:
@@ -149,12 +209,16 @@ class CNCBaseFormView(FormView):
             print('Snippet was not defined here!')
             messages.add_message(self.request, messages.ERROR, 'Process Error - Snippet not found')
             return HttpResponseRedirect('/')
+        except CCFParserError as cpe:
+            print('Could not load CCF Metadata!')
+            messages.add_message(self.request, messages.ERROR, 'Process Error - Could not load CCF')
+            return HttpResponseRedirect('/')
 
     def post(self, request, *args, **kwargs) -> Any:
         """
         Handle POST requests: instantiate a form instance with the passed
         POST variables and then check if it's valid. If valid, save variables to the session
-        and load the desired snippet
+        and call form_valid
         """
         form = self.get_form()
         if form.is_valid():
@@ -169,6 +233,11 @@ class CNCBaseFormView(FormView):
             return self.form_invalid(form)
 
     def render_snippet_template(self) -> str:
+        """
+        Convenience method to render the defined snippet. By default this will render the first snippet defined in the
+        metdata.xml file. An optional argument can be added to render a specific file if desired
+        :return: string containing rendered snippet template
+        """
 
         if 'variables' not in self.service:
             print('Service not loaded on this class!')
@@ -196,11 +265,21 @@ class CNCBaseFormView(FormView):
         self.request.session[self.app_dir] = current_workflow
 
     def save_value_to_workflow(self, var_name, var_value) -> None:
+        """
+        Save a specific key value pair to the current workflow session cache
+        :param var_name: variable name to use
+        :param var_value: value of the variable to store
+        :return: None
+        """
 
         workflow = self.get_workflow()
         workflow[var_name] = var_value
 
     def get_workflow(self) -> dict:
+        """
+        Return the workflow from the session cache
+        :return:
+        """
         if self.app_dir in self.request.session:
             return self.request.session[self.app_dir]
         else:
@@ -208,7 +287,7 @@ class CNCBaseFormView(FormView):
 
     def get_snippet_context(self) -> dict:
         """
-        Convienence function to return the current workflow and env secrets in a single context
+        Convenience method to return the current workflow and env secrets in a single context
         useful for rendering snippets that require values from both
         :return: dict containing env secrets and workflow values
         """
@@ -236,7 +315,11 @@ class CNCBaseFormView(FormView):
         else:
             return default
 
-    def get_environment_secrets(self):
+    def get_environment_secrets(self) -> dict:
+        """
+        Returns a dict containing the currently loaded environment secrets
+        :return: dict with key value pairs of secrets
+        """
         default = dict()
         if 'environments' not in self.request.session or 'current_env' not in self.request.session:
             return default
@@ -257,6 +340,12 @@ class CNCBaseFormView(FormView):
         return e['secrets']
 
     def get_value_from_environment(self, var_name, default) -> Any:
+        """
+        Return the specified value from the environment secrets dict
+        :param var_name: name of the key to lookup
+        :param default: what to return if the key was not found
+        :return: value of the specified secret key
+        """
         if 'environments' not in self.request.session or 'current_env' not in self.request.session:
             return default
 
@@ -277,11 +366,25 @@ class CNCBaseFormView(FormView):
             return default
 
     def generate_dynamic_form(self) -> forms.Form:
+        """
+        The heart of this class. This will generate a Form object based on the value of the self.snippet
+        All variables defined in a snippet metadata.xml file will be converted into a form field depending on it's
+        type_hint. The initial value of the variable will be the value of the 'default' key defined in the metadata file
+        or the value of a secret from the currently loaded environment if it contains the same name.
+
+        :return: Form object
+        """
 
         dynamic_form = forms.Form()
 
         if self.service is None:
-            print('There is not service here :-/')
+            # A GET call will find and load a snippet, then use the snippet_utils library to load that snippet
+            # into the self.service attribute
+            print('There is no service here :-/')
+            return dynamic_form
+
+        if not isinstance(self.service, dict):
+            print('Snippet incorrectly loaded or defined')
             return dynamic_form
 
         if 'variables' not in self.service:
@@ -290,6 +393,11 @@ class CNCBaseFormView(FormView):
 
         # Get all of the variables defined in the self.service
         for variable in self.service['variables']:
+            if type(variable) is not OrderedDict:
+                print('Variable configuration is incorrect')
+                print(type(variable))
+                continue
+
             if len(self.fields_to_filter) != 0:
                 if variable['name'] in self.fields_to_filter:
                     print('Skipping render of variable %s' % variable['name'])
@@ -300,20 +408,33 @@ class CNCBaseFormView(FormView):
                     print('Skipping render of variable %s' % variable['name'])
                     continue
 
-            field_name = variable['name']
-            type_hint = variable['type_hint']
-            description = variable['description']
+            required_keys = {'name', 'description'}
+            if not required_keys.issubset(variable.keys()):
+                print('Variable does not contain required keys: name, description')
+                continue
+
+            field_name = variable.get('name', '')
+
+            if type(field_name) is not str and type(field_name) is not int:
+                print('Variable name is not a str')
+                continue
+
+            type_hint = variable.get('type_hint', 'text')
+            description = variable.get('description', '')
+            variable_default = variable.get('default', '')
+
             # if the user has entered this before, let's grab it from the session
-            default = self.get_value_from_workflow(variable['name'], variable['default'])
+            default = self.get_value_from_workflow(field_name, variable_default)
             # Figure out which type of widget should be rendered
             # Valid widgets are dropdown, text_area, password and defaults to a char field
             if type_hint == 'dropdown' and 'dd_list' in variable:
                 dd_list = variable['dd_list']
                 choices_list = list()
                 for item in dd_list:
-                    print(item)
-                    choice = (item['value'], item['key'])
-                    choices_list.append(choice)
+                    if 'key' in item and 'value' in item:
+                        print(item)
+                        choice = (item['value'], item['key'])
+                        choices_list.append(choice)
                 dynamic_form.fields[field_name] = forms.ChoiceField(choices=tuple(choices_list), label=description,
                                                                     initial=default)
             elif type_hint == "text_area":
@@ -342,7 +463,8 @@ class CNCBaseFormView(FormView):
                 for item in cbx_list:
                     choice = (item['value'], item['key'])
                     choices_list.append(choice)
-                dynamic_form.fields[field_name] = forms.ChoiceField(widget=forms.CheckboxSelectMultiple, choices=choices_list,
+                dynamic_form.fields[field_name] = forms.ChoiceField(widget=forms.CheckboxSelectMultiple,
+                                                                    choices=choices_list,
                                                                     label=description, initial=default)
             else:
                 dynamic_form.fields[field_name] = forms.CharField(label=description, initial=default)
@@ -359,13 +481,31 @@ class CNCBaseFormView(FormView):
 
 
 class ChooseSnippetByLabelView(CNCBaseAuth, CNCBaseFormView):
+    """
+
+    A subclass of the CNCBaseFormView that adds a label_name and label_value attributes. This will
+    load the form as it's parent, but will also override or add a form_field called 'snippet_name' with a
+    dropdown list of all snippets found with a label_name with a value or label_value
+
+    This is useful to build a form that allows the user to choose a snippet to load based on some arbitrary group
+    of snippets (i.e. all snippets with a label like 'category: internet_service'
+
+    """
     label_name = ''
     label_value = ''
 
     def get_snippet(self) -> str:
+        """
+        Always return a blank snippet name - ensure we do not pick up an old selection from the POST or session cache
+        :return:
+        """
         return ''
 
     def generate_dynamic_form(self):
+        """
+        Generates a form with only 1 option - snippet_name
+        :return: Form Object
+        """
 
         form = forms.Form()
         if self.label_name == '' or self.label_value == '':
@@ -423,6 +563,19 @@ class ChooseSnippetByLabelView(CNCBaseAuth, CNCBaseFormView):
 
 
 class ChooseSnippetView(CNCBaseAuth, CNCBaseFormView):
+    """
+
+    A subclass of the CNCBaseFormView that adds a label_name and label_value attributes. This will
+    load the form as it's parent, but will also override or add a form_field based on the value of the
+    customize_field label with a dropdown list of all snippets found with a customize_label_name
+    with a value of customize_label_value.
+
+    This will also load all other form fields defined in the metadata.yaml file
+
+    This is useful to build a form that allows the user to choose a snippet to load based on some arbitrary group
+    of snippets (i.e. all snippets with a label like 'category: internet_service'
+
+    """
     snippet = ''
 
     def get_snippet(self):
@@ -433,7 +586,9 @@ class ChooseSnippetView(CNCBaseAuth, CNCBaseFormView):
         if self.service is None:
             return form
 
-        if 'labels' in self.service and 'customize_field' in self.service['labels']:
+        if 'labels' in self.service \
+                and type(self.service['labels']) is dict \
+                and 'customize_field' in self.service['labels']:
             labels = self.service['labels']
             if not {'customize_label_name', 'customize_label_value'}.issubset(labels):
                 print('Malformed Configure Service Picker!')
@@ -469,7 +624,7 @@ class ChooseSnippetView(CNCBaseAuth, CNCBaseFormView):
 
 class ProvisionSnippetView(CNCBaseAuth, CNCBaseFormView):
     """
-    Provision Service View - This view uses the Base Auth and Form View
+    Provision Snippet View - This view uses the Base Auth and Form View
     The posted view is actually a dynamically generated form so the forms.Form will actually be blank
     use form_valid as it will always be true in this case.
     """
@@ -551,16 +706,21 @@ class ProvisionSnippetView(CNCBaseAuth, CNCBaseFormView):
 
         # BUG-FIX to always just push the toplevel self.service
         pan_utils.push_service(self.service, jinja_context)
-        # if not pan_utils.validate_snippet_present(service, jinja_context):
-        #     print('Pushing new service: %s' % service['name'])
-        #     pan_utils.push_service(service, jinja_context)
-        # else:
-        #     print('This service was already configured on the server')
 
         return super().form_valid(form)
 
+#
+#
+# Environment Management Views
+#
+#
+
 
 class EnvironmentBase(CNCBaseAuth, View):
+    """
+    Base for all environment related views, ensure we always redirect to unlock_envs if no environment is currently
+    loaded
+    """
     def __init__(self):
         self.e = dict()
         super().__init__()
@@ -574,6 +734,9 @@ class EnvironmentBase(CNCBaseAuth, View):
 
 
 class UnlockEnvironmentsView(CNCBaseAuth, FormView):
+    """
+    unlock an environment
+    """
     success_url = 'list_envs'
     template_name = 'pan_cnc/dynamic_form.html'
     # base form class, you should not need to override this
@@ -624,6 +787,9 @@ class UnlockEnvironmentsView(CNCBaseAuth, FormView):
 
 
 class ListEnvironmentsView(EnvironmentBase, CNCView):
+    """
+    List all Environments
+    """
     template_name = 'pan_cnc/list_environments.html'
 
     def get_context_data(self, **kwargs):
@@ -634,6 +800,9 @@ class ListEnvironmentsView(EnvironmentBase, CNCView):
 
 
 class EditEnvironmentsView(EnvironmentBase, FormView):
+    """
+    Edit or update an environment
+    """
     success_url = '/edit_env'
     template_name = 'pan_cnc/edit_env.html'
     # base form class, you should not need to override this
@@ -697,6 +866,9 @@ class EditEnvironmentsView(EnvironmentBase, FormView):
 
 
 class CreateEnvironmentsView(EnvironmentBase, FormView):
+    """
+    Creates a new Environment
+    """
     success_url = '/edit_env'
     template_name = 'pan_cnc/dynamic_form.html'
     # base form class, you should not need to override this
@@ -759,7 +931,9 @@ class CreateEnvironmentsView(EnvironmentBase, FormView):
 
 
 class LoadEnvironmentView(EnvironmentBase, RedirectView):
-
+    """
+    Load an environment and save it on the session
+    """
     def get_redirect_url(self, *args, **kwargs):
 
         env_name = self.kwargs.get('env_name')
@@ -776,6 +950,9 @@ class LoadEnvironmentView(EnvironmentBase, RedirectView):
 
 
 class DeleteEnvironmentView(EnvironmentBase, RedirectView):
+    """
+    Delete an environment off disk and ensure it is no longer loaded in the session
+    """
 
     def get_redirect_url(self, *args, **kwargs):
 
@@ -800,6 +977,9 @@ class DeleteEnvironmentView(EnvironmentBase, RedirectView):
 
 
 class DeleteEnvironmentKeyView(EnvironmentBase, RedirectView):
+    """
+    Delete a single Key from the environment
+    """
 
     def get_redirect_url(self, *args, **kwargs):
 
@@ -824,6 +1004,9 @@ class DeleteEnvironmentKeyView(EnvironmentBase, RedirectView):
 
 
 class DebugMetadataView(CNCView):
+    """
+    Debug class
+    """
     template_name = 'pan_cnc/results.html'
 
     def __init__(self):
