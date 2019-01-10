@@ -134,7 +134,7 @@ for app_name in settings.INSTALLED_APPS_CONFIG:
 
             path_string = f'{app_name}/{view_name}'
             for p in v['parameters']:
-                path_string += f'/{p}'
+                path_string += f'/<{p}>'
 
             new_path = path(path_string, class_object.as_view(**attributes), context)
         else:
