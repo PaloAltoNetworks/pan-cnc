@@ -126,6 +126,17 @@ for app_name in settings.INSTALLED_APPS_CONFIG:
         if 'parameter' in v:
             param = v['parameter']
             new_path = path(f'{app_name}/{view_name}/<{param}>', class_object.as_view(**attributes), context)
+        elif 'parameters' in v:
+            if type(v['parameters']) is not list:
+                print(type(v['parameters']))
+                print('parameters attribute is not a list!')
+                continue
+
+            path_string = f'{app_name}/{view_name}'
+            for p in v['parameters']:
+                path_string += f'/{p}'
+
+            new_path = path(path_string, class_object.as_view(**attributes), context)
         else:
             new_path = path(f'{app_name}/{view_name}', class_object.as_view(**attributes), context)
 
