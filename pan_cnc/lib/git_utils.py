@@ -21,6 +21,9 @@ def clone_or_update_repo(repo_dir, repo_name, repo_url, branch='master'):
     except InvalidGitRepositoryError as igre:
         # this is not yet a git repo, let's try to clone it
         return clone_repo(repo_dir, repo_name, repo_url, branch)
+    except GitCommandError as gce:
+        print(gce)
+        return False
 
 
 def clone_repo(repo_dir, repo_name, repo_url, branch='master'):

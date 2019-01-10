@@ -5,7 +5,9 @@ from django.core.cache import cache
 from pathlib import Path
 from jinja2 import Environment
 from jinja2.loaders import BaseLoader
+from yaml.parser import ParserError
 from . import jinja_filters
+from .exceptions import CCFParserError
 
 
 def load_service_snippets():
@@ -80,7 +82,11 @@ def load_snippets_of_type(snippet_type=None, app_dir=None):
             except IOError as ioe:
                 print('Could not open metadata file in dir %s' % mdf)
                 print(ioe)
-                continue
+                raise CCFParserError
+            except ParserError as pe:
+                print('Could not parse metadata file in dir %s' %mdf)
+                print(pe)
+                raise CCFParserError
 
     return snippet_list
 
@@ -122,6 +128,10 @@ def get_snippet_metadata(snippet_name, app_dir):
             except IOError as ioe:
                 print('Could not open metadata file in dir %s' % mdf)
                 print(ioe)
+                return None
+            except ParserError as pe:
+                print(pe)
+                print('Could not parse metadata file')
                 return None
 
     return None

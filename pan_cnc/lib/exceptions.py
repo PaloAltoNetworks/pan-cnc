@@ -12,3 +12,8 @@ class LoginRequired(Exception):
 class TargetConnectionException(Exception):
     pass
 
+
+class CCFParserError(Exception):
+    pass
+
+
