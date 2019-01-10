@@ -587,7 +587,7 @@ class ChooseSnippetView(CNCBaseAuth, CNCBaseFormView):
             return form
 
         if 'labels' in self.service \
-                and type(self.service['labels']) is dict \
+                and isinstance(self.service['labels'], dict) \
                 and 'customize_field' in self.service['labels']:
             labels = self.service['labels']
             if not {'customize_label_name', 'customize_label_value'}.issubset(labels):
