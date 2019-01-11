@@ -283,7 +283,8 @@ class CNCBaseFormView(FormView):
         if self.app_dir in self.request.session:
             return self.request.session[self.app_dir]
         else:
-            return dict()
+            self.request.session[self.app_dir] = dict()
+            return self.request.session[self.app_dir]
 
     def get_snippet_context(self) -> dict:
         """
