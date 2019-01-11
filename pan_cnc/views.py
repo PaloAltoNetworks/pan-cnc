@@ -49,6 +49,127 @@ class CNCBaseAuth(LoginRequiredMixin):
     """
     login_url = '/login'
 
+    def save_workflow_to_session(self) -> None:
+        """
+        Save the current user input to the session
+        :return: None
+        """
+
+        if self.app_dir in self.request.session:
+            current_workflow = self.request.session[self.app_dir]
+        else:
+            current_workflow = dict()
+
+        for variable in self.service['variables']:
+            var_name = variable['name']
+            if var_name in self.request.POST:
+                print('Adding variable %s to session' % var_name)
+                current_workflow[var_name] = self.request.POST.get(var_name)
+
+        self.request.session[self.app_dir] = current_workflow
+
+    def save_value_to_workflow(self, var_name, var_value) -> None:
+        """
+        Save a specific key value pair to the current workflow session cache
+        :param var_name: variable name to use
+        :param var_value: value of the variable to store
+        :return: None
+        """
+
+        workflow = self.get_workflow()
+        workflow[var_name] = var_value
+
+    def get_workflow(self) -> dict:
+        """
+        Return the workflow from the session cache
+        :return:
+        """
+        if self.app_dir in self.request.session:
+            return self.request.session[self.app_dir]
+        else:
+            self.request.session[self.app_dir] = dict()
+            return self.request.session[self.app_dir]
+
+    def get_snippet_context(self) -> dict:
+        """
+        Convenience method to return the current workflow and env secrets in a single context
+        useful for rendering snippets that require values from both
+        :return: dict containing env secrets and workflow values
+        """
+        context = self.get_workflow()
+        context.update(self.get_environment_secrets())
+        return context
+
+    def get_value_from_workflow(self, var_name, default='') -> Any:
+        """
+        Return the variable value either from the workflow (if it's already been saved there)
+        or from the environment, if it happens to be configured there
+        :param var_name: name of variable to find and return
+        :param default: default value if nothing has been saved to the workflow or configured in the environment
+        :return: value of variable
+        """
+        session_cache = self.get_workflow()
+        secrets = self.get_environment_secrets()
+
+        if var_name in secrets:
+            print('returning variable from environment')
+            return secrets[var_name]
+        elif var_name in session_cache:
+            print('returning var from session')
+            return session_cache[var_name]
+        else:
+            return default
+
+    def get_environment_secrets(self) -> dict:
+        """
+        Returns a dict containing the currently loaded environment secrets
+        :return: dict with key value pairs of secrets
+        """
+        default = dict()
+        if 'environments' not in self.request.session or 'current_env' not in self.request.session:
+            return default
+
+        current_env = self.request.session['current_env']
+        if current_env not in self.request.session['environments']:
+            print('Environments are incorrectly loaded')
+            return default
+
+        e = self.request.session['environments'][current_env]
+        if 'secrets' not in e:
+            print('Environment secrets are incorrectly loaded')
+            return default
+
+        if type(e['secrets']) is not dict:
+            return default
+
+        return e['secrets']
+
+    def get_value_from_environment(self, var_name, default) -> Any:
+        """
+        Return the specified value from the environment secrets dict
+        :param var_name: name of the key to lookup
+        :param default: what to return if the key was not found
+        :return: value of the specified secret key
+        """
+        if 'environments' not in self.request.session or 'current_env' not in self.request.session:
+            return default
+
+        current_env = self.request.session['current_env']
+        if current_env not in self.request.session['environments']:
+            print('Environments are incorrectly loaded')
+            return default
+
+        e = self.request.session['environments'][current_env]
+        if 'secrets' not in e:
+            print('Environment secrets are incorrectly loaded')
+            return default
+
+        if var_name in e['secrets']:
+            return e['secrets'][var_name]
+        else:
+            print('Not found in ENV, returning default')
+            return default
+
 
 class CNCView(CNCBaseAuth, TemplateView):
     """
@@ -76,7 +197,7 @@ class CNCView(CNCBaseAuth, TemplateView):
         return context
 
 
-class CNCBaseFormView(FormView):
+class CNCBaseFormView(FormView, CNCBaseAuth):
     """
     Base class for most CNC view functions. Will find a 'snippet' from either the POST or the session cache
     and load it into a 'service' attribute.
@@ -245,127 +366,6 @@ class CNCBaseFormView(FormView):
         template = snippet_utils.render_snippet_template(self.service, self.app_dir, self.get_workflow())
         return template
 
-    def save_workflow_to_session(self) -> None:
-        """
-        Save the current user input to the session
-        :return: None
-        """
-
-        if self.app_dir in self.request.session:
-            current_workflow = self.request.session[self.app_dir]
-        else:
-            current_workflow = dict()
-
-        for variable in self.service['variables']:
-            var_name = variable['name']
-            if var_name in self.request.POST:
-                print('Adding variable %s to session' % var_name)
-                current_workflow[var_name] = self.request.POST.get(var_name)
-
-        self.request.session[self.app_dir] = current_workflow
-
-    def save_value_to_workflow(self, var_name, var_value) -> None:
-        """
-        Save a specific key value pair to the current workflow session cache
-        :param var_name: variable name to use
-        :param var_value: value of the variable to store
-        :return: None
-        """
-
-        workflow = self.get_workflow()
-        workflow[var_name] = var_value
-
-    def get_workflow(self) -> dict:
-        """
-        Return the workflow from the session cache
-        :return:
-        """
-        if self.app_dir in self.request.session:
-            return self.request.session[self.app_dir]
-        else:
-            self.request.session[self.app_dir] = dict()
-            return self.request.session[self.app_dir]
-
-    def get_snippet_context(self) -> dict:
-        """
-        Convenience method to return the current workflow and env secrets in a single context
-        useful for rendering snippets that require values from both
-        :return: dict containing env secrets and workflow values
-        """
-        context = self.get_workflow()
-        context.update(self.get_environment_secrets())
-        return context
-
-    def get_value_from_workflow(self, var_name, default='') -> Any:
-        """
-        Return the variable value either from the workflow (if it's already been saved there)
-        or from the environment, if it happens to be configured there
-        :param var_name: name of variable to find and return
-        :param default: default value if nothing has been saved to the workflow or configured in the environment
-        :return: value of variable
-        """
-        session_cache = self.get_workflow()
-        secrets = self.get_environment_secrets()
-
-        if var_name in secrets:
-            print('returning variable from environment')
-            return secrets[var_name]
-        elif var_name in session_cache:
-            print('returning var from session')
-            return session_cache[var_name]
-        else:
-            return default
-
-    def get_environment_secrets(self) -> dict:
-        """
-        Returns a dict containing the currently loaded environment secrets
-        :return: dict with key value pairs of secrets
-        """
-        default = dict()
-        if 'environments' not in self.request.session or 'current_env' not in self.request.session:
-            return default
-
-        current_env = self.request.session['current_env']
-        if current_env not in self.request.session['environments']:
-            print('Environments are incorrectly loaded')
-            return default
-
-        e = self.request.session['environments'][current_env]
-        if 'secrets' not in e:
-            print('Environment secrets are incorrectly loaded')
-            return default
-
-        if type(e['secrets']) is not dict:
-            return default
-
-        return e['secrets']
-
-    def get_value_from_environment(self, var_name, default) -> Any:
-        """
-        Return the specified value from the environment secrets dict
-        :param var_name: name of the key to lookup
-        :param default: what to return if the key was not found
-        :return: value of the specified secret key
-        """
-        if 'environments' not in self.request.session or 'current_env' not in self.request.session:
-            return default
-
-        current_env = self.request.session['current_env']
-        if current_env not in self.request.session['environments']:
-            print('Environments are incorrectly loaded')
-            return default
-
-        e = self.request.session['environments'][current_env]
-        if 'secrets' not in e:
-            print('Environment secrets are incorrectly loaded')
-            return default
-
-        if var_name in e['secrets']:
-            return e['secrets'][var_name]
-        else:
-            print('Not found in ENV, returning default')
-            return default
-
     def generate_dynamic_form(self) -> forms.Form:
         """
         The heart of this class. This will generate a Form object based on the value of the self.snippet
@@ -481,7 +481,7 @@ class CNCBaseFormView(FormView):
         return HttpResponseRedirect(self.next_url)
 
 
-class ChooseSnippetByLabelView(CNCBaseAuth, CNCBaseFormView):
+class ChooseSnippetByLabelView(CNCBaseFormView):
     """
 
     A subclass of the CNCBaseFormView that adds a label_name and label_value attributes. This will
@@ -563,7 +563,7 @@ class ChooseSnippetByLabelView(CNCBaseAuth, CNCBaseFormView):
             return self.form_invalid(form)
 
 
-class ChooseSnippetView(CNCBaseAuth, CNCBaseFormView):
+class ChooseSnippetView(CNCBaseFormView):
     """
 
     A subclass of the CNCBaseFormView that adds a label_name and label_value attributes. This will
@@ -623,7 +623,7 @@ class ChooseSnippetView(CNCBaseAuth, CNCBaseFormView):
         return form
 
 
-class ProvisionSnippetView(CNCBaseAuth, CNCBaseFormView):
+class ProvisionSnippetView(CNCBaseFormView):
     """
     Provision Snippet View - This view uses the Base Auth and Form View
     The posted view is actually a dynamically generated form so the forms.Form will actually be blank
@@ -789,7 +789,7 @@ class UnlockEnvironmentsView(CNCBaseAuth, FormView):
             return self.form_invalid(form)
 
 
-class ListEnvironmentsView(EnvironmentBase, CNCView):
+class ListEnvironmentsView(EnvironmentBase, TemplateView):
     """
     List all Environments
     """
@@ -1004,6 +1004,13 @@ class DeleteEnvironmentKeyView(EnvironmentBase, RedirectView):
             messages.add_message(self.request, messages.ERROR, 'Could not find secret!')
 
         return f'/edit_env/{env_name}'
+
+#
+#
+#
+# Debug Classes
+#
+#
 
 
 class DebugMetadataView(CNCView):
