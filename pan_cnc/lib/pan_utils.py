@@ -185,7 +185,7 @@ def get_vm_auth_key_from_panorama():
     xapi = panorama_login()
     try:
         xapi.op(cmd='<request><bootstrap><vm-auth-key><generate>'
-                    '<lifetime>2</lifetime></generate></vm-auth-key></bootstrap></request>')
+                    '<lifetime>24</lifetime></generate></vm-auth-key></bootstrap></request>')
         print(xapi.status_code)
         print(xapi.status_detail)
         return xapi.xml_result()
