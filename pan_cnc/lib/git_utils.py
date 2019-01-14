@@ -1,4 +1,5 @@
 import requests
+from requests import ConnectionError
 from git import InvalidGitRepositoryError, NoSuchPathError, GitCommandError
 from git import Repo
 
@@ -94,9 +95,21 @@ def get_repo_upstream_details(repo_name, repo_url):
         owner = url_parts[0]
         repo = url_parts[1].split('.git')[0]
 
-        api_url = f'https://api.github.com/repos/{owner}/{repo}'
-        detail_string = requests.get(api_url, verify=False)
-        details = detail_string.json()
-        cnc_utils.set_cached_value(f'git_utils_upstream_{repo_name}', details)
+        try:
+            api_url = f'https://api.github.com/repos/{owner}/{repo}'
+            detail_string = requests.get(api_url, verify=False)
+            details = detail_string.json()
+            cnc_utils.set_cached_value(f'git_utils_upstream_{repo_name}', details)
+        except ConnectionResetError as cre:
+            print('Could not get github details due to ConnectionResetError')
+            print(cre)
+        except ConnectionError as ce:
+            print('Could not get github details due to ConnectionError')
+            print(ce)
+            return details
+        except Exception as e:
+            print(type(e))
+            print(e)
+            raise
 
     return details
