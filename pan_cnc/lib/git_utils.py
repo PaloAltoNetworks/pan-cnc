@@ -1,3 +1,19 @@
+# Copyright (c) 2018, Palo Alto Networks
+#
+# Permission to use, copy, modify, and/or distribute this software for any
+# purpose with or without fee is hereby granted, provided that the above
+# copyright notice and this permission notice appear in all copies.
+#
+# THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+# WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+# ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+# WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+# ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+# OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+
+# Author: Nathan Embery nembery@paloaltonetworks.com
+
 import requests
 from requests import ConnectionError
 from git import InvalidGitRepositoryError, NoSuchPathError, GitCommandError
@@ -7,6 +23,14 @@ from pan_cnc.lib import cnc_utils
 
 
 def clone_or_update_repo(repo_dir, repo_name, repo_url, branch='master'):
+    """
+    Clone a repository if it does not exist OR update it if it does
+    :param repo_dir: dir where the repo should live
+    :param repo_name: name of the repo
+    :param repo_url: url from which to clone or update the repo
+    :param branch: which branch to checkout
+    :return:  boolean
+    """
     try:
 
         repo = Repo(repo_dir)
@@ -28,6 +52,14 @@ def clone_or_update_repo(repo_dir, repo_name, repo_url, branch='master'):
 
 
 def clone_repo(repo_dir, repo_name, repo_url, branch='master'):
+    """
+    Clone the given repository into the given directory name
+    :param repo_dir:
+    :param repo_name:
+    :param repo_url:
+    :param branch:
+    :return:
+    """
     try:
         repo = Repo.clone_from(repo_url, repo_dir, depth=3, branch=branch, config='http.sslVerify=false')
     except GitCommandError as gce:
@@ -38,6 +70,12 @@ def clone_repo(repo_dir, repo_name, repo_url, branch='master'):
 
 
 def get_repo_details(repo_name, repo_dir):
+    """
+    Fetch the details for a given repo name and directory
+    :param repo_name:
+    :param repo_dir:
+    :return:
+    """
     repo = Repo(repo_dir)
 
     url = repo.remotes.origin.url
@@ -69,7 +107,13 @@ def get_repo_details(repo_name, repo_dir):
 
 
 def update_repo(repo_dir):
+    """
+    Pull the latest updates from a repository
+    :param repo_dir:
+    :return:
+    """
     repo = Repo(repo_dir)
+    # FIXME - ensure we catch errors here
     f = repo.remotes.origin.pull()
     if len(f) > 0:
         flags = f[0].flags
@@ -84,6 +128,13 @@ def update_repo(repo_dir):
 
 
 def get_repo_upstream_details(repo_name, repo_url):
+    """
+    Attempt to get the details from a git repository. Details are found via specifc APIs for each type of git repo.
+    Currently only Github is supported.
+    :param repo_name:
+    :param repo_url:
+    :return:
+    """
     details = cnc_utils.get_cached_value(f'git_utils_upstream_{repo_name}')
     if details is not None:
         return details
