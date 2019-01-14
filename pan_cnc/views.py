@@ -25,9 +25,10 @@ This software is provided without support, warranty, or guarantee.
 Use at your own risk.
 """
 
-from typing import Any
 import copy
 from collections import OrderedDict
+from typing import Any
+
 from django import forms
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
@@ -225,6 +226,10 @@ class CNCBaseFormView(FormView, CNCBaseAuth):
     app_dir = 'pan_cnc'
     # base html - allow sub apps to override this with special html base if desired
     base_html = 'pan_cnc/base.html'
+    # link to external documentation
+    documentation_link = ''
+    # help text - inline documentation text
+    help_text = ''
 
     def __init__(self, **kwargs):
         # fields to render and fields to filter should never be shared to child classes
@@ -631,7 +636,14 @@ class ProvisionSnippetView(CNCBaseFormView):
     """
     snippet = ''
     header = 'Provision Service'
-    title = 'Configure Service Sales information'
+    title = 'Provision this CCF against the selected target'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data()
+        target_ip = self.get_value_from_workflow('TARGET_IP', '')
+        if target_ip == '':
+            messages.add_message(self.request, messages.ERROR, 'No TARGET_IP currently defined for provision!')
+        return context
 
     def get_snippet(self):
         print('Getting snippet here in ProvisionSnippetView:get_snippet')
@@ -712,6 +724,7 @@ class ProvisionSnippetView(CNCBaseFormView):
 
         return super().form_valid(form)
 
+
 #
 #
 # Environment Management Views
@@ -724,6 +737,7 @@ class EnvironmentBase(CNCBaseAuth, View):
     Base for all environment related views, ensure we always redirect to unlock_envs if no environment is currently
     loaded
     """
+
     def __init__(self):
         self.e = dict()
         super().__init__()
@@ -747,6 +761,14 @@ class UnlockEnvironmentsView(CNCBaseAuth, FormView):
     base_html = 'pan_cnc/base.html'
     header = 'Unlock Environments'
     title = 'Enter master passphrase to unlock the environments configuration'
+    help_text = """
+                    This form will unlock your Environment. If you have not created an Environment, a new one will be
+                    created using the password supplied below.
+                
+                    Creating an environment allows you to keep passwords and other data specific to an environment 
+                    in one place. The environments file is encrypted and placed in your home directory for safe
+                    keeping.
+                """
 
     def get_context_data(self, **kwargs) -> dict:
         context = super().get_context_data(**kwargs)
@@ -937,6 +959,7 @@ class LoadEnvironmentView(EnvironmentBase, RedirectView):
     """
     Load an environment and save it on the session
     """
+
     def get_redirect_url(self, *args, **kwargs):
 
         env_name = self.kwargs.get('env_name')
@@ -1004,6 +1027,7 @@ class DeleteEnvironmentKeyView(EnvironmentBase, RedirectView):
             messages.add_message(self.request, messages.ERROR, 'Could not find secret!')
 
         return f'/edit_env/{env_name}'
+
 
 #
 #
