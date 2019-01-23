@@ -49,7 +49,7 @@ def load_template_snippets():
 
 def load_all_snippets(app_dir):
     # cache and keep all snippets when type == none
-    if cache.has_key('all_snippets'):
+    if 'all_snippets' in cache:
         snippet_list = cache.get('all_snippets', []) 
         if snippet_list:
             return snippet_list
@@ -82,11 +82,18 @@ def load_snippets_of_type(snippet_type=None, app_dir=None):
    
     snippets_dir = Path(os.path.join(settings.SRC_PATH, app_dir, 'snippets'))
     for d in snippets_dir.rglob('./*'):
-        mdf = os.path.join(d, 'metadata.yaml')
-        if os.path.isfile(mdf):
-            snippet_path = os.path.dirname(mdf)
+        if d.is_dir() and '.git' in d.name:
+            print(f'skipping .git dir {d.parent}')
+            continue
+
+        # mdf = os.path.join(d, 'metadata.yaml')
+        mdf = d.joinpath('metadata.yaml')
+        if mdf.is_file():
+            # if os.path.isfile(mdf):
+            # snippet_path = os.path.dirname(mdf)
+            snippet_path = str(mdf.parent.absolute())
             try:
-                with open(mdf, 'r') as sc:
+                with mdf.open(mode='r') as sc:
                     service_config = oyaml.load(sc.read())
                     service_config['snippet_path'] = snippet_path
                     if snippet_type is not None:

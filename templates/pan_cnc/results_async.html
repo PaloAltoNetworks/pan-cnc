@@ -1,0 +1,78 @@
+{% extends base_html|default:'pan_cnc/base.html' %}
+{% load static %}
+
+{% block content %}
+<script type="text/javascript">
+    let time_left = 5;
+    function updateOutput(){
+        time_left = 5;
+        $.get({'url': '/logs', 'success': function(json_data) {
+            console.log(json_data);
+            // let json_data = JSON.parse(data);
+            let msg = json_data['output'];
+            let status = json_data['status'];
+            let returncode = json_data['returncode'];
+            $('#results').html(msg);
+            if (status !== 'exited') {
+                console.log('checking again');
+                countdown();
+                setTimeout(updateOutput, 5000);
+            } else{
+                let c = $('#countdown');
+                c.empty();
+                let next_link = $('<a/>');
+                if (returncode === 0) {
+                    next_link.attr('href', '/next_task');
+                    next_link.html('Continue');
+                    next_link.addClass('btn').addClass('btn-primary');
+                } else {
+                    next_link.attr('href', '/');
+                    next_link.html('Continue');
+                    next_link.addClass('btn').addClass('btn-danger');
+                    c.append('Error Executing Task');
+                    c.append('<br>');
+                }
+                c.append(next_link);
+            }
+        },
+        'headers': {"X-CSRFToken": "{{ csrf_token }}"}});
+    }
+    function countdown() {
+        let c = $('#countdown');
+        c.html('Checking again in ' + time_left);
+        time_left = time_left - 1;
+        console.log(time_left);
+        if (time_left > 0) {
+            setTimeout(countdown, 1000);
+        }
+    }
+
+    $(document).ready(function() {
+        setTimeout(updateOutput, 1000);
+    });
+
+</script>
+<div class="card border-primary mb-6 shadow-lg">
+    <div class="card-header">
+        {% if header %}
+        {{ header }}
+        {% else %}
+        Results
+        {% endif %}
+    </div>
+    <div class="card-body">
+        <h4 class="card-title">
+            {% if title %}
+            {{ title }}
+            {% else %}
+            Output
+            {% endif %}
+        </h4>
+        <div class="card-text">
+            <p>{{ view_message }}</p>
+            <pre id="results">{{ results }}</pre>
+            <pre id="countdown"></pre>
+        </div>
+    </div>
+</div>
+{%  endblock %}

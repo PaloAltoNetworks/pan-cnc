@@ -15,11 +15,14 @@
 # Author: Nathan Embery nembery@paloaltonetworks.com
 
 import requests
-from requests import ConnectionError
+import urllib3
 from git import InvalidGitRepositoryError, NoSuchPathError, GitCommandError
 from git import Repo
+from requests import ConnectionError
 
 from pan_cnc.lib import cnc_utils
+
+urllib3.disable_warnings()
 
 
 def clone_or_update_repo(repo_dir, repo_name, repo_url, branch='master'):
@@ -96,6 +99,7 @@ def get_repo_details(repo_name, repo_dir):
     repo_detail['url'] = url
     repo_detail['branch'] = branch
     repo_detail['commits'] = commit_log
+    repo_detail['commits_url'] = get_repo_commits_url(url)
 
     upstream_details = get_repo_upstream_details(repo_name, url)
     if 'description' in upstream_details:
@@ -129,7 +133,7 @@ def update_repo(repo_dir):
 
 def get_repo_upstream_details(repo_name, repo_url):
     """
-    Attempt to get the details from a git repository. Details are found via specifc APIs for each type of git repo.
+    Attempt to get the details from a git repository. Details are found via specific APIs for each type of git repo.
     Currently only Github is supported.
     :param repo_name:
     :param repo_url:
@@ -164,3 +168,16 @@ def get_repo_upstream_details(repo_name, repo_url):
             raise
 
     return details
+
+
+def get_repo_commits_url(repo_url):
+    commits_url = None
+    if 'github' in repo_url:
+        url_parts = repo_url.split('/')[-2:]
+        owner = url_parts[0]
+        repo = url_parts[1].split('.git')[0]
+
+        commits_url = f'https://github.com/{owner}/{repo}/commit/'
+
+    print(f'returning {commits_url}')
+    return commits_url

@@ -40,6 +40,7 @@ urlpatterns = [
     path('login', auth_views.LoginView.as_view(template_name='pan_cnc/login.html'), name='login'),
     path('logout', auth_views.LogoutView.as_view(next_page='login')),
     path('list_envs', pan_cnc_views.ListEnvironmentsView.as_view()),
+    path('logs', pan_cnc_views.TaskLogsView.as_view()),
     path('load_env/<env_name>', pan_cnc_views.LoadEnvironmentView.as_view()),
     path('edit_env/<env_name>', pan_cnc_views.EditEnvironmentsView.as_view()),
     path('create_env', pan_cnc_views.CreateEnvironmentsView.as_view()),
@@ -47,7 +48,8 @@ urlpatterns = [
     path('delete_env/<env_name>', pan_cnc_views.DeleteEnvironmentView.as_view()),
     path('delete_secret/<env_name>/<key_name>', pan_cnc_views.DeleteEnvironmentKeyView.as_view()),
     path('unlock_envs', pan_cnc_views.UnlockEnvironmentsView.as_view()),
-    path('debug/<app_dir>/<snippet_name>', pan_cnc_views.DebugMetadataView.as_view())
+    path('debug/<app_dir>/<snippet_name>', pan_cnc_views.DebugMetadataView.as_view()),
+    path('next_task', pan_cnc_views.NextTaskView.as_view())
 ]
 
 print('Configuring URLs for installed apps')

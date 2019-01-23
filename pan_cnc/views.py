@@ -24,15 +24,17 @@ Please see http://github.com/PaloAltoNetworks/pan-cnc for more information
 This software is provided without support, warranty, or guarantee.
 Use at your own risk.
 """
-
 import copy
+import json
 from collections import OrderedDict
 from typing import Any
 
+from celery.result import AsyncResult
 from django import forms
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.shortcuts import render, HttpResponseRedirect
+from django.shortcuts import render, HttpResponseRedirect, HttpResponse
+from django.views.decorators.csrf import csrf_exempt
 from django.views.generic import RedirectView
 from django.views.generic import TemplateView
 from django.views.generic import View
@@ -41,14 +43,17 @@ from django.views.generic.edit import FormView
 from pan_cnc.lib import cnc_utils
 from pan_cnc.lib import pan_utils
 from pan_cnc.lib import snippet_utils
+from pan_cnc.lib import terraform_utils
+from pan_cnc.lib.actions.DockerAction import DockerAction
 from pan_cnc.lib.exceptions import SnippetRequiredException, CCFParserError
 
 
-class CNCBaseAuth(LoginRequiredMixin):
+class CNCBaseAuth(LoginRequiredMixin, View):
     """
     Base Authentication Mixin - This can be overrode to provide some specific authentication implementation
     """
     login_url = '/login'
+    app_dir = 'pan_cnc'
 
     def save_workflow_to_session(self) -> None:
         """
@@ -97,8 +102,10 @@ class CNCBaseAuth(LoginRequiredMixin):
         useful for rendering snippets that require values from both
         :return: dict containing env secrets and workflow values
         """
-        context = self.get_workflow()
-        context.update(self.get_environment_secrets())
+        # context = self.get_workflow()
+        # context.update(self.get_environment_secrets())
+        context = self.get_environment_secrets()
+        context.update(self.get_workflow())
         return context
 
     def get_value_from_workflow(self, var_name, default='') -> Any:
@@ -682,6 +689,33 @@ class ProvisionSnippetView(CNCBaseFormView):
             context['results'] = template
             return render(self.request, 'pan_cnc/results.html', context)
 
+        elif self.service['type'] == 'terraform':
+            # For terraform types we need to initiate a whole new workflow
+            # other types will basically terminate after the provision stage
+            # for this though, we need to execute a background task then forward
+            # to the NextTaskView class. This view is not going to be configured per
+            # cnc app though, so things like app_dir will not be available.
+            # We will save what we need to the session and wait for the javascript
+            # in the results_async page to allow the user to continue to the next task
+            print('Launching terraform init')
+            r = terraform_utils.perform_init(self.service, self.get_snippet_context())
+            context = dict()
+            context['base_html'] = self.base_html
+            context['title'] = 'Executing Task: Terraform Init'
+            context['header'] = 'Terraform Template'
+            if r is None:
+                context['results'] = 'Could not launch init tassk!'
+                return render(self.request, 'pan_cnc/results.html', context)
+
+            context['results'] = 'task id: %s' % r.id
+            # now save needed information to gather the output of the celery tasks
+            # and allow us to proceed to the next task
+            self.request.session['task_id'] = r.id
+            self.request.session['task_next'] = 'terraform_validate'
+            self.request.session['task_app_dir'] = self.app_dir
+            self.request.session['task_base_html'] = self.base_html
+            return render(self.request, 'pan_cnc/results_async.html', context)
+
         login = pan_utils.panorama_login()
         if login is None:
             context = dict()
@@ -723,6 +757,171 @@ class ProvisionSnippetView(CNCBaseFormView):
         pan_utils.push_service(self.service, jinja_context)
 
         return super().form_valid(form)
+
+
+class NextTaskView(CNCView):
+
+    template_name = 'pan_cnc/results_async.html'
+
+    def __init__(self, **kwargs):
+        # what's our app_dir, # this is usually dynamically set in urls.py, however, this is not a view that the
+        # app builder will over configure in a pan-cnc.yaml file, so we do not have access to the current app name
+        # it should be set in the request session though, so grab it there and set it here for all other things to
+        # just work
+        self._app_dir = 'pan_cnc'
+        self._base_html = 'pan_cnc/base.html'
+
+        super().__init__(**kwargs)
+
+    @property
+    def base_html(self):
+        return self._base_html
+
+    @base_html.setter
+    def base_html(self, value):
+        self._base_html = value
+
+    @property
+    def app_dir(self):
+        return self._app_dir
+
+    @app_dir.setter
+    def app_dir(self, value):
+        self._app_dir = value
+
+    def get_app_dir(self):
+        if 'task_app_dir' in self.request.session:
+            self.app_dir = self.request.session['task_app_dir']
+            return self.app_dir
+        else:
+            return 'pan_cnc'
+
+    def get_base_html(self):
+        if 'task_base_html' in self.request.session:
+            self.base_html = self.request.session['task_base_html']
+            return self.base_html
+        else:
+            return 'pan_cnc'
+
+    def get_snippet(self):
+        # only get the snippet from the session
+        app_dir = self.get_app_dir()
+        if app_dir in self.request.session:
+            session_cache = self.request.session[app_dir]
+            if 'snippet_name' in session_cache:
+                print('returning snippet name: %s from session cache' % session_cache['snippet_name'])
+                return session_cache['snippet_name']
+        else:
+            print('snippet is not set in NextTaskView:get_snippet')
+            raise SnippetRequiredException
+
+    def get_context_data(self, **kwargs):
+        app_dir = self.get_app_dir()
+        service = snippet_utils.load_snippet_with_name(self.get_snippet(), app_dir)
+        context = dict()
+        context['base_html'] = self.base_html
+        context['header'] = 'Terraform Template'
+
+        if 'task_next' not in self.request.session or \
+                self.request.session['task_next'] == '':
+            context['results'] = 'Could not find next task to execute!'
+            return context
+
+        task_next = self.request.session['task_next']
+        if task_next == 'terraform_validate':
+            r = terraform_utils.perform_validate(service, self.get_snippet_context())
+            new_next = 'terraform_plan'
+            title = 'Executing Task: Validate'
+        elif task_next == 'terraform_plan':
+            r = terraform_utils.perform_plan(service, self.get_snippet_context())
+            new_next = 'terraform_apply'
+            title = 'Executing Task: Plan'
+        elif task_next == 'terraform_apply':
+            r = terraform_utils.perform_apply(service, self.get_snippet_context())
+            new_next = ''
+            title = 'Executing Task: Apply'
+        else:
+            self.request.session['task_next'] = ''
+            context['results'] = 'Could not launch init task!'
+            return context
+
+        context['title'] = title
+        context['results'] = 'task id: %s' % r.id
+        self.request.session['task_id'] = r.id
+        self.request.session['task_next'] = new_next
+        return context
+
+
+class DockerLogsView(CNCBaseAuth, View):
+
+    def get(self, request, *args, **kwargs) -> Any:
+        logs_output = dict()
+        if 'container_id' in request.session:
+            container_id = request.session['container_id']
+            docker_client = DockerAction()
+            logs_output = docker_client.get_container_output(container_id)
+
+            if logs_output is None:
+                print('Container no longer exists')
+                if 'container_logs' in request.session and container_id in request.session['container_logs']:
+                    logs_output = request.session['container_logs'][container_id]
+
+            if 'container_logs' not in request.session:
+                request.session['container_logs'] = dict()
+
+            request.session['container_logs'][container_id] = logs_output
+
+        return HttpResponse(json.dumps(logs_output), content_type="application/json")
+
+
+class TaskLogsView(CNCBaseAuth, View):
+
+    @csrf_exempt
+    def get(self, request, *args, **kwargs) -> Any:
+        logs_output = dict()
+        if 'task_id' in request.session:
+            task_id = request.session['task_id']
+            logs_output['task_id'] = task_id
+            task_result = AsyncResult(task_id)
+
+            print(type(task_result))
+
+            print(task_result.info)
+
+            if task_result.ready():
+                try:
+                    res = json.loads(task_result.result)
+                    out = res.get('out', '')
+                    err = res.get('err', '')
+                    rc = res.get('returncode', '250')
+
+                    if out == '' and err == '' and rc == 0:
+                        logs_output['output'] = 'Task Completed Successfully'
+                    else:
+                        logs_output['output'] = f'{out}\n{err}'
+
+                    logs_output['returncode'] = rc
+
+                except ValueError as ve:
+                    print(ve)
+                    logs_output['output'] = task_result.result
+
+                logs_output['status'] = 'exited'
+            elif task_result.failed():
+                logs_output['status'] = 'exited'
+                logs_output['output'] = 'Task Failed, check logs for details'
+            else:
+                logs_output['output'] = 'Task is still Running'
+                logs_output['status'] = task_result.state
+
+            if 'task_logs' not in request.session:
+                request.session['task_logs'] = dict()
+
+            request.session['task_logs'][task_id] = logs_output
+        else:
+            logs_output['status'] = 'no task found'
+
+        return HttpResponse(json.dumps(logs_output), content_type="application/json")
 
 
 #

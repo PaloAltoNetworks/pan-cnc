@@ -179,7 +179,6 @@ def load_panrc():
         return config
 
 
-
 def get_cached_value(key):
     return cache.get(key)
 

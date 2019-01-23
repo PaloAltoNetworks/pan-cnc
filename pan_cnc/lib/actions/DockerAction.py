@@ -19,7 +19,7 @@ import re
 import time
 
 import docker
-from docker.errors import ContainerError, DockerException
+from docker.errors import ContainerError, DockerException, NotFound
 from docker.models.containers import Container
 
 from pan_cnc.lib.actions.AbstractAction import AbstractAction
@@ -160,11 +160,12 @@ class DockerAction(AbstractAction):
         if self.storage_dir.startswith('/'):
             self.storage_dir = re.sub('^/+', '', self.storage_dir)
 
-        if len(self.storage_dir) == 0:
-            self.storage_dir = 'docker_container_action'
+        if len(self.storage_dir) != 0:
+            instance_path = os.path.join(self.persistent_dir, self.storage_dir)
+        else:
+            instance_path = self.persistent_dir
 
-        instance_path = os.path.join(self.persistent_dir, self.storage_dir)
-        print('Using instance_dir of: %s' % instance_path)
+        print('Using instance_path of: %s' % instance_path)
 
         if not os.path.exists(instance_path):
             os.makedirs(instance_path)
@@ -178,6 +179,7 @@ class DockerAction(AbstractAction):
 
         except OSError as oe:
             print('Could not write file into docker container persistent dir')
+            print(oe)
             return
 
     def execute_template(self, template=''):
@@ -206,22 +208,11 @@ class DockerAction(AbstractAction):
             instance_path = os.path.join(self.persistent_dir, self.storage_dir)
             vols = {instance_path: {'bind': self.working_dir, 'mode': 'rw'}}
             print(vols)
-            self.container = client.containers.run(self.docker_image, self.docker_cmd, volumes=vols,
-                                                   working_dir=self.working_dir,
-                                                   auto_remove=False, environment=env, detach=True)
-            timer = 1
-            while timer < 60:
-                time.sleep(1)
-                self.container.reload()
-                print('Checking for output')
-                print(self.container.status)
-                if self.container.status == 'exited':
-                    logs = self.container.logs().decode("utf-8")
-                    self.container.remove()
-                    return logs
-                timer += 1
+            self._container = client.containers.run(self.docker_image, self.docker_cmd, volumes=vols,
+                                                    working_dir=self.working_dir,
+                                                    auto_remove=False, environment=env, detach=True)
 
-            return self.container.logs()
+            return self.container.id
 
         except docker.errors.APIError as ae:
             print(ae)
@@ -248,3 +239,27 @@ class DockerAction(AbstractAction):
             return self.container.logs()
 
         return 'No Container found'
+
+    def get_container_output(self, container_id):
+        output = dict()
+        client = docker.DockerClient(base_url=self.docker_url)
+        try:
+            self.container = client.containers.get(container_id)
+            self.container.reload()
+        except NotFound as nf:
+            print(nf)
+            return None
+
+        output['output'] = self.container.logs().decode('utf-8')
+        output['status'] = self.container.status
+        if self.container.status == 'exited':
+            self.container.remove()
+
+        return output
+
+    def execute_command_in_container(self, container_id, cmd):
+        client = docker.DockerClient(base_url=self.docker_url)
+        # client = docker.DockerClient()
+        self._container = client.containers.get(container_id)
+        self.container.exec_run(cmd)
+
