@@ -28,7 +28,7 @@ from .exceptions import CCFParserError
 
 def load_service_snippets():
     """
-    Locates all configuration snippets in the mssp/snippets directory. Looks for and loads the metadata.yaml file
+    Locates all configuration snippets in the mssp/snippets directory. Looks for and loads the .meta-cnc.yaml file
     in each directory. If there is a key called 'type' and the value is 'service' add to the services list and return
     :return: List of services (dict) or empty list if none found - Check README in snippets dir for latest
     dict / YAML format
@@ -86,8 +86,8 @@ def load_snippets_of_type(snippet_type=None, app_dir=None):
             print(f'skipping .git dir {d.parent}')
             continue
 
-        # mdf = os.path.join(d, 'metadata.yaml')
-        mdf = d.joinpath('metadata.yaml')
+        # mdf = os.path.join(d, '.meta-cnc.yaml')
+        mdf = d.joinpath('.meta-cnc.yaml')
         if mdf.is_file():
             # if os.path.isfile(mdf):
             # snippet_path = os.path.dirname(mdf)
@@ -134,11 +134,11 @@ def get_snippet_metadata(snippet_name, app_dir):
     Returns the snippet metadata as a str
     :param snippet_name: name of the snippet
     :param app_dir: current app
-    :return: str of metadata.yaml file
+    :return: str of .meta-cnc.yaml file
     """
     snippets_dir = Path(os.path.join(settings.SRC_PATH, app_dir, 'snippets'))
     for d in snippets_dir.rglob('./*'):
-        mdf = os.path.join(d, 'metadata.yaml')
+        mdf = os.path.join(d, '.meta-cnc.yaml')
         if os.path.isfile(mdf):
             snippet_path = os.path.dirname(mdf)
             try:

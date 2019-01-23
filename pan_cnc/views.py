@@ -583,7 +583,7 @@ class ChooseSnippetView(CNCBaseFormView):
     customize_field label with a dropdown list of all snippets found with a customize_label_name
     with a value of customize_label_value.
 
-    This will also load all other form fields defined in the metadata.yaml file
+    This will also load all other form fields defined in the .meta-cnc.yaml file
 
     This is useful to build a form that allows the user to choose a snippet to load based on some arbitrary group
     of snippets (i.e. all snippets with a label like 'category: internet_service'
