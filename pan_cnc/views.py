@@ -476,36 +476,21 @@ class CNCBaseFormView(FormView, CNCBaseAuth):
                 for item in cbx_list:
                     choice = (item['value'], item['key'])
                     choices_list.append(choice)
+                dynamic_form.fields[field_name] = forms.ChoiceField(widget=forms.CheckboxSelectMultiple,
+                                                                    choices=choices_list,
+                                                                    label=description, initial=default)
+            else:
+                dynamic_form.fields[field_name] = forms.CharField(label=description, initial=default)
 
+        return dynamic_form
 
-dynamic_form.fields[field_name] = forms.ChoiceField(widget=forms.CheckboxSelectMultiple,
-                                                    choices=choices_list,
-                                                    label=description, initial=default)
-
-else:
-dynamic_form.fields[field_name] = forms.CharField(label=description, initial=default)
-
-return dynamic_form
-
-
-# creates a callable reference in the html to get fieldtype
-# used in bootstrap.html to create a different format for type=booleanfield
-def field_type(field, ftype):
-    try:
-        t = field.field.widget.__class__.__name__
-        return t.lower() == ftype
-    except:
-        pass
-    return False
-
-
-def form_valid(self, form):
-    """
-    Called once the form has been submitted
-    :param form: dynamic form
-    :return: rendered html response or redirect
-    """
-    return HttpResponseRedirect(self.next_url)
+    def form_valid(self, form):
+        """
+        Called once the form has been submitted
+        :param form: dynamic form
+        :return: rendered html response or redirect
+        """
+        return HttpResponseRedirect(self.next_url)
 
 
 class ChooseSnippetByLabelView(CNCBaseFormView):
@@ -731,7 +716,17 @@ class ProvisionSnippetView(CNCBaseFormView):
             self.request.session['task_base_html'] = self.base_html
             return render(self.request, 'pan_cnc/results_async.html', context)
 
-        login = pan_utils.panorama_login()
+        # Default is panos
+        target_ip = self.get_value_from_workflow('TARGET_IP', None)
+        target_username = self.get_value_from_workflow('TARGET_USERNAME', None)
+        target_password = self.get_value_from_workflow('TARGET_PASSWORD', None)
+
+        login = pan_utils.panos_login(
+            panorama_ip=target_ip,
+            panorama_username=target_username,
+            panorama_password=target_password
+        )
+
         if login is None:
             context = dict()
             context['base_html'] = self.base_html
