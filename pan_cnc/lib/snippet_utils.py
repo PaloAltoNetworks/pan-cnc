@@ -1,3 +1,19 @@
+# Copyright (c) 2018, Palo Alto Networks
+#
+# Permission to use, copy, modify, and/or distribute this software for any
+# purpose with or without fee is hereby granted, provided that the above
+# copyright notice and this permission notice appear in all copies.
+#
+# THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+# WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+# ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+# WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+# ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+# OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+
+# Author: Nathan Embery nembery@paloaltonetworks.com
+
 import oyaml
 import os
 from django.conf import settings
@@ -5,12 +21,14 @@ from django.core.cache import cache
 from pathlib import Path
 from jinja2 import Environment
 from jinja2.loaders import BaseLoader
+from yaml.parser import ParserError
 from . import jinja_filters
+from .exceptions import CCFParserError
 
 
 def load_service_snippets():
     """
-    Locates all configuration snippets in the mssp/snippets directory. Looks for and loads the metadata.yaml file
+    Locates all configuration snippets in the mssp/snippets directory. Looks for and loads the .meta-cnc.yaml file
     in each directory. If there is a key called 'type' and the value is 'service' add to the services list and return
     :return: List of services (dict) or empty list if none found - Check README in snippets dir for latest
     dict / YAML format
@@ -31,7 +49,7 @@ def load_template_snippets():
 
 def load_all_snippets(app_dir):
     # cache and keep all snippets when type == none
-    if cache.has_key('all_snippets'):
+    if 'all_snippets' in cache:
         snippet_list = cache.get('all_snippets', []) 
         if snippet_list:
             return snippet_list
@@ -64,11 +82,18 @@ def load_snippets_of_type(snippet_type=None, app_dir=None):
    
     snippets_dir = Path(os.path.join(settings.SRC_PATH, app_dir, 'snippets'))
     for d in snippets_dir.rglob('./*'):
-        mdf = os.path.join(d, 'metadata.yaml')
-        if os.path.isfile(mdf):
-            snippet_path = os.path.dirname(mdf)
+        if d.is_dir() and '.git' in d.name:
+            print(f'skipping .git dir {d.parent}')
+            continue
+
+        # mdf = os.path.join(d, '.meta-cnc.yaml')
+        mdf = d.joinpath('.meta-cnc.yaml')
+        if mdf.is_file():
+            # if os.path.isfile(mdf):
+            # snippet_path = os.path.dirname(mdf)
+            snippet_path = str(mdf.parent.absolute())
             try:
-                with open(mdf, 'r') as sc:
+                with mdf.open(mode='r') as sc:
                     service_config = oyaml.load(sc.read())
                     service_config['snippet_path'] = snippet_path
                     if snippet_type is not None:
@@ -80,7 +105,11 @@ def load_snippets_of_type(snippet_type=None, app_dir=None):
             except IOError as ioe:
                 print('Could not open metadata file in dir %s' % mdf)
                 print(ioe)
-                continue
+                raise CCFParserError
+            except ParserError as pe:
+                print('Could not parse metadata file in dir %s' %mdf)
+                print(pe)
+                raise CCFParserError
 
     return snippet_list
 
@@ -105,11 +134,11 @@ def get_snippet_metadata(snippet_name, app_dir):
     Returns the snippet metadata as a str
     :param snippet_name: name of the snippet
     :param app_dir: current app
-    :return: str of metadata.yaml file
+    :return: str of .meta-cnc.yaml file
     """
     snippets_dir = Path(os.path.join(settings.SRC_PATH, app_dir, 'snippets'))
     for d in snippets_dir.rglob('./*'):
-        mdf = os.path.join(d, 'metadata.yaml')
+        mdf = os.path.join(d, '.meta-cnc.yaml')
         if os.path.isfile(mdf):
             snippet_path = os.path.dirname(mdf)
             try:
@@ -122,6 +151,10 @@ def get_snippet_metadata(snippet_name, app_dir):
             except IOError as ioe:
                 print('Could not open metadata file in dir %s' % mdf)
                 print(ioe)
+                return None
+            except ParserError as pe:
+                print(pe)
+                print('Could not parse metadata file')
                 return None
 
     return None
