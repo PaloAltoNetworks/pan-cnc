@@ -912,6 +912,9 @@ class TaskLogsView(CNCBaseAuth, View):
 
                     logs_output['returncode'] = rc
 
+                except TypeError as te:
+                    print(te)
+                    logs_output['output'] = task_result.result
                 except ValueError as ve:
                     print(ve)
                     logs_output['output'] = task_result.result

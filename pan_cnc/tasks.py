@@ -55,7 +55,7 @@ def exec_local_task(cmd_seq, cwd):
 @shared_task
 def terraform_validate(terraform_dir, tf_vars):
     print('Executing task terraform validate')
-    cmd_seq = ['/usr/local/bin/terraform', 'validate', '-no-color']
+    cmd_seq = ['terraform', 'validate', '-no-color']
     for k, v in tf_vars.items():
         cmd_seq.append('-var')
         cmd_seq.append(f'{k}={v}')
@@ -66,7 +66,7 @@ def terraform_validate(terraform_dir, tf_vars):
 @shared_task
 def terraform_init(terraform_dir, tf_vars):
     print('Executing task terraform init')
-    cmd_seq = ['/usr/local/bin/terraform', 'init', '-no-color']
+    cmd_seq = ['terraform', 'init', '-no-color']
     for k, v in tf_vars.items():
         cmd_seq.append('-var')
         cmd_seq.append(f'{k}={v}')
@@ -77,7 +77,7 @@ def terraform_init(terraform_dir, tf_vars):
 @shared_task
 def terraform_plan(terraform_dir, tf_vars):
     print('Executing task terraform plan')
-    cmd_seq = ['/usr/local/bin/terraform', 'plan', '-no-color']
+    cmd_seq = ['terraform', 'plan', '-no-color']
     for k, v in tf_vars.items():
         cmd_seq.append('-var')
         cmd_seq.append(f'{k}={v}')
@@ -88,7 +88,7 @@ def terraform_plan(terraform_dir, tf_vars):
 @shared_task
 def terraform_apply(terraform_dir, tf_vars):
     print('Executing task terraform apply')
-    cmd_seq = ['/usr/local/bin/terraform', 'apply', '-no-color', '-auto-approve']
+    cmd_seq = ['terraform', 'apply', '-no-color', '-auto-approve']
     for k, v in tf_vars.items():
         cmd_seq.append('-var')
         cmd_seq.append(f'{k}={v}')
@@ -99,7 +99,7 @@ def terraform_apply(terraform_dir, tf_vars):
 @shared_task
 def terraform_destroy(terraform_dir, tf_vars):
     print('Executing task terraform destroy')
-    cmd_seq = ['/usr/local/bin/terraform', 'destroy', '-no-color', '-auto-approve']
+    cmd_seq = ['terraform', 'destroy', '-no-color', '-auto-approve']
     for k, v in tf_vars.items():
         cmd_seq.append('-var')
         cmd_seq.append(f'{k}={v}')
