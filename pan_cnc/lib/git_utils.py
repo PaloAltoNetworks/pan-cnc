@@ -179,5 +179,4 @@ def get_repo_commits_url(repo_url):
 
         commits_url = f'https://github.com/{owner}/{repo}/commit/'
 
-    print(f'returning {commits_url}')
     return commits_url
