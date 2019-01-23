@@ -1,0 +1,33 @@
+{% extends base_html %}
+{% load static %}
+
+{% block content %}
+
+{% for e, e_details in envs.items %}
+
+{% if forloop.counter0|divisibleby:2 %}
+{% if forloop.first %}
+<div class="row mb-4">
+    {% else %}
+</div><div class="row mb-4">
+    {% endif %}
+    {% endif %}
+    <div class="col-sm-6">
+        <div class="card shadow-lg">
+            <div class="card-body">
+                <h5 class="card-title">{{ e }}</h5>
+                <p class="card-text">{{ e_details.meta.description }}</p>
+                <a href="/load_env/{{ e }}" class="btn btn-primary">Load</a>
+                &nbsp;
+                <a href="/edit_env/{{ e }}" class="btn btn-secondary">Configure</a>
+                &nbsp;
+                 <a href="/clone_env/{{ e }}" class="btn btn-success">Clone</a>
+                &nbsp;
+                <a href="/delete_env/{{ e }}" class="btn btn-danger">Delete</a>
+            </div>
+        </div>
+    </div>
+{% endfor %}
+</div>
+
+{% endblock %}

@@ -1,0 +1,30 @@
+{% extends "pan_cnc/base.html" %}
+{% load static %}
+
+{% block content %}
+<div class="jumbotron mt-4 shadow-lg">
+    <h1 class="display-3">
+        {% if title %}
+            {{ title }}
+        {% else %}
+            Welcome!
+        {% endif %}
+    </h1>
+    <p class="lead">
+        {% if description %}
+        {{ description }}
+        {% else %}
+        Welcome to the Palo Alto Networks tools framework
+        {% endif %}
+    </p>
+    <p class="lead">
+        {% if documentation_link %}
+        <a class="btn btn-primary btn-lg" href="{{ documentation_link }}" role="button">Learn more</a>
+        {% endif %}
+        &nbsp;
+        {% if next %}
+        <a class="btn btn-secondary btn-lg" href="/{{ app_dir }}/{{ next }}" role="button">Get Started</a>
+        {% endif %}
+    </p>
+</div>
+{%  endblock %}

@@ -1,0 +1,106 @@
+{% load static %}
+{% load build_menu %}
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>CNC Tools</title>
+    <link rel="icon" type="image/x-icon" href="{% static 'images/pan_favicon.ico' %}">
+    <link href="{% static 'css/bootstrap.css' %}" rel="stylesheet">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.1.1/js/bootstrap.min.js"></script>
+    <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.6.3/css/all.css"
+          integrity="sha384-UHRtZLI+pbxtHCWp1t77Bi1L4ZtiqrqD80Kn4Z8NTSRyMA2Fd33n5dQ8lWUE00s/" crossorigin="anonymous">
+</head>
+<body>
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+    <a class="nav-brand" href="http://paloaltonetworks.com">
+        <img src="{% static 'images/logo-pan-bg.png' %}" alt="PAN" style="height: 30px; width: 50px;"/>
+    </a>
+    <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarColor02"
+            aria-controls="navbarColor02" aria-expanded="false" aria-label="Toggle navigation">
+        <span class="navbar-toggler-icon"></span>
+    </button>
+
+    <div class="collapse navbar-collapse" id="navbarColor02">
+
+        <ul class="navbar-nav mr-auto">
+            <li class="nav-item">
+                <a class="nav-link" href="/">Home <span class="sr-only">(current)</span></a>
+            </li>
+            {% build_menu as menu %}
+            {% for menu_item, menu_dropdown in menu.items %}
+            <li class="nav-item dropdown">
+                <a class="nav-link dropdown-toggle" href="#" id="navbardrop{{ forloop.counter }}"
+                   data-toggle="dropdown">
+                    {{ menu_item }}
+                </a>
+                <div class="dropdown-menu">
+                    {% for menu_option in menu_dropdown %}
+                    <a class="dropdown-item" href="{{ menu_option.value }}">{{ menu_option.label }}</a>
+                    {% endfor %}
+                </div>
+            </li>
+            {% endfor %}
+        </ul>
+        <ul class="navbar-nav mr-1">
+            <li class="nav-link">
+                {% if request.session.current_env %}
+                <a href="/list_envs" title="Loaded Environment"
+                class="text-primary">
+                    <i class="fas fa-unlock"></i>
+                    {{ request.session.current_env }}
+                </a>
+                {% else %}
+                <a href="/list_envs" title="Unlock Environments"
+                class="text-primary">
+                    <i class="fas fa-lock"></i>
+                    &nbsp;
+                </a>
+                {% endif %}
+            </li>
+            <li class="nav-item dropdown">
+                <a class="nav-link dropdown-toggle text-primary" href="#" id="navbardrop-user"
+                   data-toggle="dropdown">
+                    {{ user }}
+                </a>
+                <div class="dropdown-menu dropdown-menu-right">
+                    <a class="dropdown-item" href="/list_envs">Configure Environment</a>
+                    <a class="dropdown-item" href="/create_env">Create Environment</a>
+                    <a class="dropdown-item" href="/logout">Logout</a>
+                </div>
+            </li>
+        </ul>
+    </div>
+</nav>
+
+<div id="page-content-wrapper">
+    <div class="page-content">
+        <div class="container">
+            <div class="row">
+                <div class="col-md-12 my-5">
+                    {% if messages %}
+                    {% for message in messages %}
+                    {% if message.level == DEFAULT_MESSAGE_LEVELS.ERROR %}
+                    <div class="alert alert-danger mb-5 shadow-lg" role="alert">
+                        {% elif message.level == DEFAULT_MESSAGE_LEVELS.SUCCESS %}
+                        <div class="alert alert-success mb-5 shadow-lg" role="alert">
+                            {% else %}
+                            <div class="alert alert-info mb-5 shadow-lg" role="alert">
+                                {% endif %}
+                                {{ message }}
+                                <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                                    <span aria-hidden="true">&times;</span>
+                                </button>
+                            </div>
+                            {% endfor %}
+                            {% endif %}
+                            {% block content %}{% endblock %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+</body>
+</html>

@@ -1,0 +1,71 @@
+{% load static %}
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>CNC Tools</title>
+    <link rel="icon" type="image/x-icon" href="{% static 'images/pan_favicon.ico' %}">
+    <link href="{% static 'css/bootstrap.css' %}" rel="stylesheet">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.1.1/js/bootstrap.min.js"></script>
+</head>
+<body>
+
+<div id="page-content-wrapper">
+    <div class="page-content">
+        <div class="container">
+            <div class="row">
+                <div class="col-md-12 my-5">
+                    {% if form.errors %}
+                    <div class="alert alert-dismissible alert-danger shadow-lg mb-5">
+                        <button type="button" class="close" data-dismiss="alert">&times;</button>
+                        <strong>Oh snap!</strong>
+                        Your username and password didn't match. Please try again.
+                    </div>
+                    {% endif %}
+
+                    {% if next %}
+                    {% if user.is_authenticated %}
+                    <div class="alert alert-dismissible alert-danger shadow-lg mb-5">
+                        <button type="button" class="close" data-dismiss="alert">&times;</button>
+                       Your account doesn't have access to this page. To proceed,
+                        please login with an account that has access.
+                    </div>
+                    {% else %}
+                     <div class="alert alert-dismissible alert-danger shadow-lg mb-5">
+                        <button type="button" class="close" data-dismiss="alert">&times;</button>
+                         Please login to see this page.
+                     </div>
+                    {% endif %}
+                    {% endif %}
+                    <div class="card border-secondary mb-1 shadow-lg rounded">
+                        <div class="card-header bg-secondary text-white">Login</div>
+                        <div class="card-body">
+                            <h4 class="card-title">Enter Authentication</h4>
+                            <p class="card-text">
+                            <form method="post" action="{% url 'login' %}">
+                                {% csrf_token %}
+                                <table class="table">
+                                    <tr>
+                                        <td>{{ form.username.label_tag }}</td>
+                                        <td>{{ form.username }}</td>
+                                    </tr>
+                                    <tr>
+                                        <td>{{ form.password.label_tag }}</td>
+                                        <td>{{ form.password }}</td>
+                                    </tr>
+                                </table>
+                                <button type="submit" class="btn btn-secondary">Login</button>
+                                <input type="hidden" name="next" value="{{ next }}">
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+</body>
+</html>
+

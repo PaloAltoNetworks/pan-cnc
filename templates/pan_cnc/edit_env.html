@@ -1,0 +1,53 @@
+{% extends base_html %}
+{% load static %}
+
+{% block content %}
+<div class="card border-primary mb-5 shadow-lg">
+    <div class="card-header">Environment: {{ env_name }}</div>
+    <div class="card-body">
+        <h5 class="card-title">Secrets stored in this environment</h5>
+        <p class="card-text">
+        <table class="table">
+            <caption>All stored secrets for {{ env_name }}</caption>
+            <thead>
+            <tr>
+                <th scope="col">#</th>
+                <th scope="col">Key</th>
+                <th scope="col">Value</th>
+                <th scope="col">Options</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for k,v in environment.secrets.items %}
+            <tr>
+                <th scope="row">{{ forloop.counter }}</th>
+                <td>{{ k }}</td>
+                <td>{{ v }}</td>
+                <td>
+                    <a href="/delete_secret/{{ env_name |urlencode }}/{{ k |urlencode }}">Delete Secret</a>
+                </td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+        </p>
+        <a href="/clone_env/{{ env_name }}" class="btn btn-primary">Clone</a>
+        <a href="/load_env/{{ env_name }}" class="btn btn-secondary">Load</a>
+        <a href="/delete_env/{{ env_name }}" class="btn btn-danger">Delete</a>
+    </div>
+</div>
+
+    <div class="card border-primary mb-6 shadow-lg rounded">
+        <div class="card-header">Add Secret to Environment: {{ env_name }}</div>
+        <div class="card-body">
+            <p class="card-text">
+            <form action="{{ action }}" method="post">
+                {% csrf_token %}
+                {% include 'pan_cnc/bootstrap_form.html' with form=form %}
+                <button type="submit" class="btn btn-primary">Submit</button>
+            </form>
+            </p>
+        </div>
+    </div>
+
+{% endblock %}
