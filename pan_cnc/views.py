@@ -343,11 +343,27 @@ class CNCBaseFormView(FormView):
                     choice = (item['value'], item['key'])
                     choices_list.append(choice)
                 dynamic_form.fields[field_name] = forms.ChoiceField(widget=forms.CheckboxSelectMultiple, choices=choices_list,
-                                                                    label=description, initial=default)
+                                                                label=description, initial=default)
+            # form option as a simple boolean checkbox
+            # creates fieldtype of boolean with different output formatting in bootstrap.html
+            # required=False allows for an empty checkbox and if checked then 'on'
+            elif type_hint == "simplecheckbox":
+                dynamic_form.fields[field_name] = forms.BooleanField(required=False)
+
             else:
                 dynamic_form.fields[field_name] = forms.CharField(label=description, initial=default)
 
         return dynamic_form
+
+    # creates a callable reference in the html to get fieldtype
+    # used in bootstrap.html to create a different format for type=booleanfield
+    def field_type(field, ftype):
+        try:
+            t = field.field.widget.__class__.__name__
+            return t.lower() == ftype
+        except:
+            pass
+        return False
 
     def form_valid(self, form):
         """
