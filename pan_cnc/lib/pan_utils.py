@@ -35,12 +35,12 @@ handler = logging.StreamHandler()
 logger.addHandler(handler)
 
 
-def panorama_login(panorama_ip=None, panorama_username=None, panorama_password=None):
+def panos_login(panorama_ip=None, panorama_username=None, panorama_password=None):
     global xapi_obj
     try:
         if xapi_obj is None:
             print('xapi not init yet')
-            credentials = get_panorama_credentials(panorama_ip, panorama_username, panorama_password)
+            credentials = get_panos_credentials(panorama_ip, panorama_username, panorama_password)
             xapi_obj = pan.xapi.PanXapi(**credentials)
             if 'api_key' not in credentials:
                 print('Setting API KEY')
@@ -60,14 +60,15 @@ def panorama_login(panorama_ip=None, panorama_username=None, panorama_password=N
 
 
 def test_panorama():
-    xapi = panorama_login()
+    xapi = panos_login()
     xapi.op(cmd='show system info', cmd_xml=True)
     print(xapi.xml_result())
 
 
-def get_panorama_credentials(panorama_ip, panorama_username, panorama_password):
+def get_panos_credentials(panorama_ip, panorama_username, panorama_password):
     if panorama_ip is None or panorama_username is None or panorama_password is None:
         # check the env for it if not here
+        # FIXME - this should be renmaed to TARGET or some other value that is not specific to PANORAMA
         panorama_ip = os.environ.get('PANORAMA_IP', '0.0.0.0')
         panorama_username = os.environ.get('PANORAMA_USERNAME', 'admin')
         panorama_password = os.environ.get('PANORAMA_PASSWORD', 'admin')
@@ -87,7 +88,7 @@ def get_panorama_credentials(panorama_ip, panorama_username, panorama_password):
 
 
 def push_service(service, context):
-    xapi = panorama_login()
+    xapi = panos_login()
 
     if xapi is None:
         print('Could not login in to Panorama')
@@ -142,7 +143,7 @@ def validate_snippet_present(service, context):
     :param context: dict containing all jinja variables as key / value pairs
     :return: boolean True if found, false if any xpath is not found
     """
-    xapi = panorama_login()
+    xapi = panos_login()
     if xapi is None:
         print('Could not login to Panorama')
         raise TargetConnectionException
@@ -169,7 +170,7 @@ def validate_snippet_present(service, context):
 
 
 def get_device_groups_from_panorama():
-    xapi = panorama_login()
+    xapi = panos_login()
     device_group_xpath = "/config/devices/entry[@name='localhost.localdomain']/device-group"
 
     services = list()
@@ -198,7 +199,7 @@ def get_device_groups_from_panorama():
 
 
 def get_vm_auth_key_from_panorama():
-    xapi = panorama_login()
+    xapi = panos_login()
     try:
         xapi.op(cmd='<request><bootstrap><vm-auth-key><generate>'
                     '<lifetime>24</lifetime></generate></vm-auth-key></bootstrap></request>')

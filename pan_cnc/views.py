@@ -716,7 +716,17 @@ class ProvisionSnippetView(CNCBaseFormView):
             self.request.session['task_base_html'] = self.base_html
             return render(self.request, 'pan_cnc/results_async.html', context)
 
-        login = pan_utils.panorama_login()
+        # Default is panos
+        target_ip = self.get_value_from_workflow('TARGET_IP', None)
+        target_username = self.get_value_from_workflow('TARGET_USERNAME', None)
+        target_password = self.get_value_from_workflow('TARGET_PASSWORD', None)
+
+        login = pan_utils.panos_login(
+            panorama_ip=target_ip,
+            panorama_username=target_username,
+            panorama_password=target_password
+        )
+
         if login is None:
             context = dict()
             context['base_html'] = self.base_html
