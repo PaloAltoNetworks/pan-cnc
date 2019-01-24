@@ -540,7 +540,7 @@ class ChooseSnippetByLabelView(CNCBaseFormView):
         # convert our list of tuples into a tuple itself
         choices_set = tuple(choices_list)
         # make our new field
-        new_choices_field = forms.ChoiceField(choices=choices_set)
+        new_choices_field = forms.ChoiceField(choices=choices_set, label='Template Name')
         # set it on the original form, overwriting the hardcoded GSB version
 
         form.fields['snippet_name'] = new_choices_field
