@@ -393,16 +393,36 @@ class CNCBaseFormView(FormView, CNCBaseAuth):
         if self.service is None:
             # A GET call will find and load a snippet, then use the snippet_utils library to load that snippet
             # into the self.service attribute
-            print('There is no service here :-/')
+            print('There is no metadata defined here :-/')
             return dynamic_form
 
         if not isinstance(self.service, dict):
-            print('Snippet incorrectly loaded or defined')
+            print('Metadata incorrectly loaded or defined')
             return dynamic_form
 
         if 'variables' not in self.service:
-            print('No self.service found on this class')
+            print('No variables defined in metadata')
             return dynamic_form
+
+        if 'type' not in self.service:
+            print('No type defined in metadata')
+            return dynamic_form
+
+        target_ip = self.get_value_from_workflow('TARGET_IP', '')
+        if self.service['type'] == 'panos':
+            # Verify we have a valid target_ip, username, and password set up
+            if target_ip == '':
+                dynamic_form.fields['TARGET_IP'] = forms.CharField(label='Pan-OS Device', initial='192.168.55.10')
+                dynamic_form.fields['TARGET_USERNAME'] = forms.CharField(label='Pan-OS Username', initial='admin')
+                dynamic_form.fields['TARGET_PASSWORD'] = forms.CharField(widget=forms.PasswordInput(),
+                                                                         label='Pan-OS Password')
+
+        elif self.service['type'] == 'panorama':
+            if target_ip == '':
+                dynamic_form.fields['TARGET_IP'] = forms.CharField(label='Panorama Device', initial='192.168.55.5')
+                dynamic_form.fields['TARGET_USERNAME'] = forms.CharField(label='Panorama Username', initial='admin')
+                dynamic_form.fields['TARGET_PASSWORD'] = forms.CharField(widget=forms.PasswordInput(),
+                                                                         label='Panorama Password')
 
         # Get all of the variables defined in the self.service
         for variable in self.service['variables']:
@@ -642,15 +662,28 @@ class ProvisionSnippetView(CNCBaseFormView):
     use form_valid as it will always be true in this case.
     """
     snippet = ''
-    header = 'Provision Service'
-    title = 'Provision this CCF against the selected target'
+    header = 'Provision Configuration'
+    title = 'Customize Variables'
 
     def get_context_data(self, **kwargs):
-        context = super().get_context_data()
-        target_ip = self.get_value_from_workflow('TARGET_IP', '')
-        if target_ip == '':
-            messages.add_message(self.request, messages.ERROR, 'No TARGET_IP currently defined for provision!')
-        return context
+        if 'type' not in self.service:
+            return super().get_context_data()
+
+        if self.service['type'] == 'template':
+            self.header = 'Render Template'
+            self.title = 'Customize Template Variables'
+        elif self.service['type'] == 'panos':
+            self.header = 'Pan-OS Configuration'
+            self.title = 'Customize Configuration Variables'
+        elif self.service['type'] == 'panorama':
+            self.header = 'Panorama Configuration'
+            self.title = 'Customize Panorama Configuration Variables'
+        else:
+            # May need to add additional types here
+            t = self.service['type']
+            print(f'Found unknown type {t} for form customization in ProvisionSnippetView:get_context_data')
+
+        return super().get_context_data()
 
     def get_snippet(self):
         print('Getting snippet here in ProvisionSnippetView:get_snippet')
