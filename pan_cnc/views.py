@@ -72,6 +72,14 @@ class CNCBaseAuth(LoginRequiredMixin, View):
                 print('Adding variable %s to session' % var_name)
                 current_workflow[var_name] = self.request.POST.get(var_name)
 
+        # ensure we grab target_ip, username, and password if supplied and not in a variable
+        if 'TARGET_IP' in self.request.POST:
+            current_workflow['TARGET_IP'] = self.request.POST.get('TARGET_IP')
+        if 'TARGET_USERNAME' in self.request.POST:
+            current_workflow['TARGET_USERNAME'] = self.request.POST.get('TARGET_USERNAME')
+        if 'TARGET_PASSWORD' in self.request.POST:
+            current_workflow['TARGET_PASSWORD'] = self.request.POST.get('TARGET_PASSWORD')
+
         self.request.session[self.app_dir] = current_workflow
 
     def save_value_to_workflow(self, var_name, var_value) -> None:
@@ -393,16 +401,36 @@ class CNCBaseFormView(FormView, CNCBaseAuth):
         if self.service is None:
             # A GET call will find and load a snippet, then use the snippet_utils library to load that snippet
             # into the self.service attribute
-            print('There is no service here :-/')
+            print('There is no metadata defined here :-/')
             return dynamic_form
 
         if not isinstance(self.service, dict):
-            print('Snippet incorrectly loaded or defined')
+            print('Metadata incorrectly loaded or defined')
             return dynamic_form
 
         if 'variables' not in self.service:
-            print('No self.service found on this class')
+            print('No variables defined in metadata')
             return dynamic_form
+
+        if 'type' not in self.service:
+            print('No type defined in metadata')
+            return dynamic_form
+
+        target_ip = self.get_value_from_workflow('TARGET_IP', '')
+        if self.service['type'] == 'panos':
+            # Verify we have a valid target_ip, username, and password set up
+            if target_ip == '':
+                dynamic_form.fields['TARGET_IP'] = forms.CharField(label='Pan-OS Device', initial='192.168.55.10')
+                dynamic_form.fields['TARGET_USERNAME'] = forms.CharField(label='Pan-OS Username', initial='admin')
+                dynamic_form.fields['TARGET_PASSWORD'] = forms.CharField(widget=forms.PasswordInput(),
+                                                                         label='Pan-OS Password')
+
+        elif self.service['type'] == 'panorama':
+            if target_ip == '':
+                dynamic_form.fields['TARGET_IP'] = forms.CharField(label='Panorama Device', initial='192.168.55.5')
+                dynamic_form.fields['TARGET_USERNAME'] = forms.CharField(label='Panorama Username', initial='admin')
+                dynamic_form.fields['TARGET_PASSWORD'] = forms.CharField(widget=forms.PasswordInput(),
+                                                                         label='Panorama Password')
 
         # Get all of the variables defined in the self.service
         for variable in self.service['variables']:
@@ -540,7 +568,7 @@ class ChooseSnippetByLabelView(CNCBaseFormView):
         # convert our list of tuples into a tuple itself
         choices_set = tuple(choices_list)
         # make our new field
-        new_choices_field = forms.ChoiceField(choices=choices_set)
+        new_choices_field = forms.ChoiceField(choices=choices_set, label='Template Name')
         # set it on the original form, overwriting the hardcoded GSB version
 
         form.fields['snippet_name'] = new_choices_field
@@ -627,7 +655,7 @@ class ChooseSnippetView(CNCBaseFormView):
         # convert our list of tuples into a tuple itself
         choices_set = tuple(choices_list)
         # make our new field
-        new_choices_field = forms.ChoiceField(choices=choices_set)
+        new_choices_field = forms.ChoiceField(choices=choices_set, label='Template Name')
         # set it on the original form, overwriting the hardcoded GSB version
 
         form.fields[custom_field] = new_choices_field
@@ -642,15 +670,28 @@ class ProvisionSnippetView(CNCBaseFormView):
     use form_valid as it will always be true in this case.
     """
     snippet = ''
-    header = 'Provision Service'
-    title = 'Provision this CCF against the selected target'
+    header = 'Provision Configuration'
+    title = 'Customize Variables'
 
     def get_context_data(self, **kwargs):
-        context = super().get_context_data()
-        target_ip = self.get_value_from_workflow('TARGET_IP', '')
-        if target_ip == '':
-            messages.add_message(self.request, messages.ERROR, 'No TARGET_IP currently defined for provision!')
-        return context
+        if 'type' not in self.service:
+            return super().get_context_data()
+
+        if self.service['type'] == 'template':
+            self.header = 'Render Template'
+            self.title = 'Customize Template Variables'
+        elif self.service['type'] == 'panos':
+            self.header = 'Pan-OS Configuration'
+            self.title = 'Customize Configuration Variables'
+        elif self.service['type'] == 'panorama':
+            self.header = 'Panorama Configuration'
+            self.title = 'Customize Panorama Configuration Variables'
+        else:
+            # May need to add additional types here
+            t = self.service['type']
+            print(f'Found unknown type {t} for form customization in ProvisionSnippetView:get_context_data')
+
+        return super().get_context_data()
 
     def get_snippet(self):
         print('Getting snippet here in ProvisionSnippetView:get_snippet')
@@ -911,6 +952,9 @@ class TaskLogsView(CNCBaseAuth, View):
 
                     logs_output['returncode'] = rc
 
+                except TypeError as te:
+                    print(te)
+                    logs_output['output'] = task_result.result
                 except ValueError as ve:
                     print(ve)
                     logs_output['output'] = task_result.result

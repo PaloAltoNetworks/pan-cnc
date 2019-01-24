@@ -139,7 +139,9 @@ def get_repo_upstream_details(repo_name, repo_url):
     :param repo_url:
     :return:
     """
-    details = cnc_utils.get_cached_value(f'git_utils_upstream_{repo_name}')
+    # ensure spaces are handled correctly
+    cache_repo_name = repo_name.replace(' ', '_')
+    details = cnc_utils.get_cached_value(f'git_utils_upstream_{cache_repo_name}')
     if details is not None:
         return details
 
@@ -179,5 +181,4 @@ def get_repo_commits_url(repo_url):
 
         commits_url = f'https://github.com/{owner}/{repo}/commit/'
 
-    print(f'returning {commits_url}')
     return commits_url
