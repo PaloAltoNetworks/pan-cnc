@@ -72,6 +72,14 @@ class CNCBaseAuth(LoginRequiredMixin, View):
                 print('Adding variable %s to session' % var_name)
                 current_workflow[var_name] = self.request.POST.get(var_name)
 
+        # ensure we grab target_ip, username, and password if supplied and not in a variable
+        if 'TARGET_IP' in self.request.POST:
+            current_workflow['TARGET_IP'] = self.request.POST.get('TARGET_IP')
+        if 'TARGET_USERNAME' in self.request.POST:
+            current_workflow['TARGET_USERNAME'] = self.request.POST.get('TARGET_USERNAME')
+        if 'TARGET_PASSWORD' in self.request.POST:
+            current_workflow['TARGET_PASSWORD'] = self.request.POST.get('TARGET_PASSWORD')
+
         self.request.session[self.app_dir] = current_workflow
 
     def save_value_to_workflow(self, var_name, var_value) -> None:
