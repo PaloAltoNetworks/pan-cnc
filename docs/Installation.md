@@ -1,0 +1,1 @@
+git submodule add -b develop git@github.com:PaloAltoNetworks/pan-cnc.git cnc
