@@ -23,7 +23,7 @@ from jinja2 import Environment
 from jinja2.loaders import BaseLoader
 from yaml.parser import ParserError
 from . import jinja_filters
-from .exceptions import CCFParserError
+from .exceptions import CCFParserError, SnippetNotFoundException
 
 
 def load_service_snippets():
@@ -163,6 +163,10 @@ def get_snippet_metadata(snippet_name, app_dir):
 def render_snippet_template(service, app_dir, context, template_file=''):
     try:
         if template_file == '':
+            if 'snippets' not in service:
+                print('No snippets defined in meta-cnc.yaml file! Cannot determine what to render...')
+                raise SnippetNotFoundException
+
             template_name = service['snippets'][0]['file']
         else:
             template_name = template_file
@@ -187,7 +191,10 @@ def render_snippet_template(service, app_dir, context, template_file=''):
     except Exception as e:
         print(e)
         print('Caught an error rendering snippet')
-        return None
+        if 'snippet_path' in service:
+            print(f"Caught error rendering snippet at path: {service['snippet_path']}")
+
+        return 'Error'
 
 
 def resolve_dependencies(snippet, app_dir, dependencies):
@@ -213,6 +220,10 @@ def resolve_dependencies(snippet, app_dir, dependencies):
         if parent_snippet_name not in dependencies:
             dependencies.append(parent_snippet_name)
             parent_snippet = load_snippet_with_name(snippet['extends'], app_dir)
+            if parent_snippet is None:
+                print(f"Could not load the snippet named by the extends from {snippet['name']}")
+                raise SnippetNotFoundException
+
             # inception time
             return resolve_dependencies(parent_snippet, app_dir, dependencies)
 
