@@ -424,22 +424,22 @@ class CNCBaseFormView(FormView, CNCBaseAuth):
         if 'type' not in self.service:
             print('No type defined in metadata')
             return dynamic_form
-
-        target_ip = self.get_value_from_workflow('TARGET_IP', '')
-        if self.service['type'] == 'panos':
-            # Verify we have a valid target_ip, username, and password set up
-            if target_ip == '':
-                dynamic_form.fields['TARGET_IP'] = forms.CharField(label='Pan-OS Device', initial='192.168.55.10')
-                dynamic_form.fields['TARGET_USERNAME'] = forms.CharField(label='Pan-OS Username', initial='admin')
-                dynamic_form.fields['TARGET_PASSWORD'] = forms.CharField(widget=forms.PasswordInput(),
-                                                                         label='Pan-OS Password')
-
-        elif self.service['type'] == 'panorama':
-            if target_ip == '':
-                dynamic_form.fields['TARGET_IP'] = forms.CharField(label='Panorama Device', initial='192.168.55.5')
-                dynamic_form.fields['TARGET_USERNAME'] = forms.CharField(label='Panorama Username', initial='admin')
-                dynamic_form.fields['TARGET_PASSWORD'] = forms.CharField(widget=forms.PasswordInput(),
-                                                                         label='Panorama Password')
+        #
+        # target_ip = self.get_value_from_workflow('TARGET_IP', '')
+        # if self.service['type'] == 'panos':
+        #     # Verify we have a valid target_ip, username, and password set up
+        #     if target_ip == '':
+        #         dynamic_form.fields['TARGET_IP'] = forms.CharField(label='Pan-OS Device', initial='192.168.55.10')
+        #         dynamic_form.fields['TARGET_USERNAME'] = forms.CharField(label='Pan-OS Username', initial='admin')
+        #         dynamic_form.fields['TARGET_PASSWORD'] = forms.CharField(widget=forms.PasswordInput(),
+        #                                                                  label='Pan-OS Password')
+        #
+        # elif self.service['type'] == 'panorama':
+        #     if target_ip == '':
+        #         dynamic_form.fields['TARGET_IP'] = forms.CharField(label='Panorama Device', initial='192.168.55.5')
+        #         dynamic_form.fields['TARGET_USERNAME'] = forms.CharField(label='Panorama Username', initial='admin')
+        #         dynamic_form.fields['TARGET_PASSWORD'] = forms.CharField(widget=forms.PasswordInput(),
+        #                                                                  label='Panorama Password')
 
         # Get all of the variables defined in the self.service
         for variable in self.service['variables']:
@@ -720,13 +720,6 @@ class ProvisionSnippetView(CNCBaseFormView):
             raise SnippetRequiredException
 
     def form_valid(self, form):
-        """
-        form_valid is always called on a blank / new form, so this is essentially going to get called on every POST
-        self.request.POST should contain all the variables defined in the service identified by the hidden field
-        'service_id'
-        :param form: blank form data from request
-        :return: render of a success template after service is provisioned
-        """
         service_name = self.get_value_from_workflow('snippet_name', '')
 
         if service_name == '':
@@ -767,58 +760,9 @@ class ProvisionSnippetView(CNCBaseFormView):
             self.request.session['task_app_dir'] = self.app_dir
             self.request.session['task_base_html'] = self.base_html
             return render(self.request, 'pan_cnc/results_async.html', context)
-
-        # Default is panos
-        target_ip = self.get_value_from_workflow('TARGET_IP', None)
-        target_username = self.get_value_from_workflow('TARGET_USERNAME', None)
-        target_password = self.get_value_from_workflow('TARGET_PASSWORD', None)
-
-        login = pan_utils.panos_login(
-            panorama_ip=target_ip,
-            panorama_username=target_username,
-            panorama_password=target_password
-        )
-
-        if login is None:
-            context = dict()
-            context['base_html'] = self.base_html
-            context['results'] = 'Could not login to Panorama'
-            return render(self.request, 'pan_cnc/results.html', context=context)
-
-        # Always grab all the default values, then update them based on user input in the workflow
-        jinja_context = dict()
-        if 'variables' in self.service and type(self.service['variables']) is list:
-            for snippet_var in self.service['variables']:
-                jinja_context[snippet_var['name']] = snippet_var['default']
-
-        # let's grab the current workflow values (values saved from ALL forms in this app
-        jinja_context.update(self.get_workflow())
-        dependencies = snippet_utils.resolve_dependencies(self.service, self.app_dir, [])
-        for baseline in dependencies:
-            # prego (it's in there)
-            baseline_service = snippet_utils.load_snippet_with_name(baseline, self.app_dir)
-            # FIX for https://github.com/nembery/vistoq2/issues/5
-            if 'variables' in baseline_service and type(baseline_service['variables']) is list:
-                for v in baseline_service['variables']:
-                    # FIXME - Should include a way show this in UI so we have POSTED values available
-                    if 'default' in v:
-                        # Do not overwrite values if they've arrived from the user via the Form
-                        if v['name'] not in jinja_context:
-                            print('Setting default from baseline on context for %s' % v['name'])
-                            jinja_context[v['name']] = v['default']
-
-            if baseline_service is not None:
-                # check the panorama config to see if it's there or not
-                if not pan_utils.validate_snippet_present(baseline_service, jinja_context):
-                    # no prego (it's not in there)
-                    print('Pushing configuration dependency: %s' % baseline_service['name'])
-                    # make it prego
-                    pan_utils.push_service(baseline_service, jinja_context)
-
-        # BUG-FIX to always just push the toplevel self.service
-        pan_utils.push_service(self.service, jinja_context)
-
-        return super().form_valid(form)
+        else:
+            print('This template type requires a target')
+            return HttpResponseRedirect('/editTarget')
 
 
 class NextTaskView(CNCView):
@@ -1352,7 +1296,9 @@ class EditTargetView(CNCBaseAuth, FormView):
     # link to external documentation
     documentation_link = ''
     # help text - inline documentation text
-    help_text = ''
+    help_text = 'The Target is the endpoint or device where the configured template will be applied. ' \
+                'This us usually a Pan-OS or other network device depending on the type of template to ' \
+                'be provisioned'
 
     def get_context_data(self, **kwargs) -> dict:
         context = super().get_context_data(**kwargs)
@@ -1364,8 +1310,14 @@ class EditTargetView(CNCBaseAuth, FormView):
         target_username_label = 'Target Username'
         target_password_label = 'Target Password'
 
+        header = 'Edit Target'
+        title = 'Configure Target information'
+
         if snippet_name != '':
             meta = snippet_utils.load_snippet_with_name(snippet_name, self.app_dir)
+            if 'label' in meta:
+                header = f"Set Target for {meta['label']}"
+
             if 'type' in meta:
                 if meta['type'] == 'panos':
                     target_ip_label = 'Pan-OS IP'
@@ -1397,11 +1349,68 @@ class EditTargetView(CNCBaseAuth, FormView):
         context['form'] = form
         context['base_html'] = self.base_html
         context['env_name'] = env_name
-        context['header'] = 'Edit Target'
-        context['title'] = 'Set Target information below'
+        context['header'] = header
+        context['title'] = title
         return context
 
     def form_valid(self, form):
-        messages.add_message(self.request, messages.SUCCESS, 'Updated Target Successfully')
-        return HttpResponseRedirect('/')
+        """
+        form_valid is always called on a blank / new form, so this is essentially going to get called on every POST
+        self.request.POST should contain all the variables defined in the service identified by the hidden field
+        'service_id'
+        :param form: blank form data from request
+        :return: render of a success template after service is provisioned
+        """
+
+        # Default is panos
+        target_ip = self.get_value_from_workflow('TARGET_IP', None)
+        target_username = self.get_value_from_workflow('TARGET_USERNAME', None)
+        target_password = self.get_value_from_workflow('TARGET_PASSWORD', None)
+
+        login = pan_utils.panos_login(
+            panorama_ip=target_ip,
+            panorama_username=target_username,
+            panorama_password=target_password
+        )
+
+        if login is None:
+            context = dict()
+            context['base_html'] = self.base_html
+            context['results'] = 'Could not login to Panorama'
+            return render(self.request, 'pan_cnc/results.html', context=context)
+
+        # Always grab all the default values, then update them based on user input in the workflow
+        jinja_context = dict()
+        if 'variables' in self.service and type(self.service['variables']) is list:
+            for snippet_var in self.service['variables']:
+                jinja_context[snippet_var['name']] = snippet_var['default']
+
+        # let's grab the current workflow values (values saved from ALL forms in this app
+        jinja_context.update(self.get_workflow())
+        dependencies = snippet_utils.resolve_dependencies(self.service, self.app_dir, [])
+        for baseline in dependencies:
+            # prego (it's in there)
+            baseline_service = snippet_utils.load_snippet_with_name(baseline, self.app_dir)
+            # FIX for https://github.com/nembery/vistoq2/issues/5
+            if 'variables' in baseline_service and type(baseline_service['variables']) is list:
+                for v in baseline_service['variables']:
+                    # FIXME - Should include a way show this in UI so we have POSTED values available
+                    if 'default' in v:
+                        # Do not overwrite values if they've arrived from the user via the Form
+                        if v['name'] not in jinja_context:
+                            print('Setting default from baseline on context for %s' % v['name'])
+                            jinja_context[v['name']] = v['default']
+
+            if baseline_service is not None:
+                # check the panorama config to see if it's there or not
+                if not pan_utils.validate_snippet_present(baseline_service, jinja_context):
+                    # no prego (it's not in there)
+                    print('Pushing configuration dependency: %s' % baseline_service['name'])
+                    # make it prego
+                    pan_utils.push_service(baseline_service, jinja_context)
+
+        # BUG-FIX to always just push the toplevel self.service
+        pan_utils.push_service(self.service, jinja_context)
+
+        return super().form_valid(form)
 
