@@ -33,3 +33,8 @@ class CCFParserError(Exception):
     pass
 
 
+class SnippetNotFoundException(Exception):
+    pass
+
+
+
