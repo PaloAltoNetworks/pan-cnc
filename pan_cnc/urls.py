@@ -49,7 +49,8 @@ urlpatterns = [
     path('delete_secret/<env_name>/<key_name>', pan_cnc_views.DeleteEnvironmentKeyView.as_view()),
     path('unlock_envs', pan_cnc_views.UnlockEnvironmentsView.as_view()),
     path('debug/<app_dir>/<snippet_name>', pan_cnc_views.DebugMetadataView.as_view()),
-    path('next_task', pan_cnc_views.NextTaskView.as_view())
+    path('next_task', pan_cnc_views.NextTaskView.as_view()),
+    path('editTarget', pan_cnc_views.EditTargetView.as_view())
 ]
 
 print('Configuring URLs for installed apps')

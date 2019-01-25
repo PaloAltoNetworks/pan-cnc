@@ -53,7 +53,16 @@ class CNCBaseAuth(LoginRequiredMixin, View):
     Base Authentication Mixin - This can be overrode to provide some specific authentication implementation
     """
     login_url = '/login'
-    app_dir = 'pan_cnc'
+    app_dir = ''
+
+    # always gets called on authenticated views
+    def dispatch(self, request, *args, **kwargs):
+        if self.app_dir != '':
+            self.request.session['current_app_dir'] = self.app_dir
+        else:
+            self.app_dir = self.request.session.get('current_app_dir', '')
+
+        return super().dispatch(request, *args, **kwargs)
 
     def save_workflow_to_session(self) -> None:
         """
@@ -674,22 +683,24 @@ class ProvisionSnippetView(CNCBaseFormView):
     title = 'Customize Variables'
 
     def get_context_data(self, **kwargs):
-        if 'type' not in self.service:
-            return super().get_context_data()
+        if self.service is not None:
 
-        if self.service['type'] == 'template':
-            self.header = 'Render Template'
-            self.title = 'Customize Template Variables'
-        elif self.service['type'] == 'panos':
-            self.header = 'Pan-OS Configuration'
-            self.title = 'Customize Configuration Variables'
-        elif self.service['type'] == 'panorama':
-            self.header = 'Panorama Configuration'
-            self.title = 'Customize Panorama Configuration Variables'
-        else:
-            # May need to add additional types here
-            t = self.service['type']
-            print(f'Found unknown type {t} for form customization in ProvisionSnippetView:get_context_data')
+            if 'type' not in self.service:
+                return super().get_context_data()
+
+            if self.service['type'] == 'template':
+                self.header = 'Render Template'
+                self.title = 'Customize Template Variables'
+            elif self.service['type'] == 'panos':
+                self.header = 'Pan-OS Configuration'
+                self.title = 'Customize Configuration Variables'
+            elif self.service['type'] == 'panorama':
+                self.header = 'Panorama Configuration'
+                self.title = 'Customize Panorama Configuration Variables'
+            else:
+                # May need to add additional types here
+                t = self.service['type']
+                print(f'Found unknown type {t} for form customization in ProvisionSnippetView:get_context_data')
 
         return super().get_context_data()
 
@@ -841,6 +852,11 @@ class NextTaskView(CNCView):
         self._app_dir = value
 
     def get_app_dir(self):
+        if 'current_app_dir' in self.request.session:
+            print('Using current_app_dir in NextTaskView')
+            self.app_dir = self.request.session['current_app_dir']
+            return self.app_dir
+
         if 'task_app_dir' in self.request.session:
             self.app_dir = self.request.session['task_app_dir']
             return self.app_dir
@@ -927,7 +943,6 @@ class DockerLogsView(CNCBaseAuth, View):
 
 class TaskLogsView(CNCBaseAuth, View):
 
-    @csrf_exempt
     def get(self, request, *args, **kwargs) -> Any:
         logs_output = dict()
         if 'task_id' in request.session:
@@ -1316,3 +1331,78 @@ class DebugMetadataView(CNCView):
         context['header'] = 'Debug Metadata'
         context['title'] = 'Metadata for %s' % self.snippet_name
         return context
+
+
+class EditTargetView(CNCBaseAuth, FormView):
+    """
+    Edit or update the current target
+    """
+    # base form class, you should not need to override this
+    form_class = forms.Form
+    # form to render, override if you need a specific html fragment to render the form
+    template_name = 'pan_cnc/dynamic_form.html'
+    # Head to show on the rendered dynamic form - Main header
+    header = 'Pan-OS Utils'
+    # title to show on dynamic form
+    title = 'Title'
+    # where to go after this? once the form has been submitted, redirect to where?
+    # this should match a 'view name' from the pan_cnc.yaml file
+    next_url = '/'
+    # base html - allow sub apps to override this with special html base if desired
+    base_html = 'pan_cnc/base.html'
+    # link to external documentation
+    documentation_link = ''
+    # help text - inline documentation text
+    help_text = ''
+
+    def get_context_data(self, **kwargs) -> dict:
+        context = super().get_context_data(**kwargs)
+        env_name = self.kwargs.get('env_name')
+        form = forms.Form()
+        snippet_name = self.get_value_from_workflow('snippet_name', '')
+
+        target_ip_label = 'Target IP'
+        target_username_label = 'Target Username'
+        target_password_label = 'Target Password'
+
+        if snippet_name != '':
+            meta = snippet_utils.load_snippet_with_name(snippet_name, self.app_dir)
+            if 'type' in meta:
+                if meta['type'] == 'panos':
+                    target_ip_label = 'Pan-OS IP'
+                    target_username_label = 'Pan-OS Username'
+                    target_password_label = 'Pan-OS Password'
+                elif meta['type'] == 'panorama':
+                    target_ip_label = 'Panorama IP'
+                    target_username_label = 'Panorama Username'
+                    target_password_label = 'Panorama Password'
+                elif meta['type'] == 'panorama-gpcs':
+                    target_ip_label = 'Panorama IP'
+                    target_username_label = 'Panorama Username'
+                    target_password_label = 'Panorama Password'
+
+        target_ip = self.get_value_from_workflow('TARGET_IP', '')
+        target_username = self.get_value_from_workflow('TARGET_USERNAME', '')
+        target_password = self.get_value_from_workflow('TARGET_PASSWORD', '')
+
+        target_ip_field = forms.CharField(label=target_ip_label, initial=target_ip)
+        target_username_field = forms.CharField(label=target_username_label, initial=target_username)
+        target_password_field = forms.CharField(widget=forms.PasswordInput(render_value=True),
+                                                label=target_password_label,
+                                                initial=target_password)
+
+        form.fields['TARGET_IP'] = target_ip_field
+        form.fields['TARGET_USERNAME'] = target_username_field
+        form.fields['TARGET_PASSWORD'] = target_password_field
+
+        context['form'] = form
+        context['base_html'] = self.base_html
+        context['env_name'] = env_name
+        context['header'] = 'Edit Target'
+        context['title'] = 'Set Target information below'
+        return context
+
+    def form_valid(self, form):
+        messages.add_message(self.request, messages.SUCCESS, 'Updated Target Successfully')
+        return HttpResponseRedirect('/')
+
