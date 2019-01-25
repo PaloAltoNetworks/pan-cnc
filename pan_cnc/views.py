@@ -1364,6 +1364,12 @@ class EditTargetView(CNCBaseAuth, FormView):
         :param form: blank form data from request
         :return: render of a success template after service is provisioned
         """
+        snippet_name = self.get_value_from_workflow('snippet_name', '')
+        if snippet_name != '':
+            meta = snippet_utils.load_snippet_with_name(snippet_name, self.app_dir)
+        else:
+            print('Could not find a valid meta-cnc def')
+            raise SnippetRequiredException
 
         # Default is panos
         target_ip = self.get_value_from_workflow('TARGET_IP', None)
@@ -1384,13 +1390,13 @@ class EditTargetView(CNCBaseAuth, FormView):
 
         # Always grab all the default values, then update them based on user input in the workflow
         jinja_context = dict()
-        if 'variables' in self.service and type(self.service['variables']) is list:
-            for snippet_var in self.service['variables']:
+        if 'variables' in meta and type(meta['variables']) is list:
+            for snippet_var in meta['variables']:
                 jinja_context[snippet_var['name']] = snippet_var['default']
 
         # let's grab the current workflow values (values saved from ALL forms in this app
         jinja_context.update(self.get_workflow())
-        dependencies = snippet_utils.resolve_dependencies(self.service, self.app_dir, [])
+        dependencies = snippet_utils.resolve_dependencies(meta, self.app_dir, [])
         for baseline in dependencies:
             # prego (it's in there)
             baseline_service = snippet_utils.load_snippet_with_name(baseline, self.app_dir)
@@ -1412,8 +1418,8 @@ class EditTargetView(CNCBaseAuth, FormView):
                     # make it prego
                     pan_utils.push_service(baseline_service, jinja_context)
 
-        # BUG-FIX to always just push the toplevel self.service
-        pan_utils.push_service(self.service, jinja_context)
+        # BUG-FIX to always just push the toplevel meta
+        pan_utils.push_service(meta, jinja_context)
 
         return super().form_valid(form)
 
