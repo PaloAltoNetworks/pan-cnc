@@ -254,6 +254,8 @@ class CNCBaseFormView(FormView, CNCBaseAuth):
     documentation_link = ''
     # help text - inline documentation text
     help_text = ''
+    # where to redirect to
+    success_url = '/'
 
     def __init__(self, **kwargs):
         # fields to render and fields to filter should never be shared to child classes
@@ -764,6 +766,7 @@ class ProvisionSnippetView(CNCBaseFormView):
             return render(self.request, 'pan_cnc/results_async.html', context)
         else:
             print('This template type requires a target')
+            self.save_value_to_workflow('next_url', self.next_url)
             return HttpResponseRedirect('/editTarget')
 
 
@@ -1420,6 +1423,6 @@ class EditTargetView(CNCBaseAuth, FormView):
 
         # BUG-FIX to always just push the toplevel meta
         pan_utils.push_service(meta, jinja_context)
-
-        return super().form_valid(form)
+        next_url = self.get_value_from_workflow('next_url', '/')
+        return HttpResponseRedirect(next_url)
 
