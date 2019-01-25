@@ -705,13 +705,15 @@ class ProvisionSnippetView(CNCBaseFormView):
         return super().get_context_data()
 
     def get_snippet(self):
-        print('Getting snippet here in ProvisionSnippetView:get_snippet')
+        session_cache = self.request.session[self.app_dir]
+
         if 'snippet_name' in self.request.POST:
             print('found snippet in post')
-            return self.request.POST['snippet_name']
+            snippet_name = self.request.POST['snippet_name']
+            session_cache['snippet_name'] = snippet_name
+            return snippet_name
 
         elif self.app_dir in self.request.session:
-            session_cache = self.request.session[self.app_dir]
             if 'snippet_name' in session_cache:
                 print('returning snippet name: %s from session cache' % session_cache['snippet_name'])
                 return session_cache['snippet_name']
@@ -773,7 +775,7 @@ class NextTaskView(CNCView):
         # app builder will over configure in a pan-cnc.yaml file, so we do not have access to the current app name
         # it should be set in the request session though, so grab it there and set it here for all other things to
         # just work
-        self._app_dir = 'pan_cnc'
+        self._app_dir = ''
         self._base_html = 'pan_cnc/base.html'
 
         super().__init__(**kwargs)
@@ -798,6 +800,7 @@ class NextTaskView(CNCView):
         if 'current_app_dir' in self.request.session:
             print('Using current_app_dir in NextTaskView')
             self.app_dir = self.request.session['current_app_dir']
+            print(f"app_dir is {self.app_dir}")
             return self.app_dir
 
         if 'task_app_dir' in self.request.session:
