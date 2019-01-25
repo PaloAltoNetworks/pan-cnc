@@ -1424,5 +1424,5 @@ class EditTargetView(CNCBaseAuth, FormView):
         # BUG-FIX to always just push the toplevel meta
         pan_utils.push_service(meta, jinja_context)
         next_url = self.get_value_from_workflow('next_url', '/')
-        return HttpResponseRedirect(next_url)
+        return HttpResponseRedirect(f"{self.app_dir}/{next_url}")
 
