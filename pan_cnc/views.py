@@ -822,7 +822,6 @@ class ProvisionSnippetView(CNCBaseFormView):
 
 
 class NextTaskView(CNCView):
-
     template_name = 'pan_cnc/results_async.html'
 
     def __init__(self, **kwargs):
@@ -1032,7 +1031,7 @@ class UnlockEnvironmentsView(CNCBaseAuth, FormView):
     help_text = """
                     This form will unlock your Environment. If you have not created an Environment, a new one will be
                     created using the password supplied below.
-                
+
                     Creating an environment allows you to keep passwords and other data specific to an environment 
                     in one place. The environments file is encrypted and placed in your home directory for safe
                     keeping.
