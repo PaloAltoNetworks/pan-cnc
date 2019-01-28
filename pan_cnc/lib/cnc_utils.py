@@ -22,7 +22,7 @@ from pathlib import Path
 
 import pyAesCrypt
 from django.core.cache import cache
-
+from django.conf import settings
 from pan_cnc.lib import git_utils
 
 
@@ -220,4 +220,17 @@ def init_app(app_cnc_config):
         print(f'Pulling / Refreshing repository: {repo_url}')
         git_utils.clone_or_update_repo(repo_dir, repo_name, repo_url, repo_branch)
 
+    return None
+
+
+def get_app_config(app_name):
+    """
+    Return the app configuration dict (pan-cnc) or None if app by app_name is not found / loaded
+    :param app_name: name of the app to load. This should match the 'name' attribute in the pan-cnc file
+    :return: dict containing app_config or None if not found
+    """
+    if app_name in settings.INSTALLED_APPS_CONFIG:
+        return settings.INSTALLED_APPS_CONFIG[app_name]
+
+    print('Could not load app_config')
     return None

@@ -24,6 +24,7 @@ Please see http://github.com/PaloAltoNetworks/pan-cnc for more information
 This software is provided without support, warranty, or guarantee.
 Use at your own risk.
 """
+
 import copy
 import json
 from collections import OrderedDict
@@ -34,7 +35,6 @@ from django import forms
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.shortcuts import render, HttpResponseRedirect, HttpResponse
-from django.views.decorators.csrf import csrf_exempt
 from django.views.generic import RedirectView
 from django.views.generic import TemplateView
 from django.views.generic import View
@@ -194,6 +194,19 @@ class CNCBaseAuth(LoginRequiredMixin, View):
         else:
             print('Not found in ENV, returning default')
             return default
+
+    def page_title(self):
+        default = 'CNC Tools'
+        if self.app_dir != '':
+            app_config = cnc_utils.get_app_config(self.app_dir)
+            if 'label' in app_config:
+                return app_config['label']
+            elif 'name' in app_config:
+                return app_config['name']
+            else:
+                return default
+
+        return default
 
 
 class CNCView(CNCBaseAuth, TemplateView):
@@ -1425,4 +1438,3 @@ class EditTargetView(CNCBaseAuth, FormView):
         pan_utils.push_service(meta, jinja_context)
         next_url = self.get_value_from_workflow('next_url', '/')
         return HttpResponseRedirect(f"{self.app_dir}/{next_url}")
-

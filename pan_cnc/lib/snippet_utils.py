@@ -72,21 +72,43 @@ def load_snippets_by_label(label_name, label_value, app_dir):
 
 def load_snippets_of_type(snippet_type=None, app_dir=None):
     """
-    Loads a list of snippets of the given type, or all snippets of snippet_type is None
+    Loads a list of snippets of the given type, or all snippets if snippet_type is None
     :param snippet_type: string of the snippet type to field
     :param app_dir: name of the app to load the snippets from
     :return: list of snippet dicts
     """
  
-    snippet_list = list() 
-   
     snippets_dir = Path(os.path.join(settings.SRC_PATH, app_dir, 'snippets'))
+    return load_snippets_of_type_from_dir(snippets_dir, snippet_type)
+
+
+def load_snippets_of_type_from_dir(directory, snippet_type=None):
+    """
+    Loads a list of snippets of the given type, or all snippets if snippet_type is None from a specified directory
+    This is useful to load all snippets that come from a specific repository for example
+    :param directory: full path to directory from which to search for meta-cnc files
+    :param snippet_type: type of snippet to add to the list if found
+    :return: list of snippet objects
+    """
+    snippet_list = list()
+
+    snippets_dir = Path(directory)
+    src_path = Path(settings.SRC_PATH)
+
+    if src_path not in snippets_dir.parents:
+        # do not allow relative paths from going outside of our app root
+        print('Not allowing escape from application source path')
+        return snippet_list
+
+    if not snippets_dir.exists():
+        print(f'Could not find meta-cnc files in dir {directory}')
+        return snippet_list
+
     for d in snippets_dir.rglob('./*'):
         if d.is_dir() and '.git' in d.name:
             print(f'skipping .git dir {d.parent}')
             continue
 
-        # mdf = os.path.join(d, '.meta-cnc.yaml')
         mdf = d.joinpath('.meta-cnc.yaml')
         if mdf.is_file():
             # if os.path.isfile(mdf):
@@ -107,7 +129,7 @@ def load_snippets_of_type(snippet_type=None, app_dir=None):
                 print(ioe)
                 raise CCFParserError
             except ParserError as pe:
-                print('Could not parse metadata file in dir %s' %mdf)
+                print('Could not parse metadata file in dir %s' % mdf)
                 print(pe)
                 raise CCFParserError
 

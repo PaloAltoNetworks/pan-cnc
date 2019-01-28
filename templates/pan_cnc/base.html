@@ -5,20 +5,15 @@
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>CNC Tools</title>
+    <title>{{ view.page_title }}</title>
     <link rel="icon" type="image/x-icon" href="{% static 'images/pan_favicon.ico' %}">
     <link href="{% static 'css/bootstrap.css' %}" rel="stylesheet">
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
     <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.1.1/js/bootstrap.min.js"></script>
     <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.6.3/css/all.css"
           integrity="sha384-UHRtZLI+pbxtHCWp1t77Bi1L4ZtiqrqD80Kn4Z8NTSRyMA2Fd33n5dQ8lWUE00s/" crossorigin="anonymous">
-    <script type="text/javascript">
-        function copy_secret(secret_name) {
-            alert(secret_name);
-        }
-    </script>
 </head>
-<body>
+<body class="bg-light">
 <nav class="navbar fixed-top navbar-expand-lg navbar-dark bg-dark">
     <a class="nav-brand" href="http://paloaltonetworks.com">
         <img src="{% static 'images/logo-pan-bg.png' %}" alt="PAN" style="height: 30px; width: 50px;"/>
@@ -81,7 +76,7 @@
 </nav>
 
 <div id="page-content-wrapper">
-    <div class="page-content pt-5 bg-light">
+    <div class="page-content pt-5">
         <div class="container">
             <div class="row">
                 <div class="col-md-12 my-5">

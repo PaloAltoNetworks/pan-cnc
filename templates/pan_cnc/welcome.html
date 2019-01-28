@@ -12,7 +12,7 @@
     </h1>
     <p class="lead">
         {% if description %}
-        {{ description }}
+        {{ description|linebreaks }}
         {% else %}
         Welcome to the Palo Alto Networks tools framework
         {% endif %}
