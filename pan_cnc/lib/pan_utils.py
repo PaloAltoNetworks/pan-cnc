@@ -99,6 +99,14 @@ def push_service(service, context):
     else:
         snippets_dir = Path(os.path.join(settings.BASE_DIR, 'mssp', 'snippets', service['name']))
 
+    if 'type' not in service:
+        commit_type = 'commit'
+    else:
+        if 'panorama' in service['type']:
+            commit_type = 'commit-all'
+        else:
+            commit_type = 'commit'
+
     try:
         for snippet in service['snippets']:
             xpath = snippet['xpath']
@@ -119,7 +127,12 @@ def push_service(service, context):
                     print('xpath was NOT found')
                     return False
 
-        xapi.commit('<commit/>', sync=True)
+        if commit_type == 'commit-all':
+            print('Performing commit-all in panorama')
+            xapi.commit('', sync=True, action='all')
+        else:
+            xapi.commit('', sync=True)
+
         print(xapi.xml_result())
         return True
 
