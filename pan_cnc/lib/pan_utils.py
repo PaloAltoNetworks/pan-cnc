@@ -135,18 +135,18 @@ def push_service(service, context):
 
         print(xapi.xml_result())
 
-        # for gpcs remote network configuration do a scope push to gpcs
-        if service['name'] == 'gpcs_remote':
-            print('push remote network scope to gpcs')
-            xapi.commit(action='all',
-                        cmd='<commit-all><shared-policy><device-group><entry name="Remote_Network_Device_Group"/></device-group></shared-policy></commit-all>')
-            print(xapi.xml_result())
-
         # for gpcs baseline and svc connection network configuration do a scope push to gpcs
         if service['name'] == 'gpcs_baseline':
             print('push baseline and svc connection scope to gpcs')
             xapi.commit(action='all',
                         cmd='<commit-all><template-stack><name>Service_Conn_Template_Stack</name></template-stack></commit-all>')
+            print(xapi.xml_result())
+
+        # for gpcs remote network configuration do a scope push to gpcs
+        if service['name'] == 'gpcs_remote' or service['name'] == 'gpcs_baseline':
+            print('push remote network scope to gpcs')
+            xapi.commit(action='all',
+                        cmd='<commit-all><shared-policy><device-group><entry name="Remote_Network_Device_Group"/></device-group></shared-policy></commit-all>')
             print(xapi.xml_result())
 
         return True
