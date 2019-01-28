@@ -129,7 +129,7 @@ def push_service(service, context):
 
         if commit_type == 'commit-all':
             print('Performing commit-all in panorama')
-            xapi.commit('', sync=True, action='all')
+            xapi.commit(cmd='<commit-all></commit-all>')
         else:
             xapi.commit('', sync=True)
 
