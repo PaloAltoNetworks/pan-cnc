@@ -228,6 +228,11 @@ def get_device_groups_from_panorama():
 
 def get_vm_auth_key_from_panorama():
     xapi = panos_login()
+
+    if xapi is None:
+        print('Could not login into Pan-OS target')
+        raise TargetConnectionException
+
     try:
         xapi.op(cmd='<request><bootstrap><vm-auth-key><generate>'
                     '<lifetime>24</lifetime></generate></vm-auth-key></bootstrap></request>')
