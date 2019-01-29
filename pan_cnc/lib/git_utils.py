@@ -117,8 +117,15 @@ def update_repo(repo_dir):
     :return:
     """
     repo = Repo(repo_dir)
-    # FIXME - ensure we catch errors here
-    f = repo.remotes.origin.pull()
+    try:
+        changes = repo.index.diff(None)
+        if len(changes) > 0:
+            print('There are local changes that may get lost if we update!')
+
+        f = repo.remotes.origin.pull()
+    except GitCommandError as gce:
+        print(gce)
+        return 'Could not update! Ensure there are no local changes before updating'
     if len(f) > 0:
         flags = f[0].flags
         if flags == 4:
@@ -131,7 +138,7 @@ def update_repo(repo_dir):
     return "Unknown Error"
 
 
-def get_repo_upstream_details(repo_name, repo_url):
+def get_repo_upstream_details(repo_name: str, repo_url: str) -> dict:
     """
     Attempt to get the details from a git repository. Details are found via specific APIs for each type of git repo.
     Currently only Github is supported.
@@ -139,7 +146,6 @@ def get_repo_upstream_details(repo_name, repo_url):
     :param repo_url:
     :return:
     """
-    # ensure spaces are handled correctly
     cache_repo_name = repo_name.replace(' ', '_')
     details = cnc_utils.get_cached_value(f'git_utils_upstream_{cache_repo_name}')
     if details is not None:
@@ -148,9 +154,24 @@ def get_repo_upstream_details(repo_name, repo_url):
     details = dict()
 
     if 'github' in repo_url:
-        url_parts = repo_url.split('/')[-2:]
-        owner = url_parts[0]
-        repo = url_parts[1].split('.git')[0]
+        # it's possible the user uses a github web address that does not end in .git
+        # let's try to fix that and see if that helps, this returns a blank dict if not anyway, so it's worth
+        # a shot
+        if repo_url.endswith('.git'):
+            # https://github.com/owner/repo.git
+            url_parts = repo_url.split('/')[-2:]
+            owner = url_parts[0]
+            repo = url_parts[1].split('.git')[0]
+        elif repo_url.endswith('/'):
+            # https://github.com/owner/repo/
+            url_parts = repo_url.split('/')[-3:]
+            owner = url_parts[0]
+            repo = url_parts[1].split('.git')[0]
+        else:
+            # https://github.com/owner/repo ?
+            url_parts = repo_url.split('/')[-2:]
+            owner = url_parts[0]
+            repo = url_parts[1].split('.git')[0]
 
         try:
             api_url = f'https://api.github.com/repos/{owner}/{repo}'
