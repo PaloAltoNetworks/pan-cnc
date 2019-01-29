@@ -1,5 +1,5 @@
-from pan_cnc.lib.actions.DockerAction import DockerAction
-from pan_cnc.tasks import terraform_init, terraform_validate, terraform_plan, terraform_apply, terraform_destroy
+from pan_cnc.tasks import terraform_init, terraform_validate, terraform_plan, terraform_apply, terraform_refresh, \
+    terraform_destroy
 
 
 def __build_cmd_seq_vars(resource_def, snippet_context):
@@ -42,3 +42,14 @@ def perform_apply(resource_def, snippet_context):
     tf_vars = __build_cmd_seq_vars(resource_def, snippet_context)
     return terraform_apply.delay(resource_dir, tf_vars)
 
+
+def perform_refresh(resource_def, snippet_context):
+    resource_dir = resource_def['snippet_path']
+    tf_vars = __build_cmd_seq_vars(resource_def, snippet_context)
+    return terraform_refresh.delay(resource_dir, tf_vars)
+
+
+def perform_destroy(resource_def, snippet_context):
+    resource_dir = resource_def['snippet_path']
+    tf_vars = __build_cmd_seq_vars(resource_def, snippet_context)
+    return terraform_destroy.delay(resource_dir, tf_vars)

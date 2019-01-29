@@ -22,9 +22,11 @@
                 c.empty();
                 let next_link = $('<a/>');
                 if (returncode === 0) {
+                    {% if request.session.task_next %}
                     next_link.attr('href', '/next_task');
                     next_link.html('Continue');
                     next_link.addClass('btn').addClass('btn-primary');
+                    {% endif %}
                 } else {
                     next_link.attr('href', '/');
                     next_link.html('Continue');

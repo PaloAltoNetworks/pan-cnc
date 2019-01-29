@@ -752,35 +752,272 @@ class ProvisionSnippetView(CNCBaseFormView):
             return render(self.request, 'pan_cnc/results.html', context)
 
         elif self.service['type'] == 'terraform':
-            # For terraform types we need to initiate a whole new workflow
-            # other types will basically terminate after the provision stage
-            # for this though, we need to execute a background task then forward
-            # to the NextTaskView class. This view is not going to be configured per
-            # cnc app though, so things like app_dir will not be available.
-            # We will save what we need to the session and wait for the javascript
-            # in the results_async page to allow the user to continue to the next task
-            print('Launching terraform init')
-            r = terraform_utils.perform_init(self.service, self.get_snippet_context())
-            context = dict()
-            context['base_html'] = self.base_html
-            context['title'] = 'Executing Task: Terraform Init'
-            context['header'] = 'Terraform Template'
-            if r is None:
-                context['results'] = 'Could not launch init tassk!'
-                return render(self.request, 'pan_cnc/results.html', context)
-
-            context['results'] = 'task id: %s' % r.id
-            # now save needed information to gather the output of the celery tasks
-            # and allow us to proceed to the next task
-            self.request.session['task_id'] = r.id
-            self.request.session['task_next'] = 'terraform_validate'
-            self.request.session['task_app_dir'] = self.app_dir
-            self.request.session['task_base_html'] = self.base_html
-            return render(self.request, 'pan_cnc/results_async.html', context)
+            # # For terraform types we need to initiate a whole new workflow
+            # # other types will basically terminate after the provision stage
+            # # for this though, we need to execute a background task then forward
+            # # to the NextTaskView class. This view is not going to be configured per
+            # # cnc app though, so things like app_dir will not be available.
+            # # We will save what we need to the session and wait for the javascript
+            # # in the results_async page to allow the user to continue to the next task
+            # print('Launching terraform init')
+            # r = terraform_utils.perform_init(self.service, self.get_snippet_context())
+            # context = super().get_context_data()
+            # context['title'] = 'Executing Task: Terraform Init'
+            # context['header'] = 'Terraform Template'
+            # if r is None:
+            #     context['results'] = 'Could not launch init tassk!'
+            #     return render(self.request, 'pan_cnc/results.html', context)
+            #
+            # context['results'] = 'task id: %s' % r.id
+            # # now save needed information to gather the output of the celery tasks
+            # # and allow us to proceed to the next task
+            # self.request.session['task_id'] = r.id
+            # self.request.session['task_next'] = 'terraform_validate'
+            # self.request.session['task_app_dir'] = self.app_dir
+            # self.request.session['task_base_html'] = self.base_html
+            # return render(self.request, 'pan_cnc/results_async.html', context)
+            print('This template type requires a target')
+            self.save_value_to_workflow('next_url', self.next_url)
+            return HttpResponseRedirect('/terraform')
         else:
             print('This template type requires a target')
             self.save_value_to_workflow('next_url', self.next_url)
             return HttpResponseRedirect('/editTarget')
+
+
+class EditTargetView(CNCBaseAuth, FormView):
+    """
+    Edit or update the current target
+    """
+    # base form class, you should not need to override this
+    form_class = forms.Form
+    # form to render, override if you need a specific html fragment to render the form
+    template_name = 'pan_cnc/dynamic_form.html'
+    # Head to show on the rendered dynamic form - Main header
+    header = 'Pan-OS Utils'
+    # title to show on dynamic form
+    title = 'Title'
+    # where to go after this? once the form has been submitted, redirect to where?
+    # this should match a 'view name' from the pan_cnc.yaml file
+    next_url = '/'
+    # base html - allow sub apps to override this with special html base if desired
+    base_html = 'pan_cnc/base.html'
+    # link to external documentation
+    documentation_link = ''
+    # help text - inline documentation text
+    help_text = 'The Target is the endpoint or device where the configured template will be applied. ' \
+                'This us usually a Pan-OS or other network device depending on the type of template to ' \
+                'be provisioned'
+
+    def get_context_data(self, **kwargs) -> dict:
+        context = super().get_context_data(**kwargs)
+        env_name = self.kwargs.get('env_name')
+        form = forms.Form()
+        snippet_name = self.get_value_from_workflow('snippet_name', '')
+
+        target_ip_label = 'Target IP'
+        target_username_label = 'Target Username'
+        target_password_label = 'Target Password'
+
+        header = 'Edit Target'
+        title = 'Configure Target information'
+
+        if snippet_name != '':
+            meta = snippet_utils.load_snippet_with_name(snippet_name, self.app_dir)
+            if 'label' in meta:
+                header = f"Set Target for {meta['label']}"
+
+            if 'type' in meta:
+                if meta['type'] == 'panos':
+                    target_ip_label = 'Pan-OS IP'
+                    target_username_label = 'Pan-OS Username'
+                    target_password_label = 'Pan-OS Password'
+                elif meta['type'] == 'panorama':
+                    target_ip_label = 'Panorama IP'
+                    target_username_label = 'Panorama Username'
+                    target_password_label = 'Panorama Password'
+                elif meta['type'] == 'panorama-gpcs':
+                    target_ip_label = 'Panorama IP'
+                    target_username_label = 'Panorama Username'
+                    target_password_label = 'Panorama Password'
+
+        target_ip = self.get_value_from_workflow('TARGET_IP', '')
+        target_username = self.get_value_from_workflow('TARGET_USERNAME', '')
+        target_password = self.get_value_from_workflow('TARGET_PASSWORD', '')
+
+        target_ip_field = forms.CharField(label=target_ip_label, initial=target_ip)
+        target_username_field = forms.CharField(label=target_username_label, initial=target_username)
+        target_password_field = forms.CharField(widget=forms.PasswordInput(render_value=True),
+                                                label=target_password_label,
+                                                initial=target_password)
+
+        form.fields['TARGET_IP'] = target_ip_field
+        form.fields['TARGET_USERNAME'] = target_username_field
+        form.fields['TARGET_PASSWORD'] = target_password_field
+
+        context['form'] = form
+        context['base_html'] = self.base_html
+        context['env_name'] = env_name
+        context['header'] = header
+        context['title'] = title
+        return context
+
+    def form_valid(self, form):
+        """
+        form_valid is always called on a blank / new form, so this is essentially going to get called on every POST
+        self.request.POST should contain all the variables defined in the service identified by the hidden field
+        'service_id'
+        :param form: blank form data from request
+        :return: render of a success template after service is provisioned
+        """
+        snippet_name = self.get_value_from_workflow('snippet_name', '')
+        if snippet_name != '':
+            meta = snippet_utils.load_snippet_with_name(snippet_name, self.app_dir)
+        else:
+            print('Could not find a valid meta-cnc def')
+            raise SnippetRequiredException
+
+        # Default is panos
+        target_ip = self.get_value_from_workflow('TARGET_IP', None)
+        target_username = self.get_value_from_workflow('TARGET_USERNAME', None)
+        target_password = self.get_value_from_workflow('TARGET_PASSWORD', None)
+
+        login = pan_utils.panos_login(
+            panorama_ip=target_ip,
+            panorama_username=target_username,
+            panorama_password=target_password
+        )
+
+        if login is None:
+            context = dict()
+            context['base_html'] = self.base_html
+            context['results'] = 'Could not login to Panorama'
+            return render(self.request, 'pan_cnc/results.html', context=context)
+
+        # Always grab all the default values, then update them based on user input in the workflow
+        jinja_context = dict()
+        if 'variables' in meta and type(meta['variables']) is list:
+            for snippet_var in meta['variables']:
+                jinja_context[snippet_var['name']] = snippet_var['default']
+
+        # let's grab the current workflow values (values saved from ALL forms in this app
+        jinja_context.update(self.get_workflow())
+        dependencies = snippet_utils.resolve_dependencies(meta, self.app_dir, [])
+        for baseline in dependencies:
+            # prego (it's in there)
+            baseline_service = snippet_utils.load_snippet_with_name(baseline, self.app_dir)
+            # FIX for https://github.com/nembery/vistoq2/issues/5
+            if 'variables' in baseline_service and type(baseline_service['variables']) is list:
+                for v in baseline_service['variables']:
+                    # FIXME - Should include a way show this in UI so we have POSTED values available
+                    if 'default' in v:
+                        # Do not overwrite values if they've arrived from the user via the Form
+                        if v['name'] not in jinja_context:
+                            print('Setting default from baseline on context for %s' % v['name'])
+                            jinja_context[v['name']] = v['default']
+
+            if baseline_service is not None:
+                # check the panorama config to see if it's there or not
+                if not pan_utils.validate_snippet_present(baseline_service, jinja_context):
+                    # no prego (it's not in there)
+                    print('Pushing configuration dependency: %s' % baseline_service['name'])
+                    # make it prego
+                    pan_utils.push_service(baseline_service, jinja_context)
+
+        # BUG-FIX to always just push the toplevel meta
+        pan_utils.push_service(meta, jinja_context)
+        next_url = self.get_value_from_workflow('next_url', '/')
+        return HttpResponseRedirect(f"{self.app_dir}/{next_url}")
+
+
+class EditTerraformView(CNCBaseAuth, FormView):
+    # base form class, you should not need to override this
+    form_class = forms.Form
+    # form to render, override if you need a specific html fragment to render the form
+    template_name = 'pan_cnc/dynamic_form.html'
+    # Head to show on the rendered dynamic form - Main header
+    header = 'Terraform Template'
+    # title to show on dynamic form
+    title = 'Choose the action to perform'
+    # where to go after this? once the form has been submitted, redirect to where?
+    # this should match a 'view name' from the pan_cnc.yaml file
+    next_url = '/'
+    # base html - allow sub apps to override this with special html base if desired
+    base_html = 'pan_cnc/base.html'
+    # link to external documentation
+    documentation_link = ''
+    # help text - inline documentation text
+    help_text = 'Choose which action you would like to perform on the selected Terraform template.'
+
+    def get_context_data(self, **kwargs) -> dict:
+        context = super().get_context_data(**kwargs)
+        env_name = self.kwargs.get('env_name')
+        form = forms.Form()
+
+        choices_list = list()
+        choices_list.append(('validate', 'Validate, Init, and Apply'))
+        choices_list.append(('refresh', 'Refresh Current Status'))
+        choices_list.append(('destroy', 'Destroy'))
+
+        choices_set = tuple(choices_list)
+        terraform_action_list = forms.ChoiceField(choices=choices_set, label='Template Name')
+        form.fields['terraform_action'] = terraform_action_list
+        context['form'] = form
+        context['base_html'] = self.base_html
+        context['env_name'] = env_name
+        context['header'] = self.header
+        context['title'] = self.title
+        return context
+
+    def form_valid(self, form):
+
+        snippet_name = self.get_value_from_workflow('snippet_name', '')
+        terraform_action = self.request.POST.get('terraform_action', 'validate')
+
+        if snippet_name != '':
+            meta = snippet_utils.load_snippet_with_name(snippet_name, self.app_dir)
+        else:
+            raise SnippetRequiredException
+
+        context = super().get_context_data()
+        context['header'] = 'Terraform Template'
+
+        if terraform_action == 'validate':
+            print('Launching terraform init')
+            context['title'] = 'Executing Task: Terraform Init'
+            r = terraform_utils.perform_init(meta, self.get_snippet_context())
+            self.request.session['task_next'] = 'terraform_validate'
+        elif terraform_action == 'refresh':
+            print('Launching terraform refresh')
+            context['title'] = 'Executing Task: Terraform Refresh'
+            r = terraform_utils.perform_refresh(meta, self.get_snippet_context())
+            self.request.session['task_next'] = ''
+        elif terraform_action == 'destroy':
+            print('Launching terraform destroy')
+            context['title'] = 'Executing Task: Terraform Destroy'
+            r = terraform_utils.perform_destroy(meta, self.get_snippet_context())
+            self.request.session['task_next'] = ''
+        else:
+            self.request.session['task_next'] = ''
+            # should not get here!
+            context = super().get_context_data()
+            context['title'] = 'Error: Unknown action supplied'
+            context['header'] = 'Terraform Template'
+            context['results'] = 'Could not launch init task!'
+            return render(self.request, 'pan_cnc/results.html', context)
+
+        if r is None:
+            context['results'] = 'Could not launch init task!'
+            return render(self.request, 'pan_cnc/results.html', context)
+
+        context['results'] = 'task id: %s' % r.id
+        # now save needed information to gather the output of the celery tasks
+        # and allow us to proceed to the next task
+        self.request.session['task_id'] = r.id
+
+        self.request.session['task_app_dir'] = self.app_dir
+        self.request.session['task_base_html'] = self.base_html
+        return render(self.request, 'pan_cnc/results_async.html', context)
 
 
 class NextTaskView(CNCView):
@@ -1069,7 +1306,7 @@ class EditEnvironmentsView(EnvironmentBase, FormView):
         env_name = self.kwargs.get('env_name')
         form = forms.Form()
         secret_label = forms.CharField(label='Key')
-        secret_data = forms.CharField(widget=forms.PasswordInput, label='Value')
+        secret_data = forms.CharField(label='Value')
         env_name_field = forms.CharField(widget=forms.HiddenInput, initial=env_name)
         form.fields['secret_label'] = secret_label
         form.fields['secret_data'] = secret_data
@@ -1295,146 +1532,4 @@ class DebugMetadataView(CNCView):
         return context
 
 
-class EditTargetView(CNCBaseAuth, FormView):
-    """
-    Edit or update the current target
-    """
-    # base form class, you should not need to override this
-    form_class = forms.Form
-    # form to render, override if you need a specific html fragment to render the form
-    template_name = 'pan_cnc/dynamic_form.html'
-    # Head to show on the rendered dynamic form - Main header
-    header = 'Pan-OS Utils'
-    # title to show on dynamic form
-    title = 'Title'
-    # where to go after this? once the form has been submitted, redirect to where?
-    # this should match a 'view name' from the pan_cnc.yaml file
-    next_url = '/'
-    # base html - allow sub apps to override this with special html base if desired
-    base_html = 'pan_cnc/base.html'
-    # link to external documentation
-    documentation_link = ''
-    # help text - inline documentation text
-    help_text = 'The Target is the endpoint or device where the configured template will be applied. ' \
-                'This us usually a Pan-OS or other network device depending on the type of template to ' \
-                'be provisioned'
 
-    def get_context_data(self, **kwargs) -> dict:
-        context = super().get_context_data(**kwargs)
-        env_name = self.kwargs.get('env_name')
-        form = forms.Form()
-        snippet_name = self.get_value_from_workflow('snippet_name', '')
-
-        target_ip_label = 'Target IP'
-        target_username_label = 'Target Username'
-        target_password_label = 'Target Password'
-
-        header = 'Edit Target'
-        title = 'Configure Target information'
-
-        if snippet_name != '':
-            meta = snippet_utils.load_snippet_with_name(snippet_name, self.app_dir)
-            if 'label' in meta:
-                header = f"Set Target for {meta['label']}"
-
-            if 'type' in meta:
-                if meta['type'] == 'panos':
-                    target_ip_label = 'Pan-OS IP'
-                    target_username_label = 'Pan-OS Username'
-                    target_password_label = 'Pan-OS Password'
-                elif meta['type'] == 'panorama':
-                    target_ip_label = 'Panorama IP'
-                    target_username_label = 'Panorama Username'
-                    target_password_label = 'Panorama Password'
-                elif meta['type'] == 'panorama-gpcs':
-                    target_ip_label = 'Panorama IP'
-                    target_username_label = 'Panorama Username'
-                    target_password_label = 'Panorama Password'
-
-        target_ip = self.get_value_from_workflow('TARGET_IP', '')
-        target_username = self.get_value_from_workflow('TARGET_USERNAME', '')
-        target_password = self.get_value_from_workflow('TARGET_PASSWORD', '')
-
-        target_ip_field = forms.CharField(label=target_ip_label, initial=target_ip)
-        target_username_field = forms.CharField(label=target_username_label, initial=target_username)
-        target_password_field = forms.CharField(widget=forms.PasswordInput(render_value=True),
-                                                label=target_password_label,
-                                                initial=target_password)
-
-        form.fields['TARGET_IP'] = target_ip_field
-        form.fields['TARGET_USERNAME'] = target_username_field
-        form.fields['TARGET_PASSWORD'] = target_password_field
-
-        context['form'] = form
-        context['base_html'] = self.base_html
-        context['env_name'] = env_name
-        context['header'] = header
-        context['title'] = title
-        return context
-
-    def form_valid(self, form):
-        """
-        form_valid is always called on a blank / new form, so this is essentially going to get called on every POST
-        self.request.POST should contain all the variables defined in the service identified by the hidden field
-        'service_id'
-        :param form: blank form data from request
-        :return: render of a success template after service is provisioned
-        """
-        snippet_name = self.get_value_from_workflow('snippet_name', '')
-        if snippet_name != '':
-            meta = snippet_utils.load_snippet_with_name(snippet_name, self.app_dir)
-        else:
-            print('Could not find a valid meta-cnc def')
-            raise SnippetRequiredException
-
-        # Default is panos
-        target_ip = self.get_value_from_workflow('TARGET_IP', None)
-        target_username = self.get_value_from_workflow('TARGET_USERNAME', None)
-        target_password = self.get_value_from_workflow('TARGET_PASSWORD', None)
-
-        login = pan_utils.panos_login(
-            panorama_ip=target_ip,
-            panorama_username=target_username,
-            panorama_password=target_password
-        )
-
-        if login is None:
-            context = dict()
-            context['base_html'] = self.base_html
-            context['results'] = 'Could not login to Panorama'
-            return render(self.request, 'pan_cnc/results.html', context=context)
-
-        # Always grab all the default values, then update them based on user input in the workflow
-        jinja_context = dict()
-        if 'variables' in meta and type(meta['variables']) is list:
-            for snippet_var in meta['variables']:
-                jinja_context[snippet_var['name']] = snippet_var['default']
-
-        # let's grab the current workflow values (values saved from ALL forms in this app
-        jinja_context.update(self.get_workflow())
-        dependencies = snippet_utils.resolve_dependencies(meta, self.app_dir, [])
-        for baseline in dependencies:
-            # prego (it's in there)
-            baseline_service = snippet_utils.load_snippet_with_name(baseline, self.app_dir)
-            # FIX for https://github.com/nembery/vistoq2/issues/5
-            if 'variables' in baseline_service and type(baseline_service['variables']) is list:
-                for v in baseline_service['variables']:
-                    # FIXME - Should include a way show this in UI so we have POSTED values available
-                    if 'default' in v:
-                        # Do not overwrite values if they've arrived from the user via the Form
-                        if v['name'] not in jinja_context:
-                            print('Setting default from baseline on context for %s' % v['name'])
-                            jinja_context[v['name']] = v['default']
-
-            if baseline_service is not None:
-                # check the panorama config to see if it's there or not
-                if not pan_utils.validate_snippet_present(baseline_service, jinja_context):
-                    # no prego (it's not in there)
-                    print('Pushing configuration dependency: %s' % baseline_service['name'])
-                    # make it prego
-                    pan_utils.push_service(baseline_service, jinja_context)
-
-        # BUG-FIX to always just push the toplevel meta
-        pan_utils.push_service(meta, jinja_context)
-        next_url = self.get_value_from_workflow('next_url', '/')
-        return HttpResponseRedirect(f"{self.app_dir}/{next_url}")

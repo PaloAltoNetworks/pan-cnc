@@ -107,3 +107,12 @@ def terraform_destroy(terraform_dir, tf_vars):
     return exec_local_task(cmd_seq, terraform_dir)
 
 
+@shared_task
+def terraform_refresh(terraform_dir, tf_vars):
+    print('Executing task terraform status')
+    cmd_seq = ['terraform', 'refresh', '-no-color']
+    for k, v in tf_vars.items():
+        cmd_seq.append('-var')
+        cmd_seq.append(f'{k}={v}')
+
+    return exec_local_task(cmd_seq, terraform_dir)
