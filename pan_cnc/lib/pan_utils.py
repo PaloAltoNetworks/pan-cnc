@@ -24,7 +24,7 @@ from django.conf import settings
 from django.core.cache import cache
 from jinja2 import Environment, BaseLoader
 
-from pan_cnc.lib.exceptions import TargetConnectionException
+from pan_cnc.lib.exceptions import TargetConnectionException, CCFParserError
 
 xapi_obj = None
 
@@ -109,6 +109,10 @@ def push_service(service, context):
 
     try:
         for snippet in service['snippets']:
+            if 'xpath' not in snippet or 'file' not in snippet:
+                print('Malformed meta-cnc error')
+                raise CCFParserError
+
             xpath = snippet['xpath']
             xml_file_name = snippet['file']
 
@@ -178,6 +182,10 @@ def validate_snippet_present(service, context):
 
     try:
         for snippet in service['snippets']:
+            if 'xpath' not in snippet:
+                print('Malformed meta-cnc error')
+                raise CCFParserError
+
             xpath = snippet['xpath']
             xpath_template = Environment(loader=BaseLoader()).from_string(xpath)
             xpath_string = xpath_template.render(context)
