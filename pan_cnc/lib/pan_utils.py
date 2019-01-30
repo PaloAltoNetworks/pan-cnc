@@ -25,6 +25,7 @@ from django.core.cache import cache
 from jinja2 import Environment, BaseLoader
 
 from pan_cnc.lib.exceptions import TargetConnectionException, CCFParserError
+from pan_cnc.lib import jinja_filters
 
 xapi_obj = None
 
@@ -119,8 +120,14 @@ def push_service(service, context):
             xml_full_path = os.path.join(snippets_dir, xml_file_name)
             with open(xml_full_path, 'r') as xml_file:
                 xml_string = xml_file.read()
-                xml_template = Environment(loader=BaseLoader()).from_string(xml_string)
-                xpath_template = Environment(loader=BaseLoader()).from_string(xpath)
+                environment = Environment(loader=BaseLoader())
+
+                for f in jinja_filters.defined_filters:
+                    if hasattr(jinja_filters, f):
+                        environment.filters[f] = getattr(jinja_filters, f)
+
+                xml_template = environment.from_string(xml_string)
+                xpath_template = environment.from_string(xpath)
                 xml_snippet = xml_template.render(context).replace('\n', '')
                 xpath_string = xpath_template.render(context)
                 print('Pushing xpath: %s' % xpath_string)
