@@ -116,7 +116,7 @@ def load_snippets_of_type_from_dir(directory, snippet_type=None):
             snippet_path = str(mdf.parent.absolute())
             try:
                 with mdf.open(mode='r') as sc:
-                    service_config = oyaml.load(sc.read())
+                    service_config = oyaml.safe_load(sc.read())
                     service_config['snippet_path'] = snippet_path
                     if snippet_type is not None:
                         if 'type' in service_config and service_config['type'] == snippet_type:
@@ -165,7 +165,7 @@ def get_snippet_metadata(snippet_name, app_dir):
             snippet_path = os.path.dirname(mdf)
             try:
                 with open(mdf, 'r') as sc:
-                    snippet_data = oyaml.load(sc.read())
+                    snippet_data = oyaml.safe_load(sc.read())
                     if 'name' in snippet_data and snippet_data['name'] == snippet_name:
                         print(f'Found {snippet_name} at {snippet_path}')
                         sc.seek(0)
