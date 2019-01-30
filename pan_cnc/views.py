@@ -936,10 +936,14 @@ class EditTargetView(CNCBaseAuth, FormView):
                     # no prego (it's not in there)
                     print('Pushing configuration dependency: %s' % baseline_service['name'])
                     # make it prego
-                    pan_utils.push_service(baseline_service, jinja_context)
+                    if not pan_utils.push_service(baseline_service, jinja_context):
+                        messages.add_message(self.request, messages.ERROR, 'Could not push baseline Configuration')
+                        return HttpResponseRedirect(f"{self.app_dir}/")
 
         # BUG-FIX to always just push the toplevel meta
-        pan_utils.push_service(meta, jinja_context)
+        if not pan_utils.push_service(meta, jinja_context):
+            messages.add_message(self.request, messages.ERROR, 'Could not push Configuration')
+            return HttpResponseRedirect(f"{self.app_dir}/")
         next_url = self.get_value_from_workflow('next_url', '/')
         return HttpResponseRedirect(f"{self.app_dir}/{next_url}")
 

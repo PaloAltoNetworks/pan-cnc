@@ -50,7 +50,7 @@ def load_template_snippets():
 def load_all_snippets(app_dir):
     # cache and keep all snippets when type == none
     if 'all_snippets' in cache:
-        snippet_list = cache.get('all_snippets', []) 
+        snippet_list = cache.get('all_snippets', [])
         if snippet_list:
             return snippet_list
     
