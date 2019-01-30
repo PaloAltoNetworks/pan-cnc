@@ -73,7 +73,7 @@ for app in os.listdir(SRC_PATH):
             if os.path.exists(os.path.join(app_dir, '.pan-cnc.yaml')):
                 try:
                     with open(os.path.join(app_dir, '.pan-cnc.yaml')) as app_conf_file:
-                        app_conf = yaml.load(app_conf_file.read())
+                        app_conf = yaml.safe_load(app_conf_file.read())
                         app_conf['app_dir'] = app_dir
                         print('Adding app config for app: %s' % app)
                         print(app_conf)
