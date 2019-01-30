@@ -69,7 +69,6 @@ class CNCBaseAuth(LoginRequiredMixin, View):
         Save the current user input to the session
         :return: None
         """
-
         if self.app_dir in self.request.session:
             current_workflow = self.request.session[self.app_dir]
         else:
@@ -82,12 +81,12 @@ class CNCBaseAuth(LoginRequiredMixin, View):
                 current_workflow[var_name] = self.request.POST.get(var_name)
 
         # ensure we grab target_ip, username, and password if supplied and not in a variable
-        if 'TARGET_IP' in self.request.POST:
-            current_workflow['TARGET_IP'] = self.request.POST.get('TARGET_IP')
-        if 'TARGET_USERNAME' in self.request.POST:
-            current_workflow['TARGET_USERNAME'] = self.request.POST.get('TARGET_USERNAME')
-        if 'TARGET_PASSWORD' in self.request.POST:
-            current_workflow['TARGET_PASSWORD'] = self.request.POST.get('TARGET_PASSWORD')
+        # if 'TARGET_IP' in self.request.POST:
+        #     current_workflow['TARGET_IP'] = self.request.POST.get('TARGET_IP')
+        # if 'TARGET_USERNAME' in self.request.POST:
+        #     current_workflow['TARGET_USERNAME'] = self.request.POST.get('TARGET_USERNAME')
+        # if 'TARGET_PASSWORD' in self.request.POST:
+        #     current_workflow['TARGET_PASSWORD'] = self.request.POST.get('TARGET_PASSWORD')
 
         self.request.session[self.app_dir] = current_workflow
 
@@ -720,7 +719,7 @@ class ProvisionSnippetView(CNCBaseFormView):
         return super().get_context_data()
 
     def get_snippet(self):
-        session_cache = self.request.session[self.app_dir]
+        session_cache = self.request.session.get(self.app_dir, {})
 
         if 'snippet_name' in self.request.POST:
             print('found snippet in post')
@@ -809,6 +808,21 @@ class EditTargetView(CNCBaseAuth, FormView):
                 'This us usually a Pan-OS or other network device depending on the type of template to ' \
                 'be provisioned'
 
+    def get(self, request, *args, **kwargs) -> Any:
+        """
+            Handle GET requests
+            Ensure we have a snippet_name in the workflow somewhere, otherwise, we need to redirect out of here
+            Fixes issue where a user goes to the editTarget URL directly
+        """
+        # load the snippet into the class attribute here so it's available to all other methods throughout the
+        # call chain in the child classes
+        snippet_name = self.get_value_from_workflow('snippet_name', '')
+        if snippet_name != '':
+            return self.render_to_response(self.get_context_data())
+        else:
+            messages.add_message(self.request, messages.ERROR, 'Process Error - Meta not found')
+            return HttpResponseRedirect('/')
+
     def get_context_data(self, **kwargs) -> dict:
         context = super().get_context_data(**kwargs)
         env_name = self.kwargs.get('env_name')
@@ -877,10 +891,10 @@ class EditTargetView(CNCBaseAuth, FormView):
             print('Could not find a valid meta-cnc def')
             raise SnippetRequiredException
 
-        # Default is panos
-        target_ip = self.get_value_from_workflow('TARGET_IP', None)
-        target_username = self.get_value_from_workflow('TARGET_USERNAME', None)
-        target_password = self.get_value_from_workflow('TARGET_PASSWORD', None)
+        # Grab the values from the form, this is always hard-coded in this class
+        target_ip = self.request.POST.get('TARGET_IP', None)
+        target_username = self.request.POST.get('TARGET_USERNAME', None)
+        target_password = self.request.POST.get('TARGET_PASSWORD', None)
 
         login = pan_utils.panos_login(
             panorama_ip=target_ip,
@@ -948,6 +962,21 @@ class EditTerraformView(CNCBaseAuth, FormView):
     documentation_link = ''
     # help text - inline documentation text
     help_text = 'Choose which action you would like to perform on the selected Terraform template.'
+
+    def get(self, request, *args, **kwargs) -> Any:
+        """
+            Handle GET requests
+            Ensure we have a snippet_name in the workflow somewhere, otherwise, we need to redirect out of here
+            Fixes issue where a user goes to the terraform URL directly
+        """
+        # load the snippet into the class attribute here so it's available to all other methods throughout the
+        # call chain in the child classes
+        snippet_name = self.get_value_from_workflow('snippet_name', '')
+        if snippet_name != '':
+            return self.render_to_response(self.get_context_data())
+        else:
+            messages.add_message(self.request, messages.ERROR, 'Process Error - Meta not found')
+            return HttpResponseRedirect('/')
 
     def get_context_data(self, **kwargs) -> dict:
         context = super().get_context_data(**kwargs)
@@ -1069,6 +1098,21 @@ class NextTaskView(CNCView):
         else:
             return 'pan_cnc'
 
+    def get(self, request, *args, **kwargs) -> Any:
+        """
+            Handle GET requests
+            Ensure we have a snippet_name in the workflow somewhere, otherwise, we need to redirect out of here
+            Fixes issue where a user goes to the next_task URL directly
+        """
+        try:
+            # attempt to locate the current snippet, if not found then we have a flow error, redirect back to the
+            # beginning
+            self.get_snippet()
+            return self.render_to_response(self.get_context_data())
+        except SnippetRequiredException:
+            messages.add_message(self.request, messages.ERROR, 'Process Error - Meta not found')
+            return HttpResponseRedirect('/')
+
     def get_snippet(self):
         # only get the snippet from the session
         app_dir = self.get_app_dir()
@@ -1077,6 +1121,8 @@ class NextTaskView(CNCView):
             if 'snippet_name' in session_cache:
                 print('returning snippet name: %s from session cache' % session_cache['snippet_name'])
                 return session_cache['snippet_name']
+            else:
+                raise SnippetRequiredException
         else:
             print('snippet is not set in NextTaskView:get_snippet')
             raise SnippetRequiredException

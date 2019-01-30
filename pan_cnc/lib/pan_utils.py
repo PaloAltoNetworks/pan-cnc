@@ -47,7 +47,7 @@ def panos_login(panorama_ip=None, panorama_username=None, panorama_password=None
                 api_key = xapi_obj.keygen()
                 cache.set('panorama_api_key', api_key, timeout=300)
         else:
-            print('Found it in memory!')
+            print('Found xapi object in memory!')
 
         return xapi_obj
 
