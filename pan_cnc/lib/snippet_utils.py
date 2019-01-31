@@ -104,6 +104,15 @@ def load_snippets_of_type_from_dir(directory, snippet_type=None):
         print(f'Could not find meta-cnc files in dir {directory}')
         return snippet_list
 
+    if 'snippet_types' in cache:
+        snippet_types_dict = cache.get('snippet_types')
+        if snippet_type in snippet_types_dict:
+            return snippet_types_dict[snippet_type]
+        else:
+            snippet_types_dict[snippet_type] = dict()
+    else:
+        snippet_types_dict = dict()
+
     for d in snippets_dir.rglob('./*'):
         if d.is_dir() and '.git' in d.name:
             print(f'skipping .git dir {d.parent}')
@@ -133,6 +142,8 @@ def load_snippets_of_type_from_dir(directory, snippet_type=None):
                 print(pe)
                 raise CCFParserError
 
+    snippet_types_dict[snippet_type] = snippet_list
+    cache.set('snippet_types', snippet_types_dict)
     return snippet_list
 
 
@@ -252,3 +263,9 @@ def resolve_dependencies(snippet, app_dir, dependencies):
     # always reverse the list as we need to walk this list from deep to shallow
     dependencies.reverse()
     return dependencies
+
+
+def invalidate_snippet_caches():
+    cache.set('snippets', list())
+    cache.set('snippet_types', dict())
+

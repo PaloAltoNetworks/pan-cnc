@@ -36,19 +36,22 @@ handler = logging.StreamHandler()
 logger.addHandler(handler)
 
 
-def panos_login(panorama_ip=None, panorama_username=None, panorama_password=None):
+def panos_login(pan_device_ip=None, pan_device_username=None, pan_device_password=None):
+
     global xapi_obj
+    if pan_device_ip is not None:
+        if xapi_obj is not None:
+            if xapi_obj.hostname == pan_device_ip:
+                return xapi_obj
+
     try:
-        if xapi_obj is None:
-            print('xapi not init yet')
-            credentials = get_panos_credentials(panorama_ip, panorama_username, panorama_password)
-            xapi_obj = pan.xapi.PanXapi(**credentials)
-            if 'api_key' not in credentials:
-                print('Setting API KEY')
-                api_key = xapi_obj.keygen()
-                cache.set('panorama_api_key', api_key, timeout=300)
-        else:
-            print('Found xapi object in memory!')
+        print(f'performing xapi init for {pan_device_ip}')
+        credentials = get_panos_credentials(pan_device_ip, pan_device_username, pan_device_password)
+        xapi_obj = pan.xapi.PanXapi(**credentials)
+        if 'api_key' not in credentials:
+            print('Setting API KEY')
+            api_key = xapi_obj.keygen()
+            cache.set('panorama_api_key', api_key, timeout=300)
 
         return xapi_obj
 
@@ -57,6 +60,7 @@ def panos_login(panorama_ip=None, panorama_username=None, panorama_password=None
         print(pxe)
         # reset to None here to force re-auth next time
         xapi_obj = None
+        cache.set('panorama_api_key', None)
         return None
 
 
@@ -66,18 +70,18 @@ def test_panorama():
     print(xapi.xml_result())
 
 
-def get_panos_credentials(panorama_ip, panorama_username, panorama_password):
-    if panorama_ip is None or panorama_username is None or panorama_password is None:
+def get_panos_credentials(pan_device_ip, pan_device_username, pan_device_password):
+    if pan_device_ip is None or pan_device_username is None or pan_device_password is None:
         # check the env for it if not here
         # FIXME - this should be renmaed to TARGET or some other value that is not specific to PANORAMA
-        panorama_ip = os.environ.get('PANORAMA_IP', '0.0.0.0')
-        panorama_username = os.environ.get('PANORAMA_USERNAME', 'admin')
-        panorama_password = os.environ.get('PANORAMA_PASSWORD', 'admin')
+        pan_device_ip = os.environ.get('PANORAMA_IP', '0.0.0.0')
+        pan_device_username = os.environ.get('PANORAMA_USERNAME', 'admin')
+        pan_device_password = os.environ.get('PANORAMA_PASSWORD', 'admin')
 
     credentials = dict()
-    credentials["hostname"] = panorama_ip
-    credentials["api_username"] = panorama_username
-    credentials["api_password"] = panorama_password
+    credentials["hostname"] = pan_device_ip
+    credentials["api_username"] = pan_device_username
+    credentials["api_password"] = pan_device_password
 
     api_key = cache.get('panorama_api_key')
     if api_key is not None:
