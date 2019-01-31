@@ -944,8 +944,9 @@ class EditTargetView(CNCBaseAuth, FormView):
         if not pan_utils.push_service(meta, jinja_context):
             messages.add_message(self.request, messages.ERROR, 'Could not push Configuration')
             return HttpResponseRedirect(f"{self.app_dir}/")
-        next_url = self.get_value_from_workflow('next_url', '/')
-        return HttpResponseRedirect(f"{self.app_dir}/{next_url}")
+
+        messages.add_message(self.request, messages.SUCCESS, 'Configuration Push Queued successfully')
+        return HttpResponseRedirect(f"{self.app_dir}/")
 
 
 class EditTerraformView(CNCBaseAuth, FormView):

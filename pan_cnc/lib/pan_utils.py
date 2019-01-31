@@ -88,7 +88,7 @@ def get_panos_credentials(panorama_ip, panorama_username, panorama_password):
     return credentials
 
 
-def push_service(service, context):
+def push_service(service, context, force_sync=False):
     xapi = panos_login()
 
     if xapi is None:
@@ -142,7 +142,10 @@ def push_service(service, context):
             print('Performing commit-all in panorama')
             xapi.commit(cmd='<commit-all></commit-all>', sync=True)
         else:
-            xapi.commit('', sync=True)
+            if force_sync:
+                xapi.commit('<commit></commit>', sync=True)
+            else:
+                xapi.commit('<commit></commit>')
 
         print(xapi.xml_result())
 
