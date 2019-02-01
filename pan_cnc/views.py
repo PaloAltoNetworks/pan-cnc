@@ -72,6 +72,11 @@ class CNCBaseAuth(LoginRequiredMixin, View):
         if self.app_dir in self.request.session:
             print('updating workflow')
             current_workflow = self.request.session[self.app_dir]
+        elif 'current_app_dir' in self.request.session:
+            if self.request.session['current_app_dir'] in self.request.session:
+                current_workflow = self.request.session[self.app_dir]
+            else:
+                current_workflow = dict()
         else:
             print('saving new workflow')
             current_workflow = dict()
@@ -782,7 +787,6 @@ class ProvisionSnippetView(CNCBaseFormView):
             return HttpResponseRedirect('/terraform')
         else:
             print('This template type requires a target')
-            self.save_value_to_workflow('next_url', self.next_url)
             return HttpResponseRedirect('/editTarget')
 
 
@@ -913,6 +917,8 @@ class EditTargetView(CNCBaseAuth, FormView):
 
         workflow = self.get_workflow()
         print(workflow)
+
+        self.request.session[self.app_dir] = workflow
 
         # self.save_value_to_workflow('TARGET_PASSWORD', target_password)
         print(f'logging in to pan device with {target_ip}')

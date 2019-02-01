@@ -39,11 +39,17 @@ logger.addHandler(handler)
 def panos_login(pan_device_ip=None, pan_device_username=None, pan_device_password=None):
 
     global xapi_obj
-    if pan_device_ip is not None:
-        if xapi_obj is not None:
+    # if pan_device_ip is not None:
+    if xapi_obj is not None:
+        if pan_device_ip is not None:
             if xapi_obj.hostname == pan_device_ip:
+                # an IP was specified and we have already connected to it
+                # oterhwise, fall through to get credentials and do another connection attempt
                 return xapi_obj
 
+        else:
+            # no new credentials passed, but we have already connected, return the current connection
+            return xapi_obj
     try:
         print(f'performing xapi init for {pan_device_ip}')
         credentials = get_panos_credentials(pan_device_ip, pan_device_username, pan_device_password)
