@@ -105,13 +105,21 @@ def load_snippets_of_type_from_dir(directory, snippet_type=None):
         return snippet_list
 
     if 'snippet_types' in cache:
-        snippet_types_dict = cache.get('snippet_types')
+        # snippet_types is a dict with a key for each directory
+        # each directory value is another dict with keys for each snippet_type
+        snippet_dirs_dict = cache.get('snippet_types')
+        if snippets_dir in snippet_dirs_dict:
+            snippet_types_dict = snippet_dirs_dict[snippets_dir]
+        else:
+            snippet_types_dict = dict()
+
         if snippet_type in snippet_types_dict:
             return snippet_types_dict[snippet_type]
         else:
             snippet_types_dict[snippet_type] = dict()
     else:
         snippet_types_dict = dict()
+        snippet_dirs_dict = dict()
 
     for d in snippets_dir.rglob('./*'):
         if d.is_dir() and '.git' in d.name:
@@ -143,7 +151,8 @@ def load_snippets_of_type_from_dir(directory, snippet_type=None):
                 raise CCFParserError
 
     snippet_types_dict[snippet_type] = snippet_list
-    cache.set('snippet_types', snippet_types_dict)
+    snippet_dirs_dict[snippets_dir] = snippet_types_dict
+    cache.set('snippet_types', snippet_dirs_dict)
     return snippet_list
 
 
@@ -153,6 +162,7 @@ def load_snippet_with_name(snippet_name, app_dir):
     'name (str)', 'description (str)', 'label (str)', 'variables (list)', and 'snippets (list)'.
     :return: Service dict or None if none found
     """
+    print(f'checking in app_dir {app_dir} for snippet {snippet_name}')
     services = load_all_snippets(app_dir)
     for service in services:
         if service['name'] == snippet_name:
@@ -266,6 +276,6 @@ def resolve_dependencies(snippet, app_dir, dependencies):
 
 
 def invalidate_snippet_caches():
-    cache.set('snippets', list())
+    cache.set('all_snippets', list())
     cache.set('snippet_types', dict())
 
