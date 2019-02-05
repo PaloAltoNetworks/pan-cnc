@@ -15,7 +15,7 @@
 </head>
 <body class="bg-light">
 <nav class="navbar fixed-top navbar-expand-lg navbar-dark bg-dark">
-    <a class="nav-brand" href="http://paloaltonetworks.com">
+    <a class="nav-brand" href="/">
         <img src="{% static 'images/logo-pan-bg.png' %}" alt="PAN" style="opacity: 0.5; height: 30px; width: 50px;"/>
     </a>
     <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarColor02"
@@ -26,9 +26,6 @@
     <div class="collapse navbar-collapse" id="navbarColor02">
 
         <ul class="navbar-nav mr-auto">
-            <li class="nav-item">
-                <a class="nav-link" href="/">HOME <span class="sr-only">(current)</span></a>
-            </li>
             {% build_menu as menu %}
             {% for menu_item, menu_dropdown in menu.items %}
             <li class="nav-item dropdown">
