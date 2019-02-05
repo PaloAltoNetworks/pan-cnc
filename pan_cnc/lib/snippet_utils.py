@@ -126,13 +126,12 @@ def load_snippets_of_type_from_dir(directory, snippet_type=None):
             print(f'skipping .git dir {d.parent}')
             continue
 
-        mdf = d.joinpath('.meta-cnc.yaml')
-        if mdf.is_file():
+        if d.is_file() and d.name == '.meta-cnc.yaml':
             # if os.path.isfile(mdf):
             # snippet_path = os.path.dirname(mdf)
-            snippet_path = str(mdf.parent.absolute())
+            snippet_path = str(d.parent.absolute())
             try:
-                with mdf.open(mode='r') as sc:
+                with d.open(mode='r') as sc:
                     service_config = oyaml.safe_load(sc.read())
                     service_config['snippet_path'] = snippet_path
                     if snippet_type is not None:
@@ -142,11 +141,11 @@ def load_snippets_of_type_from_dir(directory, snippet_type=None):
                         snippet_list.append(service_config)
 
             except IOError as ioe:
-                print('Could not open metadata file in dir %s' % mdf)
+                print('Could not open metadata file in dir %s' % d.parent)
                 print(ioe)
                 raise CCFParserError
             except ParserError as pe:
-                print('Could not parse metadata file in dir %s' % mdf)
+                print('Could not parse metadata file in dir %s' % d.parent)
                 print(pe)
                 raise CCFParserError
 
