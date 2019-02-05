@@ -1,10 +1,13 @@
 from pan_cnc.tasks import terraform_init, terraform_validate, terraform_plan, terraform_apply, terraform_refresh, \
     terraform_destroy
 
+from pathlib import Path
+import json
+
 
 def __build_cmd_seq_vars(resource_def, snippet_context):
     if 'variables' not in resource_def:
-        print('No resource def found or misconfigured')
+        print('No resource def found or mis-configured')
         return None
 
     tf_vars = dict()
@@ -53,3 +56,27 @@ def perform_destroy(resource_def, snippet_context):
     resource_dir = resource_def['snippet_path']
     tf_vars = __build_cmd_seq_vars(resource_def, snippet_context)
     return terraform_destroy.delay(resource_dir, tf_vars)
+
+
+def verify_clean_state(resource_def):
+    # Verify the tfstate file does NOT exist or contain resources if it does exist
+    resource_dir = resource_def['snippet_path']
+    rd = Path(resource_dir)
+    state_file = rd.joinpath('terraform.tfstate')
+    print(f'checking {state_file}')
+    if state_file.exists() and state_file.is_file():
+        print('It exists, so lets check it out')
+        # we have had a state at some point in the past
+        with state_file.open(mode='r') as state_object:
+            state_data = json.loads(state_object.read())
+            print(state_data)
+            modules = state_data.get('modules', [])
+            for module in modules:
+                if 'resources' in module:
+                    print('We have resources')
+                    if len(module['resources']) > 0:
+                        return False
+                    else:
+                        return True
+
+    return True

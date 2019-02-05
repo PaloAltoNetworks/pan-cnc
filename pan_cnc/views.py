@@ -69,8 +69,15 @@ class CNCBaseAuth(LoginRequiredMixin, View):
         :return: None
         """
         if self.app_dir in self.request.session:
+            print('updating workflow')
             current_workflow = self.request.session[self.app_dir]
+        elif 'current_app_dir' in self.request.session:
+            if self.request.session['current_app_dir'] in self.request.session:
+                current_workflow = self.request.session[self.app_dir]
+            else:
+                current_workflow = dict()
         else:
+            print('saving new workflow')
             current_workflow = dict()
 
         for variable in self.service['variables']:
@@ -779,7 +786,6 @@ class ProvisionSnippetView(CNCBaseFormView):
             return HttpResponseRedirect('/terraform')
         else:
             print('This template type requires a target')
-            self.save_value_to_workflow('next_url', self.next_url)
             return HttpResponseRedirect('/editTarget')
 
 
@@ -854,6 +860,9 @@ class EditTargetView(CNCBaseAuth, FormView):
                     target_username_label = 'Panorama Username'
                     target_password_label = 'Panorama Password'
 
+        workflow = self.get_workflow()
+        print(workflow)
+
         target_ip = self.get_value_from_workflow('TARGET_IP', '')
         target_username = self.get_value_from_workflow('TARGET_USERNAME', '')
         target_password = self.get_value_from_workflow('TARGET_PASSWORD', '')
@@ -890,15 +899,32 @@ class EditTargetView(CNCBaseAuth, FormView):
             print('Could not find a valid meta-cnc def')
             raise SnippetRequiredException
 
+        workflow = self.get_workflow()
+        print(workflow)
+
+        tip = self.get_value_from_workflow('TARGET_IP', None)
+        print(f'found current target_ip in workflow of {tip}')
         # Grab the values from the form, this is always hard-coded in this class
         target_ip = self.request.POST.get('TARGET_IP', None)
         target_username = self.request.POST.get('TARGET_USERNAME', None)
         target_password = self.request.POST.get('TARGET_PASSWORD', None)
 
+        print(f'saving target_ip {target_ip} to workflow')
+
+        self.save_value_to_workflow('TARGET_IP', target_ip)
+        self.save_value_to_workflow('TARGET_USERNAME', target_username)
+
+        workflow = self.get_workflow()
+        print(workflow)
+
+        self.request.session[self.app_dir] = workflow
+
+        # self.save_value_to_workflow('TARGET_PASSWORD', target_password)
+        print(f'logging in to pan device with {target_ip}')
         login = pan_utils.panos_login(
-            panorama_ip=target_ip,
-            panorama_username=target_username,
-            panorama_password=target_password
+            pan_device_ip=target_ip,
+            pan_device_username=target_username,
+            pan_device_password=target_password
         )
 
         if login is None:
@@ -1149,9 +1175,18 @@ class NextTaskView(CNCView):
             new_next = 'terraform_plan'
             title = 'Executing Task: Validate'
         elif task_next == 'terraform_plan':
-            r = terraform_utils.perform_plan(service, self.get_snippet_context())
-            new_next = 'terraform_apply'
-            title = 'Executing Task: Plan'
+            print('Checking state before new plan')
+            if terraform_utils.verify_clean_state(service):
+                print('state appears clean')
+                r = terraform_utils.perform_plan(service, self.get_snippet_context())
+                new_next = 'terraform_apply'
+                title = 'Executing Task: Plan'
+            else:
+                self.request.session['task_next'] = ''
+                context['results'] = '\n\nRefusing to continue as it appears there is already a deployed state present.' \
+                                     '\n\nPlease destroy the current state or refresh the local state to continue.\n\n'
+                context['error'] = 1
+                return context
         elif task_next == 'terraform_apply':
             r = terraform_utils.perform_apply(service, self.get_snippet_context())
             new_next = ''
@@ -1159,6 +1194,7 @@ class NextTaskView(CNCView):
         else:
             self.request.session['task_next'] = ''
             context['results'] = 'Could not launch init task!'
+            context['error'] = 1
             return context
 
         context['title'] = title

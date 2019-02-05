@@ -104,18 +104,34 @@ def load_snippets_of_type_from_dir(directory, snippet_type=None):
         print(f'Could not find meta-cnc files in dir {directory}')
         return snippet_list
 
+    if 'snippet_types' in cache:
+        # snippet_types is a dict with a key for each directory
+        # each directory value is another dict with keys for each snippet_type
+        snippet_dirs_dict = cache.get('snippet_types')
+        if snippets_dir in snippet_dirs_dict:
+            snippet_types_dict = snippet_dirs_dict[snippets_dir]
+        else:
+            snippet_types_dict = dict()
+
+        if snippet_type in snippet_types_dict:
+            return snippet_types_dict[snippet_type]
+        else:
+            snippet_types_dict[snippet_type] = dict()
+    else:
+        snippet_types_dict = dict()
+        snippet_dirs_dict = dict()
+
     for d in snippets_dir.rglob('./*'):
         if d.is_dir() and '.git' in d.name:
             print(f'skipping .git dir {d.parent}')
             continue
 
-        mdf = d.joinpath('.meta-cnc.yaml')
-        if mdf.is_file():
+        if d.is_file() and d.name == '.meta-cnc.yaml':
             # if os.path.isfile(mdf):
             # snippet_path = os.path.dirname(mdf)
-            snippet_path = str(mdf.parent.absolute())
+            snippet_path = str(d.parent.absolute())
             try:
-                with mdf.open(mode='r') as sc:
+                with d.open(mode='r') as sc:
                     service_config = oyaml.safe_load(sc.read())
                     service_config['snippet_path'] = snippet_path
                     if snippet_type is not None:
@@ -125,14 +141,17 @@ def load_snippets_of_type_from_dir(directory, snippet_type=None):
                         snippet_list.append(service_config)
 
             except IOError as ioe:
-                print('Could not open metadata file in dir %s' % mdf)
+                print('Could not open metadata file in dir %s' % d.parent)
                 print(ioe)
                 raise CCFParserError
             except ParserError as pe:
-                print('Could not parse metadata file in dir %s' % mdf)
+                print('Could not parse metadata file in dir %s' % d.parent)
                 print(pe)
                 raise CCFParserError
 
+    snippet_types_dict[snippet_type] = snippet_list
+    snippet_dirs_dict[snippets_dir] = snippet_types_dict
+    cache.set('snippet_types', snippet_dirs_dict)
     return snippet_list
 
 
@@ -142,6 +161,7 @@ def load_snippet_with_name(snippet_name, app_dir):
     'name (str)', 'description (str)', 'label (str)', 'variables (list)', and 'snippets (list)'.
     :return: Service dict or None if none found
     """
+    print(f'checking in app_dir {app_dir} for snippet {snippet_name}')
     services = load_all_snippets(app_dir)
     for service in services:
         if service['name'] == snippet_name:
@@ -252,3 +272,9 @@ def resolve_dependencies(snippet, app_dir, dependencies):
     # always reverse the list as we need to walk this list from deep to shallow
     dependencies.reverse()
     return dependencies
+
+
+def invalidate_snippet_caches():
+    cache.set('all_snippets', list())
+    cache.set('snippet_types', dict())
+
