@@ -44,7 +44,6 @@ from pan_cnc.lib import cnc_utils
 from pan_cnc.lib import pan_utils
 from pan_cnc.lib import snippet_utils
 from pan_cnc.lib import terraform_utils
-from pan_cnc.lib.actions.DockerAction import DockerAction
 from pan_cnc.lib.exceptions import SnippetRequiredException, CCFParserError
 
 
@@ -1169,28 +1168,6 @@ class NextTaskView(CNCView):
         return context
 
 
-class DockerLogsView(CNCBaseAuth, View):
-
-    def get(self, request, *args, **kwargs) -> Any:
-        logs_output = dict()
-        if 'container_id' in request.session:
-            container_id = request.session['container_id']
-            docker_client = DockerAction()
-            logs_output = docker_client.get_container_output(container_id)
-
-            if logs_output is None:
-                print('Container no longer exists')
-                if 'container_logs' in request.session and container_id in request.session['container_logs']:
-                    logs_output = request.session['container_logs'][container_id]
-
-            if 'container_logs' not in request.session:
-                request.session['container_logs'] = dict()
-
-            request.session['container_logs'][container_id] = logs_output
-
-        return HttpResponse(json.dumps(logs_output), content_type="application/json")
-
-
 class TaskLogsView(CNCBaseAuth, View):
 
     def get(self, request, *args, **kwargs) -> Any:
@@ -1581,6 +1558,3 @@ class DebugMetadataView(CNCView):
         context['header'] = 'Debug Metadata'
         context['title'] = 'Metadata for %s' % self.snippet_name
         return context
-
-
-
