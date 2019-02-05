@@ -16,7 +16,7 @@
 <body class="bg-light">
 <nav class="navbar fixed-top navbar-expand-lg navbar-dark bg-dark">
     <a class="nav-brand" href="http://paloaltonetworks.com">
-        <img src="{% static 'images/logo-pan-bg.png' %}" alt="PAN" style="height: 30px; width: 50px;"/>
+        <img src="{% static 'images/logo-pan-bg.png' %}" alt="PAN" style="opacity: 0.5; height: 30px; width: 50px;"/>
     </a>
     <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarColor02"
             aria-controls="navbarColor02" aria-expanded="false" aria-label="Toggle navigation">
@@ -27,14 +27,14 @@
 
         <ul class="navbar-nav mr-auto">
             <li class="nav-item">
-                <a class="nav-link" href="/">Home <span class="sr-only">(current)</span></a>
+                <a class="nav-link" href="/">HOME <span class="sr-only">(current)</span></a>
             </li>
             {% build_menu as menu %}
             {% for menu_item, menu_dropdown in menu.items %}
             <li class="nav-item dropdown">
                 <a class="nav-link dropdown-toggle" href="#" id="navbardrop{{ forloop.counter }}"
                    data-toggle="dropdown">
-                    {{ menu_item }}
+                    {{ menu_item |upper }}
                 </a>
                 <div class="dropdown-menu">
                     {% for menu_option in menu_dropdown %}
