@@ -1176,9 +1176,18 @@ class NextTaskView(CNCView):
             new_next = 'terraform_plan'
             title = 'Executing Task: Validate'
         elif task_next == 'terraform_plan':
-            r = terraform_utils.perform_plan(service, self.get_snippet_context())
-            new_next = 'terraform_apply'
-            title = 'Executing Task: Plan'
+            print('Checking state before new plan')
+            if terraform_utils.verify_clean_state(service):
+                print('state appears clean')
+                r = terraform_utils.perform_plan(service, self.get_snippet_context())
+                new_next = 'terraform_apply'
+                title = 'Executing Task: Plan'
+            else:
+                self.request.session['task_next'] = ''
+                context['results'] = '\n\nRefusing to continue as it appears there is already a deployed state present.' \
+                                     '\n\nPlease destroy the current state or refresh the local state to continue.\n\n'
+                context['error'] = 1
+                return context
         elif task_next == 'terraform_apply':
             r = terraform_utils.perform_apply(service, self.get_snippet_context())
             new_next = ''
@@ -1186,6 +1195,7 @@ class NextTaskView(CNCView):
         else:
             self.request.session['task_next'] = ''
             context['results'] = 'Could not launch init task!'
+            context['error'] = 1
             return context
 
         context['title'] = title

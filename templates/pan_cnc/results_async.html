@@ -48,10 +48,11 @@
             setTimeout(countdown, 1000);
         }
     }
-
+    {%  if not error %}
     $(document).ready(function() {
         setTimeout(updateOutput, 1000);
     });
+    {%  endif %}
 
 </script>
 <div class="card border-primary mb-6 shadow-lg">
