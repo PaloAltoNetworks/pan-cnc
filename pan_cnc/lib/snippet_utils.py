@@ -26,7 +26,7 @@ from . import jinja_filters
 from .exceptions import CCFParserError, SnippetNotFoundException
 
 
-def load_service_snippets():
+def load_service_snippets() -> list:
     """
     Locates all configuration snippets in the mssp/snippets directory. Looks for and loads the .meta-cnc.yaml file
     in each directory. If there is a key called 'type' and the value is 'service' add to the services list and return
@@ -37,17 +37,17 @@ def load_service_snippets():
     return services
 
 
-def load_baseline_snippets():
+def load_baseline_snippets() -> list:
     services = load_snippets_of_type('baseline')
     return services
 
 
-def load_template_snippets():
+def load_template_snippets() -> list:
     services = load_snippets_of_type('templates')
     return services
 
 
-def load_all_snippets(app_dir):
+def load_all_snippets(app_dir) -> list:
     # cache and keep all snippets when type == none
     if 'all_snippets' in cache:
         snippet_list = cache.get('all_snippets', [])
@@ -59,7 +59,7 @@ def load_all_snippets(app_dir):
     return snippet_list
 
 
-def load_snippets_by_label(label_name, label_value, app_dir):
+def load_snippets_by_label(label_name, label_value, app_dir) -> list:
     services = load_snippets_of_type(snippet_type=None, app_dir=app_dir)
     filtered_services = list()
     for service in services:
@@ -70,7 +70,7 @@ def load_snippets_by_label(label_name, label_value, app_dir):
     return filtered_services
 
 
-def load_snippets_of_type(snippet_type=None, app_dir=None):
+def load_snippets_of_type(snippet_type=None, app_dir=None) -> list:
     """
     Loads a list of snippets of the given type, or all snippets if snippet_type is None
     :param snippet_type: string of the snippet type to field
@@ -82,7 +82,7 @@ def load_snippets_of_type(snippet_type=None, app_dir=None):
     return load_snippets_of_type_from_dir(snippets_dir, snippet_type)
 
 
-def load_snippets_of_type_from_dir(directory, snippet_type=None):
+def load_snippets_of_type_from_dir(directory, snippet_type=None) -> list:
     """
     Loads a list of snippets of the given type, or all snippets if snippet_type is None from a specified directory
     This is useful to load all snippets that come from a specific repository for example
@@ -155,7 +155,7 @@ def load_snippets_of_type_from_dir(directory, snippet_type=None):
     return snippet_list
 
 
-def load_snippet_with_name(snippet_name, app_dir):
+def load_snippet_with_name(snippet_name, app_dir) -> (dict, None):
     """
     Returns a service (dict) that has a 'name' attribute matching 'snippet_name'. Service is a dict containing keys:
     'name (str)', 'description (str)', 'label (str)', 'variables (list)', and 'snippets (list)'.
@@ -171,7 +171,7 @@ def load_snippet_with_name(snippet_name, app_dir):
     return None
 
 
-def get_snippet_metadata(snippet_name, app_dir):
+def get_snippet_metadata(snippet_name, app_dir) -> (str, None):
     """
     Returns the snippet metadata as a str
     :param snippet_name: name of the snippet
@@ -202,7 +202,7 @@ def get_snippet_metadata(snippet_name, app_dir):
     return None
 
 
-def render_snippet_template(service, app_dir, context, template_file=''):
+def render_snippet_template(service, app_dir, context, template_file='') -> str:
     try:
         if template_file == '':
             if 'snippets' not in service:
@@ -239,7 +239,7 @@ def render_snippet_template(service, app_dir, context, template_file=''):
         return 'Error'
 
 
-def resolve_dependencies(snippet, app_dir, dependencies):
+def resolve_dependencies(snippet, app_dir, dependencies) -> list:
     """
     Takes a snippet object and resolved all dependencies. Will return a list of dependencies
 
@@ -274,7 +274,7 @@ def resolve_dependencies(snippet, app_dir, dependencies):
     return dependencies
 
 
-def invalidate_snippet_caches():
+def invalidate_snippet_caches() -> None:
     cache.set('all_snippets', list())
     cache.set('snippet_types', dict())
 
