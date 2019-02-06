@@ -28,7 +28,21 @@ Use at your own risk.
 from __future__ import absolute_import, unicode_literals
 from celery import Celery
 import os
+import sys
 
+# play some tricks with the src path, as we don't always know what apps will be avialable here
+SITE_PATH = os.path.abspath(os.path.dirname(__file__))
+PROJECT_PATH = os.path.normpath(os.path.join(SITE_PATH, '..', '..'))
+SRC_PATH = os.path.join(PROJECT_PATH, 'src')
+
+# add the src path to the system module search path
+if SRC_PATH not in sys.path:
+    sys.path.insert(0, SRC_PATH)
+
+cnc_apps = list()
+for d in os.listdir(SRC_PATH):
+    print(f'Adding package {d} to celery')
+    cnc_apps.append(d)
 
 __broker_inout = '/tmp/celery'
 __broker_processed = '/tmp/celery_processed'
@@ -58,4 +72,4 @@ app.conf.update({
     'result_serializer': 'json',
     'accept_content': ['json']})
 
-# app.autodiscover_tasks()
+app.autodiscover_tasks(cnc_apps)

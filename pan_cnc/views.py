@@ -444,22 +444,6 @@ class CNCBaseFormView(FormView, CNCBaseAuth):
         if 'type' not in self.service:
             print('No type defined in metadata')
             return dynamic_form
-        #
-        # target_ip = self.get_value_from_workflow('TARGET_IP', '')
-        # if self.service['type'] == 'panos':
-        #     # Verify we have a valid target_ip, username, and password set up
-        #     if target_ip == '':
-        #         dynamic_form.fields['TARGET_IP'] = forms.CharField(label='Pan-OS Device', initial='192.168.55.10')
-        #         dynamic_form.fields['TARGET_USERNAME'] = forms.CharField(label='Pan-OS Username', initial='admin')
-        #         dynamic_form.fields['TARGET_PASSWORD'] = forms.CharField(widget=forms.PasswordInput(),
-        #                                                                  label='Pan-OS Password')
-        #
-        # elif self.service['type'] == 'panorama':
-        #     if target_ip == '':
-        #         dynamic_form.fields['TARGET_IP'] = forms.CharField(label='Panorama Device', initial='192.168.55.5')
-        #         dynamic_form.fields['TARGET_USERNAME'] = forms.CharField(label='Panorama Username', initial='admin')
-        #         dynamic_form.fields['TARGET_PASSWORD'] = forms.CharField(widget=forms.PasswordInput(),
-        #                                                                  label='Panorama Password')
 
         # Get all of the variables defined in the self.service
         for variable in self.service['variables']:
@@ -757,30 +741,6 @@ class ProvisionSnippetView(CNCBaseFormView):
             return render(self.request, 'pan_cnc/results.html', context)
 
         elif self.service['type'] == 'terraform':
-            # # For terraform types we need to initiate a whole new workflow
-            # # other types will basically terminate after the provision stage
-            # # for this though, we need to execute a background task then forward
-            # # to the NextTaskView class. This view is not going to be configured per
-            # # cnc app though, so things like app_dir will not be available.
-            # # We will save what we need to the session and wait for the javascript
-            # # in the results_async page to allow the user to continue to the next task
-            # print('Launching terraform init')
-            # r = terraform_utils.perform_init(self.service, self.get_snippet_context())
-            # context = super().get_context_data()
-            # context['title'] = 'Executing Task: Terraform Init'
-            # context['header'] = 'Terraform Template'
-            # if r is None:
-            #     context['results'] = 'Could not launch init tassk!'
-            #     return render(self.request, 'pan_cnc/results.html', context)
-            #
-            # context['results'] = 'task id: %s' % r.id
-            # # now save needed information to gather the output of the celery tasks
-            # # and allow us to proceed to the next task
-            # self.request.session['task_id'] = r.id
-            # self.request.session['task_next'] = 'terraform_validate'
-            # self.request.session['task_app_dir'] = self.app_dir
-            # self.request.session['task_base_html'] = self.base_html
-            # return render(self.request, 'pan_cnc/results_async.html', context)
             print('This template type requires a target')
             self.save_value_to_workflow('next_url', self.next_url)
             return HttpResponseRedirect('/terraform')
