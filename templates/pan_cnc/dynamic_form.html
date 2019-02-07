@@ -2,61 +2,69 @@
 {% load static %}
 
 {% block content %}
-<script type="text/javascript">
-    function set_cursor() {
-        let doc = $(document.documentElement);
-        doc.css('cursor', 'progress');
-        $('#submit_button').prop("disabled",true);
-        $('#dynamic_form').submit();
-    }
-</script>
-<div class="card border-primary mb-6 shadow-lg rounded">
-    <div class="card-header">
-        {{ header }}
-        <div class="float-right">
-            {% if view.help_text != '' %}
-            <a href="#" data-toggle="modal" data-target="#helpTextModal" title="Help">
-                <i class="fas fa-question-circle text-muted mr-1"></i>
-            </a>
-            {% endif %}
-            {% if app_dir and snippet_name %}
-            <a href="/debug/{{ app_dir }}/{{ snippet_name }}" title="Debug Snippet">
-                <i class="fas fa-cog text-muted" title="Debug Snippet"></i>
-            </a>
-            {% endif %}
+    <script type="text/javascript">
+        function set_cursor() {
+            let doc = $(document.documentElement);
+            doc.css('cursor', 'progress');
+            $('#submit_button').prop("disabled", true);
+            $('#dynamic_form').submit();
+        }
+    </script>
+    <div class="card border-primary mb-6 shadow-lg rounded">
+        <div class="card-header">
+            {{ header }}
+            <div class="float-right">
+                {% if view.help_text != '' %}
+                    <a href="#" data-toggle="modal" data-target="#helpTextModal" title="Help">
+                        <i class="fas fa-question-circle text-muted mr-1"></i>
+                    </a>
+                {% elif view.service.descripion != '' %}
+                    <a href="#" data-toggle="modal" data-target="#helpTextModal" title="Help">
+                        <i class="fas fa-question-circle text-muted mr-1"></i>
+                    </a>
+                {% endif %}
+                {% if app_dir and snippet_name %}
+                    <a href="/debug/{{ app_dir }}/{{ snippet_name }}" title="Debug Snippet">
+                        <i class="fas fa-cog text-muted" title="Debug Snippet"></i>
+                    </a>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="card-body">
+            <h4 class="card-title">{{ title }}</h4>
+            <p class="card-text">
+            <form action="{{ action }}" id="dynamic_form" method="post">
+                {% csrf_token %}
+                {% include 'pan_cnc/bootstrap_form.html' with form=form %}
+                <button type="submit" class="btn btn-primary" id="submit_button" onclick="set_cursor()">Submit</button>
+            </form>
+            </p>
         </div>
     </div>
 
-    <div class="card-body">
-        <h4 class="card-title">{{ title }}</h4>
-        <p class="card-text">
-        <form action="{{ action }}" id="dynamic_form" method="post">
-            {% csrf_token %}
-            {% include 'pan_cnc/bootstrap_form.html' with form=form %}
-            <button type="submit" class="btn btn-primary" id="submit_button" onclick="set_cursor()">Submit</button>
-        </form>
-        </p>
+    <!-- Modal -->
+    <div class="modal fade" id="helpTextModal" tabindex="-1" role="dialog" aria-labelledby="helpTextModalLabel"
+         aria-hidden="true">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="exampleModalLabel">Help</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    {% if view.help_text != '' %}
+                        {{ view.help_text|linebreaksbr }}
+                    {% elif view.service.description != '' %}
+                        {{ view.service.description }}
+                    {% endif %}
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
     </div>
-</div>
-
-<!-- Modal -->
-<div class="modal fade" id="helpTextModal" tabindex="-1" role="dialog" aria-labelledby="helpTextModalLabel"
-     aria-hidden="true">
-  <div class="modal-dialog" role="document">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title" id="exampleModalLabel">Help</h5>
-        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-          <span aria-hidden="true">&times;</span>
-        </button>
-      </div>
-      <div class="modal-body">
-        {{ view.help_text|linebreaksbr }}
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
-      </div>
-    </div>
-  </div>
-</div>
 {% endblock %}

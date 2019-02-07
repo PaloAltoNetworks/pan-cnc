@@ -694,13 +694,13 @@ class ProvisionSnippetView(CNCBaseFormView):
 
             if self.service['type'] == 'template':
                 self.header = 'Render Template'
-                self.title = f"Customize Template: {self.service['description']}"
+                self.title = f"Customize Template: {self.service['label']}"
             elif self.service['type'] == 'panos':
                 self.header = 'Pan-OS Configuration'
-                self.title = f"Customize Pan-OS Skillet: {self.service['description']}"
+                self.title = f"Customize Pan-OS Skillet: {self.service['label']}"
             elif self.service['type'] == 'panorama':
                 self.header = 'Panorama Configuration'
-                self.title = f"Customize Panorama Skillet: {self.service['description']}"
+                self.title = f"Customize Panorama Skillet: {self.service['label']}"
             else:
                 # May need to add additional types here
                 t = self.service['type']
