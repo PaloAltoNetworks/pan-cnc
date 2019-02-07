@@ -40,14 +40,22 @@ def clone_or_update_repo(repo_dir, repo_name, repo_url, branch='master'):
         f = repo.remotes.origin.pull()
         if len(f) > 0:
             flags = f[0].flags
-            print(f'Updated repo with return: {flags}')
+            if flags == 4:
+                return "Already up to date"
+            elif flags == 64:
+                return "Updated to Latest"
+            else:
+                return "Unknown flag returned"
+
+        repo.close()
         return True
-    except NoSuchPathError as nspe:
+    except NoSuchPathError:
         print('Directory does not exist')
         return False
 
-    except InvalidGitRepositoryError as igre:
+    except InvalidGitRepositoryError:
         # this is not yet a git repo, let's try to clone it
+        print(f'Cloning new repo with name {repo_name}')
         return clone_repo(repo_dir, repo_name, repo_url, branch)
     except GitCommandError as gce:
         print(gce)
@@ -82,6 +90,11 @@ def get_repo_details(repo_name, repo_dir):
     repo = Repo(repo_dir)
 
     url = repo.remotes.origin.url
+    url_details = parse_repo_origin_url(url)
+
+    if 'repo' not in url_details or url_details['repo'] is None or url_details['repo'] == '':
+        url_details['repo'] = repo_name
+
     branch = repo.active_branch.name
     commits = repo.iter_commits(branch, max_count=5)
 
@@ -96,6 +109,8 @@ def get_repo_details(repo_name, repo_dir):
 
     repo_detail = dict()
     repo_detail['name'] = repo_name
+    repo_detail['label'] = url_details['repo']
+    repo_detail['dir'] = repo_name
     repo_detail['url'] = url
     repo_detail['branch'] = branch
     repo_detail['commits'] = commit_log
@@ -103,7 +118,10 @@ def get_repo_details(repo_name, repo_dir):
 
     upstream_details = get_repo_upstream_details(repo_name, url)
     if 'description' in upstream_details:
-        repo_detail['description'] = upstream_details['description']
+        if upstream_details['description'] is None or upstream_details['description'] == 'None':
+            repo_detail['description'] = f"{url} {branch}"
+        else:
+            repo_detail['description'] = upstream_details['description']
     else:
         repo_detail['description'] = branch
 
@@ -153,10 +171,42 @@ def get_repo_upstream_details(repo_name: str, repo_url: str) -> dict:
 
     details = dict()
 
-    if 'github' in repo_url:
-        # it's possible the user uses a github web address that does not end in .git
-        # let's try to fix that and see if that helps, this returns a blank dict if not anyway, so it's worth
-        # a shot
+    url_details = parse_repo_origin_url(repo_url)
+    owner = url_details.get('owner', '')
+    repo = url_details.get('repo', '')
+
+    try:
+        api_url = f'https://api.github.com/repos/{owner}/{repo}'
+        detail_string = requests.get(api_url, verify=False)
+        details = detail_string.json()
+        cnc_utils.set_cached_value(f'git_utils_upstream_{cache_repo_name}', details)
+    except ConnectionResetError as cre:
+        print('Could not get github details due to ConnectionResetError')
+        print(cre)
+    except ConnectionError as ce:
+        print('Could not get github details due to ConnectionError')
+        print(ce)
+    except Exception as e:
+        print(type(e))
+        print(e)
+        raise
+
+    return details
+
+
+def get_repo_commits_url(repo_url):
+    url_details = parse_repo_origin_url(repo_url)
+    owner = url_details.get('owner', '')
+    repo = url_details.get('repo', '')
+
+    return f'https://github.com/{owner}/{repo}/commit/'
+
+
+def parse_repo_origin_url(repo_url):
+
+    url_details = dict()
+
+    try:
         if repo_url.endswith('.git'):
             # https://github.com/owner/repo.git
             url_parts = repo_url.split('/')[-2:]
@@ -172,34 +222,12 @@ def get_repo_upstream_details(repo_name: str, repo_url: str) -> dict:
             url_parts = repo_url.split('/')[-2:]
             owner = url_parts[0]
             repo = url_parts[1].split('.git')[0]
+    except IndexError:
+        print('Could not parse repo url!')
+        owner = None
+        repo = None
 
-        try:
-            api_url = f'https://api.github.com/repos/{owner}/{repo}'
-            detail_string = requests.get(api_url, verify=False)
-            details = detail_string.json()
-            cnc_utils.set_cached_value(f'git_utils_upstream_{repo_name}', details)
-        except ConnectionResetError as cre:
-            print('Could not get github details due to ConnectionResetError')
-            print(cre)
-        except ConnectionError as ce:
-            print('Could not get github details due to ConnectionError')
-            print(ce)
-            return details
-        except Exception as e:
-            print(type(e))
-            print(e)
-            raise
+    url_details['owner'] = owner
+    url_details['repo'] = repo
 
-    return details
-
-
-def get_repo_commits_url(repo_url):
-    commits_url = None
-    if 'github' in repo_url:
-        url_parts = repo_url.split('/')[-2:]
-        owner = url_parts[0]
-        repo = url_parts[1].split('.git')[0]
-
-        commits_url = f'https://github.com/{owner}/{repo}/commit/'
-
-    return commits_url
+    return url_details
