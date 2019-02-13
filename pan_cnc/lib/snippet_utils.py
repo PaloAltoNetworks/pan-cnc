@@ -278,3 +278,105 @@ def invalidate_snippet_caches() -> None:
     cache.set('all_snippets', list())
     cache.set('snippet_types', dict())
 
+
+def load_all_labels(app_dir: str) -> list:
+    """
+    Returns a list of labels defined across all snippets
+    for example:
+    labels:
+        label_name: label_value
+
+    will add 'label_name' to the list
+
+    :param app_dir: application directory where to search all snippets
+    :return: list of strings representing all found label keys
+    """
+    labels = list()
+    snippets = load_all_snippets(app_dir)
+    for snippet in snippets:
+        if 'labels' not in snippet:
+            continue
+
+        labels = snippet.get('labels', [])
+        for label_name in labels:
+            labels.append(label_name)
+
+    return labels
+
+
+def load_all_label_values(app_dir: str, label_name: str) -> list:
+    """
+    Returns a list of label values defined across all snippets with a given label
+    for example:
+    labels:
+        label_name: label_value
+
+    will add 'label_name' to the list
+
+    :param app_dir: application directory where to search all snippets
+    :param label_name: name of the label to search for
+    :return: list of strings representing all found label values for given key
+    """
+    labels_list = list()
+    snippets = load_all_snippets_with_label_key(app_dir, label_name)
+    for snippet in snippets:
+        if 'labels' not in snippet:
+            continue
+
+        labels = snippet.get('labels', [])
+        for label_key in labels:
+            if label_key == label_name:
+                label_value = labels[label_name]
+                if label_value not in labels_list:
+                    labels_list.append(label_value)
+
+    return labels_list
+
+
+def load_all_snippets_with_label_key(app_dir: str, label: str):
+    """
+    Returns a list of snippets that have a label key == label
+    :param app_dir: application directory where to search for snippets
+    :param label: name of the label key to search
+    :return: list of dicts representing loaded .meta-cnc definitions
+    """
+    snippets_with_label = list()
+    snippets = load_all_snippets(app_dir)
+    for snippet in snippets:
+        if 'labels' not in snippet:
+            continue
+
+        labels = snippet.get('labels', [])
+        for label_name in labels:
+            if label_name == label:
+                snippets_with_label.append(snippet)
+
+    return snippets_with_label
+
+
+def load_all_snippets_without_label_key(app_dir: str, label: str):
+    """
+    Returns a list of snippets that do not have a label key == label
+    :param app_dir: application directory where to search for snippets
+    :param label: name of the label key to search
+    :return: list of dicts representing loaded .meta-cnc definitions
+    """
+    snippets_with_label = list()
+    snippets = load_all_snippets(app_dir)
+    for snippet in snippets:
+        if 'labels' not in snippet:
+            continue
+
+        labels = snippet.get('labels', [])
+        found = False
+        for label_name in labels:
+            if label_name == label:
+                found = True
+
+        if not found:
+            # ignore meta-cnc files with a type of 'app'
+            if 'type' in snippet and snippet['type'] != 'app':
+                snippets_with_label.append(snippet)
+
+    return snippets_with_label
+
