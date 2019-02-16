@@ -42,6 +42,7 @@ from django.views.generic.edit import FormView
 
 from pan_cnc.lib import cnc_utils
 from pan_cnc.lib import pan_utils
+from pan_cnc.lib import rest_utils
 from pan_cnc.lib import snippet_utils
 from pan_cnc.lib import terraform_utils
 from pan_cnc.lib.exceptions import SnippetRequiredException, CCFParserError
@@ -739,9 +740,14 @@ class ProvisionSnippetView(CNCBaseFormView):
             context['base_html'] = self.base_html
             context['results'] = template
             return render(self.request, 'pan_cnc/results.html', context)
-
+        elif self.service['type'] == 'rest':
+            # Found a skillet type of 'rest'
+            results = rest_utils.execute_all(self.service, self.app_dir, self.get_workflow())
+            context = dict()
+            context['base_html'] = self.base_html
+            context['results'] = results
+            return render(self.request, 'pan_cnc/results.html', context)
         elif self.service['type'] == 'terraform':
-            print('This template type requires a target')
             self.save_value_to_workflow('next_url', self.next_url)
             return HttpResponseRedirect('/terraform')
         else:
