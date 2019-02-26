@@ -52,7 +52,6 @@ ALLOWED_HOSTS = ['*']
 # Application definition
 
 INSTALLED_APPS = [
-    'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
@@ -60,6 +59,7 @@ INSTALLED_APPS = [
     'widget_tweaks',
     'django.contrib.staticfiles',
     'cnc_tags',
+    #   'django.contrib.admin',
 ]
 
 INSTALLED_APPS_CONFIG = dict()
@@ -163,9 +163,11 @@ SESSION_ENGINE = 'django.contrib.sessions.backends.cache'
 # https://docs.djangoproject.com/en/2.1/howto/static-files/
 
 STATIC_URL = '/static/'
-STATICFILES_DIRS = [
-    os.path.join(BASE_DIR, 'assets')
-]
+#STATICFILES_DIRS = [
+#    os.path.join(BASE_DIR, 'assets')
+#]
+
+STATIC_ROOT = os.path.join(BASE_DIR, 'assets/')
 
 # Keep the caches / sessions in memory only
 CACHES = {
