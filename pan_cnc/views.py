@@ -1257,19 +1257,28 @@ class UnlockEnvironmentsView(CNCBaseAuth, FormView):
                     created using the password supplied below.
 
                     Creating an environment allows you to keep passwords and other data specific to an environment 
-                    in one place. The environments file is encrypted and placed in your home directory for safe
-                    keeping.
+                    in one place. The environments file is encrypted and placed in your home directory for safe keeping.
                 """
 
     def get_context_data(self, **kwargs) -> dict:
         context = super().get_context_data(**kwargs)
         form = forms.Form()
-        unlock_field = forms.CharField(widget=forms.PasswordInput, label='Master PassPhrase')
+
+        unlock_field = forms.CharField(widget=forms.PasswordInput, label='Master Passphrase')
         form.fields['password'] = unlock_field
+
+        user = self.request.user
+        if not cnc_utils.check_user_secret(str(user.id)):
+            context['header'] = 'Create a new Passphrase protected Environment'
+            context['title'] = 'Set new Master Passphrase'
+            verify_field = forms.CharField(widget=forms.PasswordInput, label='Verify Master Passphrase')
+            form.fields['verify'] = verify_field
+        else:
+            context['header'] = self.header
+            context['title'] = self.title
+
         context['form'] = form
         context['base_html'] = self.base_html
-        context['header'] = self.header
-        context['title'] = self.title
         return context
 
     def post(self, request, *args, **kwargs) -> Any:
@@ -1278,20 +1287,34 @@ class UnlockEnvironmentsView(CNCBaseAuth, FormView):
         if form.is_valid():
             print('checking passphrase')
             if 'password' in request.POST:
-                print('Getting environment configs')
+                password = request.POST['password']
+
                 user = request.user
+                # check if new environment should be created
                 if not cnc_utils.check_user_secret(str(user.id)):
-                    if cnc_utils.create_new_user_environment_set(str(user.id), request.POST['password']):
+                    if 'verify' not in request.POST or request.POST['verify'] == '':
+                        messages.add_message(request, messages.ERROR, 'Passwords Verification failed!')
+                        return self.form_invalid(form)
+
+                    verify = request.POST['verify']
+
+                    if password != verify:
+                        messages.add_message(request, messages.ERROR, 'Passwords do not match!')
+                        return self.form_invalid(form)
+
+                    if cnc_utils.create_new_user_environment_set(str(user.id), password):
                         messages.add_message(request, messages.SUCCESS,
                                              'Created New Env with supplied master passphrase')
-                envs = cnc_utils.load_user_secrets(str(user.id), request.POST['password'])
+
+                print('Getting environment configs')
+                envs = cnc_utils.load_user_secrets(str(user.id), password)
                 if envs is None:
                     messages.add_message(request, messages.ERROR, 'Incorrect Password')
                     return self.form_invalid(form)
 
                 session = request.session
                 session['environments'] = envs
-                session['passphrase'] = request.POST['password']
+                session['passphrase'] = password
                 env_names = envs.keys()
                 if len(env_names) > 0:
                     session['current_env'] = list(env_names)[0]
