@@ -14,6 +14,17 @@
 
 # Author: Nathan Embery nembery@paloaltonetworks.com
 
+"""
+Palo Alto Networks pan-cnc
+
+pan-cnc is a library to build simple GUIs and workflows primarily to interact with various APIs
+
+Please see http://github.com/PaloAltoNetworks/pan-cnc for more information
+
+This software is provided without support, warranty, or guarantee.
+Use at your own risk.
+"""
+
 import logging
 import os
 from pathlib import Path
@@ -24,8 +35,8 @@ from django.conf import settings
 from django.core.cache import cache
 from jinja2 import Environment, BaseLoader
 
-from pan_cnc.lib.exceptions import TargetConnectionException, CCFParserError
 from pan_cnc.lib import jinja_filters
+from pan_cnc.lib.exceptions import TargetConnectionException, CCFParserError
 
 xapi_obj = None
 
@@ -36,8 +47,15 @@ handler = logging.StreamHandler()
 logger.addHandler(handler)
 
 
-def panos_login(pan_device_ip=None, pan_device_username=None, pan_device_password=None):
-
+def panos_login(pan_device_ip=None, pan_device_username=None, pan_device_password=None) -> pan.xapi.PanXapi:
+    """
+    Using the pan-xapi to log in to a Pan-OS or Panorama instance. If supplied ip, username, and password are None
+    this will attempt to find them via environment variables 'PANORAMA_IP', 'PANORAMA_USERNAME', and 'PANORAMA_PASSWORD'
+    :param pan_device_ip: ip address of the target instance
+    :param pan_device_username: username to use
+    :param pan_device_password: password to use
+    :return: PanXapi object
+    """
     global xapi_obj
     # if pan_device_ip is not None:
     if xapi_obj is not None:
@@ -62,7 +80,7 @@ def panos_login(pan_device_ip=None, pan_device_username=None, pan_device_passwor
         return xapi_obj
 
     except pan.xapi.PanXapiError as pxe:
-        print('Got error logging in to Panorama')
+        print('Error logging in to Palo Alto Networks device')
         print(pxe)
         # reset to None here to force re-auth next time
         xapi_obj = None
@@ -70,16 +88,28 @@ def panos_login(pan_device_ip=None, pan_device_username=None, pan_device_passwor
         return None
 
 
-def test_panorama():
+def test_panorama() -> None:
+    """
+    test Pan-OS device auth from environment variables
+    :return: None
+    """
     xapi = panos_login()
     xapi.op(cmd='show system info', cmd_xml=True)
     print(xapi.xml_result())
 
 
-def get_panos_credentials(pan_device_ip, pan_device_username, pan_device_password):
+def get_panos_credentials(pan_device_ip, pan_device_username, pan_device_password) ->dict:
+    """
+    Returns a dict containing the panorama or Pan-OS credentials. If supplied args are None, attempt to load them
+    via the Environment.
+    :param pan_device_ip:
+    :param pan_device_username:
+    :param pan_device_password:
+    :return:
+    """
     if pan_device_ip is None or pan_device_username is None or pan_device_password is None:
         # check the env for it if not here
-        # FIXME - this should be renmaed to TARGET or some other value that is not specific to PANORAMA
+        # FIXME - this should be renamed to TARGET or some other value that is not specific to PANORAMA
         pan_device_ip = os.environ.get('PANORAMA_IP', '0.0.0.0')
         pan_device_username = os.environ.get('PANORAMA_USERNAME', 'admin')
         pan_device_password = os.environ.get('PANORAMA_PASSWORD', 'admin')
@@ -98,11 +128,18 @@ def get_panos_credentials(pan_device_ip, pan_device_username, pan_device_passwor
     return credentials
 
 
-def push_service(service, context, force_sync=False):
+def push_service(service, context, force_sync=False) -> bool:
+    """
+    Push a skillet to a PanXapi connected device
+    :param service: dict containing parsed and loaded skillet
+    :param context: all compiled variables from the user interaction
+    :param force_sync: should we wait on a successful commit operation or return after queue
+    :return: boolean on success / failure
+    """
     xapi = panos_login()
 
     if xapi is None:
-        print('Could not login in to Panorama')
+        print('Could not login in to Palo Alto Networks Device')
         return False
 
     if 'snippet_path' in service:
@@ -163,20 +200,23 @@ def push_service(service, context, force_sync=False):
         if service['name'] == 'gpcs_baseline':
             print('push baseline and svc connection scope to gpcs')
             xapi.commit(action='all',
-                        cmd='<commit-all><template-stack><name>Service_Conn_Template_Stack</name></template-stack></commit-all>')
+                        cmd='<commit-all><template-stack>'
+                            '<name>Service_Conn_Template_Stack</name></template-stack></commit-all>')
             print(xapi.xml_result())
 
         # for gpcs remote network configuration do a scope push to gpcs
         if service['name'] == 'gpcs_remote' or service['name'] == 'gpcs_baseline':
             print('push remote network scope to gpcs')
             xapi.commit(action='all',
-                        cmd='<commit-all><shared-policy><device-group><entry name="Remote_Network_Device_Group"/></device-group></shared-policy></commit-all>')
+                        cmd='<commit-all><shared-policy><device-group>'
+                            '<entry name="Remote_Network_Device_Group"/></device-group></shared-policy></commit-all>')
             print(xapi.xml_result())
 
         return True
 
     except IOError as ioe:
         print('Could not open xml snippet file for reading!!!')
+        print(ioe)
         # FIXME - raise a decent error here
         return False
 
@@ -186,7 +226,7 @@ def push_service(service, context, force_sync=False):
         return False
 
 
-def validate_snippet_present(service, context):
+def validate_snippet_present(service, context) -> bool:
     """
     Checks all xpaths in the service to validate if they are already present in panorama
     Status codes documented here:
@@ -197,7 +237,7 @@ def validate_snippet_present(service, context):
     """
     xapi = panos_login()
     if xapi is None:
-        print('Could not login to Panorama')
+        print('Could not login to Palo Alto Networks device')
         raise TargetConnectionException
 
     try:
@@ -225,7 +265,11 @@ def validate_snippet_present(service, context):
         raise TargetConnectionException
 
 
-def get_device_groups_from_panorama():
+def get_device_groups_from_panorama() -> list:
+    """
+    Return a list of device groups from panorama instance
+    :return: List of dicts containing device group entries
+    """
     xapi = panos_login()
     device_group_xpath = "/config/devices/entry[@name='localhost.localdomain']/device-group"
 
@@ -254,7 +298,11 @@ def get_device_groups_from_panorama():
     return services
 
 
-def get_vm_auth_key_from_panorama():
+def get_vm_auth_key_from_panorama() -> str:
+    """
+    Queries a Panorama instance to generate a new VM Auth key
+    :return: string results from panorama (still needs parsed to pull out raw auth key)
+    """
     xapi = panos_login()
 
     if xapi is None:
@@ -264,6 +312,7 @@ def get_vm_auth_key_from_panorama():
     try:
         xapi.op(cmd='<request><bootstrap><vm-auth-key><generate>'
                     '<lifetime>24</lifetime></generate></vm-auth-key></bootstrap></request>')
+        # FIXME - check status code here and do the right thing
         print(xapi.status_code)
         print(xapi.status_detail)
         return xapi.xml_result()
