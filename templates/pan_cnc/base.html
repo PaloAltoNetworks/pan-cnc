@@ -12,11 +12,82 @@
     <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.1.1/js/bootstrap.min.js"></script>
     <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.6.3/css/all.css"
           integrity="sha384-UHRtZLI+pbxtHCWp1t77Bi1L4ZtiqrqD80Kn4Z8NTSRyMA2Fd33n5dQ8lWUE00s/" crossorigin="anonymous">
+    {% block head %}{% endblock %}
+    <script type="text/javascript">
+        var c = {}; // cache
+        var a = ''; // current active
+
+        function load_secret(k, indx) {
+
+            // mask out all current secrets
+            $("[id ^= 'secret_']").each(function (i, e) {
+                $(e).empty();
+                $(e).html('****************');
+            });
+
+            // check cache if we've already queried the server
+            if (k in c) {
+                let v = c[k];
+                let d = $('#secret_' + indx);
+                d.empty();
+                // if this one is already active (stored in a) then mask it out and return
+                if (a === k) {
+                    d.html('****************');
+                    return;
+                }
+                // not active = show it, set as active, and return
+                d.html(v);
+                a = k;
+                return;
+            }
+
+            // not in the cache, query the server for it
+            let doc = $(document.documentElement);
+            doc.css('cursor', 'progress');
+
+            let url = '/load_secret/';
+            let params = {};
+            params['k'] = k;
+            // e if for environment, blank will cause server to use current loaded env if possible
+            params['e'] = '';
+
+            // ensure CSRF token is included
+            $.ajaxSetup({
+                'headers': {"X-CSRFToken": "{{ csrf_token }}"}
+            });
+
+            // perform the post
+            let post = $.post(url, params, function (response) {
+                if (response['status'] == 'success') {
+                    let v = response['v'];
+                    let v_div = $('#secret_' + indx);
+                    v_div.empty();
+                    v_div.html(v);
+                    // store value in cache
+                    c[k] = v;
+                    // set this key as active so we can mask it out again later if needed
+                    a = k;
+                } else {
+                    alert(response['status']);
+                }
+            });
+
+            post.fail(function () {
+                alert('Could not perform request!');
+            });
+
+            post.always(function () {
+                doc.css('cursor', '');
+            });
+        }
+
+    </script>
 </head>
 <body class="bg-light">
-<nav class="navbar fixed-top navbar-expand-lg navbar-dark bg-dark">
+<nav class="navbar fixed-top navbar-expand-lg navbar-dark" style="background-color: #444">
     <a class="nav-brand" href="/">
-        <img src="{% static 'images/logo-pan-bg.png' %}" alt="PAN" style="opacity: 0.5; height: 30px; width: 50px;"/>
+        <img src="{% static 'images/logo-pan-bg.png' %}" alt="PAN"
+             style="opacity: 0.25; height: 40px; width: 60px; margin-right: -35px"/>
     </a>
     <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarColor02"
             aria-controls="navbarColor02" aria-expanded="false" aria-label="Toggle navigation">
@@ -28,37 +99,35 @@
         <ul class="navbar-nav mr-auto">
             {% build_menu as menu %}
             {% for menu_item, menu_dropdown in menu.items %}
-            <li class="nav-item dropdown">
-                <a class="nav-link dropdown-toggle" href="#" id="navbardrop{{ forloop.counter }}"
-                   data-toggle="dropdown">
-                    {{ menu_item |upper }}
-                </a>
-                <div class="dropdown-menu">
-                    {% for menu_option in menu_dropdown %}
-                    <a class="dropdown-item" href="{{ menu_option.value }}">{{ menu_option.label }}</a>
-                    {% endfor %}
-                </div>
-            </li>
+                <li class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle text-white font-weight-bold" href="#"
+                       id="navbardrop{{ forloop.counter }}" data-toggle="dropdown">
+                        {{ menu_item |upper }}
+                    </a>
+                    <div class="dropdown-menu">
+                        {% for menu_option in menu_dropdown %}
+                            <a class="dropdown-item" href="{{ menu_option.value }}">{{ menu_option.label }}</a>
+                        {% endfor %}
+                    </div>
+                </li>
             {% endfor %}
         </ul>
         <ul class="navbar-nav mr-1">
             <li class="nav-link">
                 {% if request.session.current_env %}
-                <a href="#" data-toggle="modal" data-target="#envModal" title="Loaded Environment"
-                class="text-primary">
-                    <i class="fas fa-unlock"></i>
-                    {{ request.session.current_env }}
-                </a>
+                    <a href="#" data-toggle="modal" data-target="#envModal" title="Loaded Environment"
+                       class="text-light">
+                        <i class="fas fa-unlock"></i>
+                        {{ request.session.current_env }}
+                    </a>
                 {% else %}
-                <a href="/list_envs" title="Unlock Environments"
-                class="text-primary">
-                    <i class="fas fa-lock"></i>
+                    <a href="/list_envs" title="Unlock Environments"
+                       class="text-light"><i class="fas fa-lock"></i></a>
                     &nbsp;
-                </a>
                 {% endif %}
             </li>
             <li class="nav-item dropdown">
-                <a class="nav-link dropdown-toggle text-primary" href="#" id="navbardrop-user"
+                <a class="nav-link dropdown-toggle text-light" href="#" id="navbardrop-user"
                    data-toggle="dropdown">
                     {{ user }}
                 </a>
@@ -78,67 +147,75 @@
             <div class="row">
                 <div class="col-md-12 my-5">
                     {% if messages %}
-                    {% for message in messages %}
-                    {% if message.level == DEFAULT_MESSAGE_LEVELS.ERROR %}
-                    <div class="alert alert-danger mb-5 shadow-lg" role="alert">
-                        {% elif message.level == DEFAULT_MESSAGE_LEVELS.SUCCESS %}
-                        <div class="alert alert-success mb-5 shadow-lg" role="alert">
+                        {% for message in messages %}
+                            {% if message.level == DEFAULT_MESSAGE_LEVELS.ERROR %}
+                                <div class="alert alert-danger mb-5 shadow-lg" role="alert">
+                            {% elif message.level == DEFAULT_MESSAGE_LEVELS.SUCCESS %}
+                                <div class="alert alert-success mb-5 shadow-lg" role="alert">
                             {% else %}
-                            <div class="alert alert-info mb-5 shadow-lg" role="alert">
-                                {% endif %}
-                                {{ message }}
-                                <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-                                    <span aria-hidden="true">&times;</span>
-                                </button>
-                            </div>
-                            {% endfor %}
+                                <div class="alert alert-info mb-5 shadow-lg" role="alert">
                             {% endif %}
-                            {% block content %}{% endblock %}
+                        {{ message }}
+                        <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
                         </div>
+                        {% endfor %}
+                    {% endif %}
+                    {% block content %}{% endblock %}
+                    </div>
                     </div>
                 </div>
             </div>
         </div>
         <!-- Modal -->
-<div class="modal fade" id="envModal" tabindex="-1" role="dialog" aria-labelledby="envModalLabel"
-     aria-hidden="true">
-  <div class="modal-dialog" role="document">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title" id="envModalLabel">Environment</h5>
-        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-          <span aria-hidden="true">&times;</span>
-        </button>
-      </div>
-      <div class="modal-body" style="overflow-y: auto">
-          <table class="table">
-            <caption>Environment Secrets</caption>
-            <thead>
-            <tr>
-                <th scope="col"></th>
-                <th scope="col">Key</th>
-                <th scope="col">Value</th>
-            </tr>
-            </thead>
-            <tbody>
-            <!-- fixme this should only pull secrets on server side -->
-            <!-- fixme bad form to show the secrets here on the page -->
-            <!-- patches welcome :-) -->
-            {% for k, v in view.get_environment_secrets.items %}
-            <tr>
-                <th scope="row">{{ forloop.counter }}</th>
-                <td>{{ k }}</td>
-                <td>{{ v }}</td>
-            </tr>
-            {% endfor %}
-            </tbody>
-        </table>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
-      </div>
-    </div>
-  </div>
-</div>
+        <div class="modal fade" id="envModal" tabindex="-1" role="dialog" aria-labelledby="envModalLabel"
+             aria-hidden="true">
+            <div class="modal-dialog" role="document">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="envModalLabel">Environment</h5>
+                        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                    <div class="modal-body" style="overflow-y: auto">
+                        <table class="table">
+                            <caption>Environment Secrets</caption>
+                            <thead>
+                            <tr>
+                                <th scope="col"></th>
+                                <th scope="col">Key</th>
+                                <th scope="col">Value</th>
+                                <th scope="col"></th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <!-- fixme this should only pull secrets on server side -->
+                            <!-- fixme bad form to show the secrets here on the page -->
+                            <!-- patches welcome :-) -->
+                            {% for k, v in view.get_environment_secrets.items %}
+                                <tr>
+                                    <th scope="row">{{ forloop.counter }}</th>
+                                    <td>{{ k }}</td>
+                                    <td id="secret_{{ forloop.counter }}">****************</td>
+                                    <td>
+                                        <input type="button" class="btn btn-primary"
+                                               onclick="load_secret('{{ k }}', {{ forloop.counter }})"
+                                               value="Show"/>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="modal-footer">
+                        <a href="/edit_env/{{ request.session.current_env|urlencode }}"
+                           class="btn btn-success">Manage</a>
+                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
 </body>
 </html>

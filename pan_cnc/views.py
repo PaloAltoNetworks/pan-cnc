@@ -39,6 +39,7 @@ from django.views.generic import RedirectView
 from django.views.generic import TemplateView
 from django.views.generic import View
 from django.views.generic.edit import FormView
+from django.http import JsonResponse
 
 from pan_cnc.lib import cnc_utils
 from pan_cnc.lib import pan_utils
@@ -223,6 +224,7 @@ class CNCView(CNCBaseAuth, TemplateView):
     # base html - allow sub apps to override this with special html base if desired
     base_html = 'pan_cnc/base.html'
     app_dir = 'pan_cnc'
+    help_text = ''
 
     def get_context_data(self, **kwargs):
         """
@@ -1241,6 +1243,33 @@ class EnvironmentBase(CNCBaseAuth, View):
         return super().dispatch(request, *args, **kwargs)
 
 
+class GetSecretView(EnvironmentBase):
+
+    def post(self, request, *args, **kwargs) -> JsonResponse:
+        res = dict()
+        res['v'] = ''
+        res['status'] = 'error'
+
+        if 'k' not in request.POST:
+            print('Could not find required params in POST in GetSecretView')
+            return JsonResponse(res)
+
+        secret_name = request.POST['k']
+        env_name = request.POST['e']
+
+        if env_name == '' or env_name is None:
+            env_name = request.session['current_env']
+
+        if env_name in self.e and secret_name in self.e[env_name]['secrets']:
+            secret_value = self.e[env_name]['secrets'][secret_name]
+            res['v'] = secret_value
+            res['status'] = 'success'
+            return JsonResponse(res)
+        else:
+            res['status'] = 'k not found'
+            return JsonResponse(res)
+
+
 class UnlockEnvironmentsView(CNCBaseAuth, FormView):
     """
     unlock an environment
@@ -1526,7 +1555,7 @@ class DeleteEnvironmentKeyView(EnvironmentBase, RedirectView):
         env_name = self.kwargs.get('env_name')
         key_name = self.kwargs.get('key_name')
 
-        print(f'{env_name} {key_name}')
+        # print(f'{env_name} {key_name}')
         if env_name in self.e and key_name in self.e[env_name]['secrets']:
             print(f'Deleting Secret {key_name} from {env_name}')
             messages.add_message(self.request, messages.SUCCESS, 'Secret Deleted')

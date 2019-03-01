@@ -16,11 +16,11 @@
             <div class="float-right">
                 {% if view.help_text != '' %}
                     <a href="#" data-toggle="modal" data-target="#helpTextModal" title="Help">
-                        <i class="fas fa-question-circle text-muted mr-1"></i>
+                        <i class="fas fa-question-circle text-primary mr-1"></i>
                     </a>
                 {% elif view.service.descripion != '' %}
                     <a href="#" data-toggle="modal" data-target="#helpTextModal" title="Help">
-                        <i class="fas fa-question-circle text-muted mr-1"></i>
+                        <i class="fas fa-question-circle text-primary mr-1"></i>
                     </a>
                 {% endif %}
                 {% if app_dir and snippet_name %}
@@ -37,18 +37,20 @@
             <form action="{{ action }}" id="dynamic_form" method="post">
                 {% csrf_token %}
                 {% include 'pan_cnc/bootstrap_form.html' with form=form %}
-                <button type="submit" class="btn btn-primary" id="submit_button" onclick="set_cursor()">Submit</button>
             </form>
             </p>
+        </div>
+        <div class="card-footer text-right">
+            <button type="submit" class="btn btn-primary" id="submit_button" onclick="set_cursor()">Submit</button>
         </div>
     </div>
 
     <!-- Modal -->
-    <div class="modal fade" id="helpTextModal" tabindex="-1" role="dialog" aria-labelledby="helpTextModalLabel"
+    <div class="modal fade border-top border-primary" id="helpTextModal" tabindex="-1" role="dialog" aria-labelledby="helpTextModalLabel"
          aria-hidden="true">
         <div class="modal-dialog" role="document">
             <div class="modal-content">
-                <div class="modal-header">
+                <div class="modal-header bg-light">
                     <h5 class="modal-title" id="exampleModalLabel">Help</h5>
                     <button type="button" class="close" data-dismiss="modal" aria-label="Close">
                         <span aria-hidden="true">&times;</span>
@@ -61,8 +63,8 @@
                         {{ view.service.description }}
                     {% endif %}
                 </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                <div class="modal-footer bg-light text-right">
+                    <button type="button" class="btn btn-primary" data-dismiss="modal">Close</button>
                 </div>
             </div>
         </div>
