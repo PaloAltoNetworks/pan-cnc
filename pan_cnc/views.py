@@ -258,7 +258,7 @@ class CNCBaseFormView(FormView, CNCBaseAuth):
     # form to render, override if you need a specific html fragment to render the form
     template_name = 'pan_cnc/dynamic_form.html'
     # Head to show on the rendered dynamic form - Main header
-    header = 'Pan-OS Utils'
+    header = 'PAN-OS Utils'
     # title to show on dynamic form
     title = 'Title'
     # where to go after this? once the form has been submitted, redirect to where?
@@ -698,8 +698,8 @@ class ProvisionSnippetView(CNCBaseFormView):
                 self.header = 'Render Template'
                 self.title = f"Customize Template: {self.service['label']}"
             elif self.service['type'] == 'panos':
-                self.header = 'Pan-OS Configuration'
-                self.title = f"Customize Pan-OS Skillet: {self.service['label']}"
+                self.header = 'PAN-OS Configuration'
+                self.title = f"Customize PAN-OS Skillet: {self.service['label']}"
             elif self.service['type'] == 'panorama':
                 self.header = 'Panorama Configuration'
                 self.title = f"Customize Panorama Skillet: {self.service['label']}"
@@ -760,7 +760,7 @@ class EditTargetView(CNCBaseAuth, FormView):
     # form to render, override if you need a specific html fragment to render the form
     template_name = 'pan_cnc/dynamic_form.html'
     # Head to show on the rendered dynamic form - Main header
-    header = 'Pan-OS Utils'
+    header = 'PAN-OS Utils'
     # title to show on dynamic form
     title = 'Title'
     # where to go after this? once the form has been submitted, redirect to where?
@@ -772,7 +772,7 @@ class EditTargetView(CNCBaseAuth, FormView):
     documentation_link = ''
     # help text - inline documentation text
     help_text = 'The Target is the endpoint or device where the configured template will be applied. ' \
-                'This us usually a Pan-OS or other network device depending on the type of template to ' \
+                'This us usually a PAN-OS or other network device depending on the type of template to ' \
                 'be provisioned'
 
     def get(self, request, *args, **kwargs) -> Any:
@@ -810,9 +810,9 @@ class EditTargetView(CNCBaseAuth, FormView):
 
             if 'type' in meta:
                 if meta['type'] == 'panos':
-                    target_ip_label = 'Pan-OS IP'
-                    target_username_label = 'Pan-OS Username'
-                    target_password_label = 'Pan-OS Password'
+                    target_ip_label = 'PAN-OS IP'
+                    target_username_label = 'PAN-OS Username'
+                    target_password_label = 'PAN-OS Password'
                 elif meta['type'] == 'panorama':
                     target_ip_label = 'Panorama IP'
                     target_username_label = 'Panorama Username'

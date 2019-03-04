@@ -49,7 +49,7 @@ logger.addHandler(handler)
 
 def panos_login(pan_device_ip=None, pan_device_username=None, pan_device_password=None) -> pan.xapi.PanXapi:
     """
-    Using the pan-xapi to log in to a Pan-OS or Panorama instance. If supplied ip, username, and password are None
+    Using the pan-xapi to log in to a PAN-OS or Panorama instance. If supplied ip, username, and password are None
     this will attempt to find them via environment variables 'PANORAMA_IP', 'PANORAMA_USERNAME', and 'PANORAMA_PASSWORD'
     :param pan_device_ip: ip address of the target instance
     :param pan_device_username: username to use
@@ -90,7 +90,7 @@ def panos_login(pan_device_ip=None, pan_device_username=None, pan_device_passwor
 
 def test_panorama() -> None:
     """
-    test Pan-OS device auth from environment variables
+    test PAN-OS device auth from environment variables
     :return: None
     """
     xapi = panos_login()
@@ -100,7 +100,7 @@ def test_panorama() -> None:
 
 def get_panos_credentials(pan_device_ip, pan_device_username, pan_device_password) ->dict:
     """
-    Returns a dict containing the panorama or Pan-OS credentials. If supplied args are None, attempt to load them
+    Returns a dict containing the panorama or PAN-OS credentials. If supplied args are None, attempt to load them
     via the Environment.
     :param pan_device_ip:
     :param pan_device_username:
@@ -306,7 +306,7 @@ def get_vm_auth_key_from_panorama() -> str:
     xapi = panos_login()
 
     if xapi is None:
-        print('Could not login into Pan-OS target')
+        print('Could not login into PAN-OS target')
         raise TargetConnectionException
 
     try:
