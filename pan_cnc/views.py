@@ -39,6 +39,7 @@ from django.views.generic import RedirectView
 from django.views.generic import TemplateView
 from django.views.generic import View
 from django.views.generic.edit import FormView
+from django.http import JsonResponse
 
 from pan_cnc.lib import cnc_utils
 from pan_cnc.lib import pan_utils
@@ -224,6 +225,7 @@ class CNCView(CNCBaseAuth, TemplateView):
     # base html - allow sub apps to override this with special html base if desired
     base_html = 'pan_cnc/base.html'
     app_dir = 'pan_cnc'
+    help_text = ''
 
     def get_context_data(self, **kwargs):
         """
@@ -257,7 +259,7 @@ class CNCBaseFormView(FormView, CNCBaseAuth):
     # form to render, override if you need a specific html fragment to render the form
     template_name = 'pan_cnc/dynamic_form.html'
     # Head to show on the rendered dynamic form - Main header
-    header = 'Pan-OS Utils'
+    header = 'PAN-OS Utils'
     # title to show on dynamic form
     title = 'Title'
     # where to go after this? once the form has been submitted, redirect to where?
@@ -697,8 +699,8 @@ class ProvisionSnippetView(CNCBaseFormView):
                 self.header = 'Render Template'
                 self.title = f"Customize Template: {self.service['label']}"
             elif self.service['type'] == 'panos':
-                self.header = 'Pan-OS Configuration'
-                self.title = f"Customize Pan-OS Skillet: {self.service['label']}"
+                self.header = 'PAN-OS Configuration'
+                self.title = f"Customize PAN-OS Skillet: {self.service['label']}"
             elif self.service['type'] == 'panorama':
                 self.header = 'Panorama Configuration'
                 self.title = f"Customize Panorama Skillet: {self.service['label']}"
@@ -764,7 +766,7 @@ class EditTargetView(CNCBaseAuth, FormView):
     # form to render, override if you need a specific html fragment to render the form
     template_name = 'pan_cnc/dynamic_form.html'
     # Head to show on the rendered dynamic form - Main header
-    header = 'Pan-OS Utils'
+    header = 'PAN-OS Utils'
     # title to show on dynamic form
     title = 'Title'
     # where to go after this? once the form has been submitted, redirect to where?
@@ -776,7 +778,7 @@ class EditTargetView(CNCBaseAuth, FormView):
     documentation_link = ''
     # help text - inline documentation text
     help_text = 'The Target is the endpoint or device where the configured template will be applied. ' \
-                'This us usually a Pan-OS or other network device depending on the type of template to ' \
+                'This us usually a PAN-OS or other network device depending on the type of template to ' \
                 'be provisioned'
 
     def get(self, request, *args, **kwargs) -> Any:
@@ -814,9 +816,9 @@ class EditTargetView(CNCBaseAuth, FormView):
 
             if 'type' in meta:
                 if meta['type'] == 'panos':
-                    target_ip_label = 'Pan-OS IP'
-                    target_username_label = 'Pan-OS Username'
-                    target_password_label = 'Pan-OS Password'
+                    target_ip_label = 'PAN-OS IP'
+                    target_username_label = 'PAN-OS Username'
+                    target_password_label = 'PAN-OS Password'
                 elif meta['type'] == 'panorama':
                     target_ip_label = 'Panorama IP'
                     target_username_label = 'Panorama Username'
@@ -1247,6 +1249,33 @@ class EnvironmentBase(CNCBaseAuth, View):
         return super().dispatch(request, *args, **kwargs)
 
 
+class GetSecretView(EnvironmentBase):
+
+    def post(self, request, *args, **kwargs) -> JsonResponse:
+        res = dict()
+        res['v'] = ''
+        res['status'] = 'error'
+
+        if 'k' not in request.POST:
+            print('Could not find required params in POST in GetSecretView')
+            return JsonResponse(res)
+
+        secret_name = request.POST['k']
+        env_name = request.POST['e']
+
+        if env_name == '' or env_name is None:
+            env_name = request.session['current_env']
+
+        if env_name in self.e and secret_name in self.e[env_name]['secrets']:
+            secret_value = self.e[env_name]['secrets'][secret_name]
+            res['v'] = secret_value
+            res['status'] = 'success'
+            return JsonResponse(res)
+        else:
+            res['status'] = 'k not found'
+            return JsonResponse(res)
+
+
 class UnlockEnvironmentsView(CNCBaseAuth, FormView):
     """
     unlock an environment
@@ -1263,19 +1292,28 @@ class UnlockEnvironmentsView(CNCBaseAuth, FormView):
                     created using the password supplied below.
 
                     Creating an environment allows you to keep passwords and other data specific to an environment 
-                    in one place. The environments file is encrypted and placed in your home directory for safe
-                    keeping.
+                    in one place. The environments file is encrypted and placed in your home directory for safe keeping.
                 """
 
     def get_context_data(self, **kwargs) -> dict:
         context = super().get_context_data(**kwargs)
         form = forms.Form()
-        unlock_field = forms.CharField(widget=forms.PasswordInput, label='Master PassPhrase')
+
+        unlock_field = forms.CharField(widget=forms.PasswordInput, label='Master Passphrase')
         form.fields['password'] = unlock_field
+
+        user = self.request.user
+        if not cnc_utils.check_user_secret(str(user.id)):
+            context['header'] = 'Create a new Passphrase protected Environment'
+            context['title'] = 'Set new Master Passphrase'
+            verify_field = forms.CharField(widget=forms.PasswordInput, label='Verify Master Passphrase')
+            form.fields['verify'] = verify_field
+        else:
+            context['header'] = self.header
+            context['title'] = self.title
+
         context['form'] = form
         context['base_html'] = self.base_html
-        context['header'] = self.header
-        context['title'] = self.title
         return context
 
     def post(self, request, *args, **kwargs) -> Any:
@@ -1284,20 +1322,34 @@ class UnlockEnvironmentsView(CNCBaseAuth, FormView):
         if form.is_valid():
             print('checking passphrase')
             if 'password' in request.POST:
-                print('Getting environment configs')
+                password = request.POST['password']
+
                 user = request.user
+                # check if new environment should be created
                 if not cnc_utils.check_user_secret(str(user.id)):
-                    if cnc_utils.create_new_user_environment_set(str(user.id), request.POST['password']):
+                    if 'verify' not in request.POST or request.POST['verify'] == '':
+                        messages.add_message(request, messages.ERROR, 'Passwords Verification failed!')
+                        return self.form_invalid(form)
+
+                    verify = request.POST['verify']
+
+                    if password != verify:
+                        messages.add_message(request, messages.ERROR, 'Passwords do not match!')
+                        return self.form_invalid(form)
+
+                    if cnc_utils.create_new_user_environment_set(str(user.id), password):
                         messages.add_message(request, messages.SUCCESS,
                                              'Created New Env with supplied master passphrase')
-                envs = cnc_utils.load_user_secrets(str(user.id), request.POST['password'])
+
+                print('Getting environment configs')
+                envs = cnc_utils.load_user_secrets(str(user.id), password)
                 if envs is None:
                     messages.add_message(request, messages.ERROR, 'Incorrect Password')
                     return self.form_invalid(form)
 
                 session = request.session
                 session['environments'] = envs
-                session['passphrase'] = request.POST['password']
+                session['passphrase'] = password
                 env_names = envs.keys()
                 if len(env_names) > 0:
                     session['current_env'] = list(env_names)[0]
@@ -1509,7 +1561,7 @@ class DeleteEnvironmentKeyView(EnvironmentBase, RedirectView):
         env_name = self.kwargs.get('env_name')
         key_name = self.kwargs.get('key_name')
 
-        print(f'{env_name} {key_name}')
+        # print(f'{env_name} {key_name}')
         if env_name in self.e and key_name in self.e[env_name]['secrets']:
             print(f'Deleting Secret {key_name} from {env_name}')
             messages.add_message(self.request, messages.SUCCESS, 'Secret Deleted')

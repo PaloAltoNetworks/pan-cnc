@@ -1,41 +1,121 @@
 {% extends base_html|default:'pan_cnc/base.html' %}
 {% load static %}
+{% block head %}
+        <script type="text/javascript">
+        var e_c = {};
+        var e_a = '';
 
+        function load_env_secret(k, indx) {
+
+            $("[id ^= 'secret_e_']").each(function(i, e){
+                $(e).empty();
+                $(e).html('****************');
+            });
+
+            if (k in e_c) {
+                let v = e_c[k];
+                let d = $('#secret_e_' + indx);
+                d.empty();
+                if (e_a === k) {
+                    d.html('****************');
+                    e_a = '';
+                    return;
+                }
+                e_a = k;
+                d.html(v);
+                return;
+            }
+
+            let doc = $(document.documentElement);
+            doc.css('cursor', 'progress');
+
+            let url = '/load_secret/';
+            let params = {};
+            params['k'] = k;
+            params['e'] = '{{ env_name }}';
+
+            $.ajaxSetup({
+                'headers': {"X-CSRFToken": "{{ csrf_token }}"}
+            });
+
+
+            let post = $.post(url, params, function (response) {
+                if (response['status'] == 'success') {
+                    let v = response['v'];
+                    let v_div = $('#secret_e_' + indx);
+                    v_div.empty();
+                    v_div.html(v);
+                    e_c[k] = v;
+                    e_a = k;
+                } else {
+                    alert(response['status']);
+                }
+            });
+
+            post.fail(function () {
+                alert('Could not perform request!');
+            });
+
+            post.always(function () {
+                doc.css('cursor', '');
+            });
+        }
+
+        function delete_secret(k) {
+            if (confirm('Are you sure you want to remove this secret?')) {
+                window.location = '/delete_secret/{{ env_name |urlencode }}/' + k;
+            }
+        }
+
+    </script>
+{% endblock %}
 {% block content %}
-<div class="card border-primary mb-5 shadow-lg">
-    <div class="card-header">Environment: {{ env_name }}</div>
-    <div class="card-body">
-        <h5 class="card-title">Secrets stored in this environment</h5>
-        <p class="card-text">
-        <table class="table">
-            <caption>All stored secrets for {{ env_name }}</caption>
-            <thead>
-            <tr>
-                <th scope="col">#</th>
-                <th scope="col">Key</th>
-                <th scope="col">Value</th>
-                <th scope="col">Options</th>
-            </tr>
-            </thead>
-            <tbody>
-            {% for k,v in environment.secrets.items %}
-            <tr>
-                <th scope="row">{{ forloop.counter }}</th>
-                <td>{{ k }}</td>
-                <td>{{ v }}</td>
-                <td>
-                    <a href="/delete_secret/{{ env_name |urlencode }}/{{ k |urlencode }}">Delete Secret</a>
-                </td>
-            </tr>
-            {% endfor %}
-            </tbody>
-        </table>
-        </p>
-        <a href="/clone_env/{{ env_name }}" class="btn btn-primary">Clone</a>
-        <a href="/load_env/{{ env_name }}" class="btn btn-secondary">Load</a>
-        <a href="/delete_env/{{ env_name }}" class="btn btn-danger">Delete</a>
+    <div class="card border-primary mb-5 shadow-lg">
+        <div class="card-header">Environment: {{ env_name }}
+        <div class="float-right">
+                {% if view.help_text != '' %}
+                    <a href="#" data-toggle="modal" data-target="#helpTextModal" title="Help">
+                        <i class="fas fa-question-circle text-primary mr-1"></i>
+                    </a>
+                {% endif %}
+            </div>
+        </div>
+        <div class="card-body">
+            <h5 class="card-title">Secrets stored in this environment</h5>
+            <p class="card-text">
+            <table class="table">
+                <caption>All stored secrets for {{ env_name }}</caption>
+                <thead>
+                <tr>
+                    <th scope="col">#</th>
+                    <th scope="col">Key</th>
+                    <th scope="col">Value</th>
+                    <th scope="col">Options</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for k,v in environment.secrets.items %}
+                    <tr>
+                        <th scope="row">{{ forloop.counter }}</th>
+                        <td>{{ k }}</td>
+                        <td id="secret_e_{{ forloop.counter }}">****************</td>
+                        <td>
+                            <input type="button" class="btn btn-primary"
+                                   onclick="load_env_secret('{{ k }}', {{  forloop.counter }})" value="Show"/>
+                            <input type="button" class="btn btn-danger"
+                                   onclick="delete_secret('{{ k |urlencode }}')"
+                                   value="Delete"/>
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+            </p>
+            <a href="/clone_env/{{ env_name }}" class="btn btn-primary">Clone</a>
+            <a href="/load_env/{{ env_name }}" class="btn btn-secondary">Load</a>
+            <a href="/delete_env/{{ env_name }}" class="btn btn-danger">Delete</a>
+        </div>
     </div>
-</div>
 
     <div class="card border-primary mb-6 shadow-lg rounded">
         <div class="card-header">Add Secret to Environment: {{ env_name }}</div>
@@ -47,6 +127,42 @@
                 <button type="submit" class="btn btn-primary">Submit</button>
             </form>
             </p>
+        </div>
+    </div>
+
+        <!-- Modal -->
+    <div class="modal fade border-top border-primary" id="helpTextModal" tabindex="-1" role="dialog" aria-labelledby="helpTextModalLabel"
+         aria-hidden="true">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header bg-light">
+                    <h5 class="modal-title" id="exampleModalLabel">Help</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-3">
+                    This screen allows you to configure secrets to be kept in this environment. These secrets can
+                    be accessed by clicking on the environment name in the navigation bar at the top of the page and
+                    clicking 'Show'.
+                    </p>
+                    <p class="mb-3">
+                    Alternately, any variables defined in a Skillet that has a 'name' attribute
+                    that matches a 'key' will have it's value auto-populated with the value of the secret. You can find
+                    the name of the various skillet variables (form fields) by clicking on the
+                    <i class="fas fa-cog text-muted" title="Debug Skillet"></i> icon and viewing the .meta-cnc.yaml file
+                    for that skillet.
+                    </p>
+                    <p class="mb-3">
+                    For more details, visit the panhandler documentation
+                    <a href="https://panhandler.readthedocs.io/en/latest/environments.html">here.</a>
+                    </p>
+                </div>
+                <div class="modal-footer bg-light text-right">
+                    <button type="button" class="btn btn-primary" data-dismiss="modal">Close</button>
+                </div>
+            </div>
         </div>
     </div>
 
