@@ -25,6 +25,7 @@ from jinja2 import Environment
 from urllib3.exceptions import HTTPError
 
 from pan_cnc.lib import jinja_filters
+from pan_cnc.lib import output_utils
 from pan_cnc.lib.exceptions import CCFParserError
 
 
@@ -49,17 +50,20 @@ def execute_all(meta_cnc, app_dir, context):
     else:
         snippets_dir = Path(os.path.join(settings.BASE_DIR, app_dir, 'snippets', meta_cnc['name']))
 
-    responses = dict()
-
+    response = dict()
+    response['status'] = 'success'
+    response['message'] = 'A-OK'
+    response['snippets'] = dict()
     try:
+        # execute our rest call for each item in the 'snippets' stanza of the meta-cnc file
         for snippet in meta_cnc['snippets']:
-            if 'rest_path' not in snippet or 'rest_op' not in snippet:
+            if 'path' not in snippet:
                 print('Malformed meta-cnc error')
                 raise CCFParserError
 
             name = snippet.get('name', '')
-            rest_path = snippet.get('rest_path', '/api')
-            rest_op = snippet.get('rest_operation', 'get')
+            rest_path = snippet.get('path', '/api')
+            rest_op = snippet.get('operation', 'get')
             payload_name = snippet.get('payload', '')
 
             # FIXME - implement this to give some control over what will be sent to rest server
@@ -73,7 +77,12 @@ def execute_all(meta_cnc, app_dir, context):
                     environment.filters[f] = getattr(jinja_filters, f)
 
             path_template = environment.from_string(rest_path)
+            rest_host = context.get('TARGET_IP', '')
             path_string = path_template.render(context)
+            if not str(rest_host).endswith('/') and not str(path_string).startswith('/'):
+                rest_host += '/'
+
+            full_rest_url = rest_host + path_string
 
             # keep track of response text or json object
             r = ''
@@ -85,26 +94,38 @@ def execute_all(meta_cnc, app_dir, context):
                     payload = payload_template.render(context)
                     # FIXME - assumes JSON content_type and accepts, should take into account the values
                     # FIXME - of content-type and accepts_type from above if they were supplied
-                    response = requests.post(path_string, json=payload)
-                    if response.status_code != 200:
+                    res = requests.post(full_rest_url, json=payload, verify=False)
+                    if res.status_code != 200:
                         print('Found a non-200 response status_code!')
-                        print(response.status_code)
-                        responses[name] = response.text
+                        print(res.status_code)
+                        response['snippets'][name] = res.text
                         break
 
-                    # all good, record the results and move on
-                    r = response.json()
+                r = res.text
 
             elif rest_op == 'get':
-                response = requests.get(path_string)
-                r = response.json()
+                print('Performing REST GET')
+                print(full_rest_url)
+                res = requests.get(full_rest_url, verify=False)
+                r = res.text
+                if res.status_code != 200:
+                    response['status'] = 'error'
+                    response['snippets'][name] = r
+                    break
 
             # collect the response text or json and continue
-            responses[name] = r
+            response['snippets'][name] = dict()
+            response['snippets'][name]['results'] = r
+            response['snippets'][name]['outputs'] = dict()
 
-        # return all the collected responses
-        return responses
+            if 'outputs' in snippet:
+                outputs = output_utils.parse_outputs(meta_cnc, snippet, r)
+                response['snippets'][name]['outputs'] = outputs
+
+        # return all the collected response
+        return response
 
     except HTTPError as he:
-        print(he)
-        return 'HTTP Error during REST operation'
+        response['status'] = 'error'
+        response['message'] = str(he)
+        return response

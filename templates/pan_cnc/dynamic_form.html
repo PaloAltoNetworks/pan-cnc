@@ -12,7 +12,7 @@
     </script>
     <div class="card border-primary mb-6 shadow-lg rounded">
         <div class="card-header">
-            {{ header }}
+            {{ view.get_header|default:header }}
             <div class="float-right">
                 {% if view.help_text != '' %}
                     <a href="#" data-toggle="modal" data-target="#helpTextModal" title="Help">

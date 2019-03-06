@@ -77,7 +77,7 @@ def terraform_init(terraform_dir, tf_vars):
 @shared_task
 def terraform_plan(terraform_dir, tf_vars):
     print('Executing task terraform plan')
-    cmd_seq = ['terraform', 'plan', '-no-color']
+    cmd_seq = ['terraform', 'plan', '-no-color', '-out=.cnc_plan']
     for k, v in tf_vars.items():
         cmd_seq.append('-var')
         cmd_seq.append(f'{k}={v}')
@@ -88,11 +88,22 @@ def terraform_plan(terraform_dir, tf_vars):
 @shared_task
 def terraform_apply(terraform_dir, tf_vars):
     print('Executing task terraform apply')
-    cmd_seq = ['terraform', 'apply', '-no-color', '-auto-approve']
-    for k, v in tf_vars.items():
-        cmd_seq.append('-var')
-        cmd_seq.append(f'{k}={v}')
+    cmd_seq = ['terraform', 'apply', '-no-color', '-auto-approve', './.cnc_plan']
+    # for k, v in tf_vars.items():
+    #     cmd_seq.append('-var')
+    #     cmd_seq.append(f'{k}={v}')
 
+    return exec_local_task(cmd_seq, terraform_dir)
+
+
+@shared_task
+def terraform_output(terraform_dir, tf_vars):
+    print('Executing task terraform output')
+    cmd_seq = ['terraform', 'output', '-no-color', '-json']
+    # for k, v in tf_vars.items():
+    #     cmd_seq.append('-var')
+    #     cmd_seq.append(f'{k}={v}')
+    print(cmd_seq)
     return exec_local_task(cmd_seq, terraform_dir)
 
 

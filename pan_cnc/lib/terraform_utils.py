@@ -1,8 +1,10 @@
-from pan_cnc.tasks import terraform_init, terraform_validate, terraform_plan, terraform_apply, terraform_refresh, \
-    terraform_destroy
-
-from pathlib import Path
 import json
+from pathlib import Path
+from celery.result import EagerResult
+from celery.result import AsyncResult
+
+from pan_cnc.tasks import terraform_init, terraform_validate, terraform_plan, terraform_apply, terraform_refresh, \
+    terraform_destroy, terraform_output
 
 
 def __build_cmd_seq_vars(resource_def, snippet_context):
@@ -22,43 +24,49 @@ def __build_cmd_seq_vars(resource_def, snippet_context):
     return tf_vars
 
 
-def perform_init(resource_def, snippet_context):
+def perform_init(resource_def, snippet_context) -> AsyncResult:
     resource_dir = resource_def['snippet_path']
     tf_vars = __build_cmd_seq_vars(resource_def, snippet_context)
     return terraform_init.delay(resource_dir, tf_vars)
 
 
-def perform_validate(resource_def, snippet_context):
+def perform_validate(resource_def, snippet_context) -> AsyncResult:
     resource_dir = resource_def['snippet_path']
     tf_vars = __build_cmd_seq_vars(resource_def, snippet_context)
     return terraform_validate.delay(resource_dir, tf_vars)
 
 
-def perform_plan(resource_def, snippet_context):
+def perform_plan(resource_def, snippet_context) -> AsyncResult:
     resource_dir = resource_def['snippet_path']
     tf_vars = __build_cmd_seq_vars(resource_def, snippet_context)
     return terraform_plan.delay(resource_dir, tf_vars)
 
 
-def perform_apply(resource_def, snippet_context):
+def perform_apply(resource_def, snippet_context) -> AsyncResult:
     resource_dir = resource_def['snippet_path']
     tf_vars = __build_cmd_seq_vars(resource_def, snippet_context)
     return terraform_apply.delay(resource_dir, tf_vars)
 
 
-def perform_refresh(resource_def, snippet_context):
+def perform_output(resource_def, snippet_context) -> EagerResult:
+    resource_dir = resource_def['snippet_path']
+    tf_vars = __build_cmd_seq_vars(resource_def, snippet_context)
+    return terraform_output.apply(args=[resource_dir, tf_vars])
+
+
+def perform_refresh(resource_def, snippet_context) -> AsyncResult:
     resource_dir = resource_def['snippet_path']
     tf_vars = __build_cmd_seq_vars(resource_def, snippet_context)
     return terraform_refresh.delay(resource_dir, tf_vars)
 
 
-def perform_destroy(resource_def, snippet_context):
+def perform_destroy(resource_def, snippet_context) -> AsyncResult:
     resource_dir = resource_def['snippet_path']
     tf_vars = __build_cmd_seq_vars(resource_def, snippet_context)
     return terraform_destroy.delay(resource_dir, tf_vars)
 
 
-def verify_clean_state(resource_def):
+def verify_clean_state(resource_def) -> bool:
     # Verify the tfstate file does NOT exist or contain resources if it does exist
     resource_dir = resource_def['snippet_path']
     rd = Path(resource_dir)

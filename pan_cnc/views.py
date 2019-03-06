@@ -34,14 +34,15 @@ from celery.result import AsyncResult
 from django import forms
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.http import JsonResponse
 from django.shortcuts import render, HttpResponseRedirect, HttpResponse
 from django.views.generic import RedirectView
 from django.views.generic import TemplateView
 from django.views.generic import View
 from django.views.generic.edit import FormView
-from django.http import JsonResponse
 
 from pan_cnc.lib import cnc_utils
+from pan_cnc.lib import output_utils
 from pan_cnc.lib import pan_utils
 from pan_cnc.lib import rest_utils
 from pan_cnc.lib import snippet_utils
@@ -55,6 +56,7 @@ class CNCBaseAuth(LoginRequiredMixin, View):
     """
     login_url = '/login'
     app_dir = ''
+    header = ''
 
     # always gets called on authenticated views
     def dispatch(self, request, *args, **kwargs):
@@ -82,19 +84,12 @@ class CNCBaseAuth(LoginRequiredMixin, View):
             print('saving new workflow')
             current_workflow = dict()
 
-        for variable in self.service['variables']:
-            var_name = variable['name']
-            if var_name in self.request.POST:
-                print('Adding variable %s to session' % var_name)
-                current_workflow[var_name] = self.request.POST.get(var_name)
-
-        # ensure we grab target_ip, username, and password if supplied and not in a variable
-        # if 'TARGET_IP' in self.request.POST:
-        #     current_workflow['TARGET_IP'] = self.request.POST.get('TARGET_IP')
-        # if 'TARGET_USERNAME' in self.request.POST:
-        #     current_workflow['TARGET_USERNAME'] = self.request.POST.get('TARGET_USERNAME')
-        # if 'TARGET_PASSWORD' in self.request.POST:
-        #     current_workflow['TARGET_PASSWORD'] = self.request.POST.get('TARGET_PASSWORD')
+        if hasattr(self, 'service'):
+            for variable in self.service['variables']:
+                var_name = variable['name']
+                if var_name in self.request.POST:
+                    print('Adding variable %s to session' % var_name)
+                    current_workflow[var_name] = self.request.POST.get(var_name)
 
         self.request.session[self.app_dir] = current_workflow
 
@@ -108,6 +103,17 @@ class CNCBaseAuth(LoginRequiredMixin, View):
 
         workflow = self.get_workflow()
         workflow[var_name] = var_value
+
+    def save_dict_to_workflow(self, dict_to_save: dict) -> None:
+        """
+        Saves all values from a dict into the session_cache / workflow
+        :param dict_to_save: a dict of key / value pairs to save
+        :return: None
+        """
+
+        workflow = self.get_workflow()
+        for k in dict_to_save:
+            workflow[k] = dict_to_save[k]
 
     def get_workflow(self) -> dict:
         """
@@ -203,8 +209,15 @@ class CNCBaseAuth(LoginRequiredMixin, View):
             return default
 
     def page_title(self):
-        default = 'CNC Tools'
-        if self.app_dir != '':
+        default = 'PAN CNC'
+        app_dir = ''
+
+        if 'app_dir' in self.request.session:
+            app_dir = self.request.session.get('app_dir', '')
+        elif self.app_dir != '':
+            app_dir = self.app_dir
+
+        if app_dir != '':
             app_config = cnc_utils.get_app_config(self.app_dir)
             if 'label' in app_config:
                 return app_config['label']
@@ -214,6 +227,16 @@ class CNCBaseAuth(LoginRequiredMixin, View):
                 return default
 
         return default
+
+    def get_header(self):
+        print('HERE WE GO')
+        next_step = self.request.session.get('next_step', None)
+        if next_step is None:
+            print('No next step found!')
+            return self.header
+        else:
+            print('Found next step, ok')
+            return f"Step {next_step}: {self.header}"
 
 
 class CNCView(CNCBaseAuth, TemplateView):
@@ -243,7 +266,7 @@ class CNCView(CNCBaseAuth, TemplateView):
         return context
 
 
-class CNCBaseFormView(FormView, CNCBaseAuth):
+class CNCBaseFormView(CNCBaseAuth, FormView):
     """
     Base class for most CNC view functions. Will find a 'snippet' from either the POST or the session cache
     and load it into a 'service' attribute.
@@ -268,7 +291,7 @@ class CNCBaseFormView(FormView, CNCBaseAuth):
     # the action of the form if it needs to differ (it shouldn't)
     action = '/'
     # the app dir should match the app name and is used to load app specific snippets
-    app_dir = 'pan_cnc'
+    app_dir = ''
     # base html - allow sub apps to override this with special html base if desired
     base_html = 'pan_cnc/base.html'
     # link to external documentation
@@ -704,14 +727,22 @@ class ProvisionSnippetView(CNCBaseFormView):
             elif self.service['type'] == 'panorama':
                 self.header = 'Panorama Configuration'
                 self.title = f"Customize Panorama Skillet: {self.service['label']}"
+            elif self.service['type'] == 'workflow':
+                self.header = 'Workflow'
+                self.title = self.service['label']
             else:
                 # May need to add additional types here
                 t = self.service['type']
+                self.header = 'Provision'
+                self.title = self.service['label']
                 print(f'Found unknown type {t} for form customization in ProvisionSnippetView:get_context_data')
 
         return super().get_context_data()
 
     def get_snippet(self):
+        print('Checking app_dir')
+        print(self.app_dir)
+
         session_cache = self.request.session.get(self.app_dir, {})
 
         if 'snippet_name' in self.request.POST:
@@ -738,17 +769,28 @@ class ProvisionSnippetView(CNCBaseFormView):
 
         if self.service['type'] == 'template':
             template = snippet_utils.render_snippet_template(self.service, self.app_dir, self.get_workflow())
+            snippet = self.service['snippets'][0]
+
+            # check for and handle outputs
+            if 'outputs' in snippet:
+                # template type only has 1 snippet defined, which is the template to render
+                outputs = output_utils.parse_outputs(self.service, snippet, template)
+                self.save_dict_to_workflow(outputs)
+
             context = dict()
             context['base_html'] = self.base_html
+            # context['header'] = f"Results for {self.service['label']}"
+            self.header = f"Results for {self.service['label']}"
+            context['title'] = "Rendered Output"
             context['results'] = template
+            context['view'] = self
             return render(self.request, 'pan_cnc/results.html', context)
         elif self.service['type'] == 'rest':
             # Found a skillet type of 'rest'
-            results = rest_utils.execute_all(self.service, self.app_dir, self.get_workflow())
-            context = dict()
-            context['base_html'] = self.base_html
-            context['results'] = results
-            return render(self.request, 'pan_cnc/results.html', context)
+            return HttpResponseRedirect('/editRestTarget')
+        elif self.service['type'] == 'workflow':
+            # Found a skillet type of 'workflow'
+            return HttpResponseRedirect('/workflow/0')
         elif self.service['type'] == 'terraform':
             self.save_value_to_workflow('next_url', self.next_url)
             return HttpResponseRedirect('/terraform')
@@ -898,7 +940,7 @@ class EditTargetView(CNCBaseAuth, FormView):
         if login is None:
             context = dict()
             context['base_html'] = self.base_html
-            context['results'] = 'Could not login to Panorama'
+            context['results'] = 'Could not login to PAN-OS'
             return render(self.request, 'pan_cnc/results.html', context=context)
 
         # Always grab all the default values, then update them based on user input in the workflow
@@ -940,6 +982,128 @@ class EditTargetView(CNCBaseAuth, FormView):
 
         messages.add_message(self.request, messages.SUCCESS, 'Configuration Push Queued successfully')
         return HttpResponseRedirect(f"{self.app_dir}/")
+
+
+class EditRestTargetView(CNCBaseAuth, FormView):
+    """
+    Edit or update the current rest endpoint
+    """
+    # base form class, you should not need to override this
+    form_class = forms.Form
+    # form to render, override if you need a specific html fragment to render the form
+    template_name = 'pan_cnc/dynamic_form.html'
+    # Head to show on the rendered dynamic form - Main header
+    header = 'Rest Configuration'
+    # title to show on dynamic form
+    title = 'Enter Rest Endpoint'
+    # where to go after this? once the form has been submitted, redirect to where?
+    # this should match a 'view name' from the pan_cnc.yaml file
+    next_url = '/'
+    # base html - allow sub apps to override this with special html base if desired
+    base_html = 'pan_cnc/base.html'
+    # link to external documentation
+    documentation_link = ''
+    # help text - inline documentation text
+    help_text = 'The Target is the endpoint or device where the configured template will be applied. ' \
+                'This us usually a PAN-OS or other network device depending on the type of template to ' \
+                'be provisioned'
+
+    def get(self, request, *args, **kwargs) -> Any:
+        """
+            Handle GET requests
+            Ensure we have a snippet_name in the workflow somewhere, otherwise, we need to redirect out of here
+            Fixes issue where a user goes to the editTarget URL directly
+        """
+        # load the snippet into the class attribute here so it's available to all other methods throughout the
+        # call chain in the child classes
+        snippet_name = self.get_value_from_workflow('snippet_name', '')
+        if snippet_name != '':
+            return self.render_to_response(self.get_context_data())
+        else:
+            messages.add_message(self.request, messages.ERROR, 'Process Error - Meta not found')
+            return HttpResponseRedirect('/')
+
+    def get_context_data(self, **kwargs) -> dict:
+        context = super().get_context_data(**kwargs)
+
+        snippet_name = self.get_value_from_workflow('snippet_name', '')
+        if snippet_name != '':
+            meta = snippet_utils.load_snippet_with_name(snippet_name, self.app_dir)
+        else:
+            print('Could not find a valid meta-cnc def')
+            raise SnippetRequiredException
+
+        form = forms.Form()
+
+        target_ip_label = 'Endpoint Host'
+
+        workflow = self.get_workflow()
+        print(workflow)
+
+        target_ip = self.get_value_from_workflow('TARGET_IP', '')
+
+        target_ip_field = forms.CharField(label=target_ip_label, initial=target_ip)
+
+        form.fields['TARGET_IP'] = target_ip_field
+
+        context['form'] = form
+        context['base_html'] = self.base_html
+        context['header'] = meta['label']
+        context['title'] = self.title
+        return context
+
+    def form_valid(self, form):
+        """
+        form_valid is always called on a blank / new form, so this is essentially going to get called on every POST
+        self.request.POST should contain all the variables defined in the service identified by the hidden field
+        'service_id'
+        :param form: blank form data from request
+        :return: render of a success template after service is provisioned
+        """
+        snippet_name = self.get_value_from_workflow('snippet_name', '')
+        if snippet_name != '':
+            meta = snippet_utils.load_snippet_with_name(snippet_name, self.app_dir)
+        else:
+            print('Could not find a valid meta-cnc def')
+            raise SnippetRequiredException
+
+        target_ip = self.request.POST.get('TARGET_IP', None)
+        if target_ip is None:
+            messages.add(self.request, messages.ERROR, 'Endpoint cannot be blank')
+            return self.form_invalid(self.form)
+
+        if not str(target_ip).startswith('http'):
+            print('Adding https to endpoint')
+            target_ip = f'https://{target_ip}'
+
+        self.save_value_to_workflow('TARGET_IP', target_ip)
+
+        results = rest_utils.execute_all(meta, self.app_dir, self.get_workflow())
+
+        context = dict()
+        context['base_html'] = self.base_html
+        context['results'] = results
+        context['view'] = self
+
+        # results is a dict containing 'snippets' 'status' 'message'
+        if 'snippets' not in results or 'status' not in results or 'message' not in results:
+            print('Results from rest_utils is malformed')
+        else:
+            # Save all results into the workflow
+            for result in results['snippets']:
+                result_snippet = results['snippets'][result]
+                if 'outputs' in result_snippet:
+                    for output in result_snippet['outputs']:
+                        print(f"Saving value for key {output} to session")
+                        v = result_snippet['outputs'][output]
+                        print(v)
+                        self.save_value_to_workflow(output, v)
+
+                    self.save_workflow_to_session()
+                else:
+                    print('no outputs for this one')
+
+        return render(self.request, 'pan_cnc/results.html', context)
 
 
 class EditTerraformView(CNCBaseAuth, FormView):
@@ -1018,7 +1182,7 @@ class EditTerraformView(CNCBaseAuth, FormView):
             print('Launching terraform refresh')
             context['title'] = 'Executing Task: Terraform Refresh'
             r = terraform_utils.perform_refresh(meta, self.get_snippet_context())
-            self.request.session['task_next'] = ''
+            self.request.session['task_next'] = 'terraform_output'
         elif terraform_action == 'destroy':
             print('Launching terraform destroy')
             context['title'] = 'Executing Task: Terraform Destroy'
@@ -1135,6 +1299,8 @@ class NextTaskView(CNCView):
         if 'task_next' not in self.request.session or \
                 self.request.session['task_next'] == '':
             context['results'] = 'Could not find next task to execute!'
+            context['completed'] = True
+            context['error'] = True
             return context
 
         task_next = self.request.session['task_next']
@@ -1143,22 +1309,59 @@ class NextTaskView(CNCView):
             new_next = 'terraform_plan'
             title = 'Executing Task: Validate'
         elif task_next == 'terraform_plan':
-            print('Checking state before new plan')
-            if terraform_utils.verify_clean_state(service):
-                print('state appears clean')
-                r = terraform_utils.perform_plan(service, self.get_snippet_context())
-                new_next = 'terraform_apply'
-                title = 'Executing Task: Plan'
-            else:
-                self.request.session['task_next'] = ''
-                context['results'] = '\n\nRefusing to continue as it appears there is already a deployed state present.' \
-                                     '\n\nPlease destroy the current state or refresh the local state to continue.\n\n'
-                context['error'] = 1
-                return context
+            r = terraform_utils.perform_plan(service, self.get_snippet_context())
+            new_next = 'terraform_apply'
+            title = 'Executing Task: Plan'
+
         elif task_next == 'terraform_apply':
             r = terraform_utils.perform_apply(service, self.get_snippet_context())
-            new_next = ''
+            new_next = 'terraform_output'
             title = 'Executing Task: Apply'
+        elif task_next == 'terraform_output':
+            r = terraform_utils.perform_output(service, {})
+            # output is run synch so we have the results here
+            # capture outputs before returning to the results_async page
+
+            print(type(r))
+
+            result = r.result
+            output = 'Captured output from terraform'
+            err = ''
+            try:
+                json_status = json.loads(result)
+                print('---------------------------------')
+                print(json_status)
+                print('---------------------------------')
+                if 'out' in json_status:
+                    print('Setting up output')
+                    output = json_status['out']
+                    try:
+                        output_object = json.loads(output)
+                        for k in output_object:
+                            print(f'Saving key {k} to workflow')
+                            self.save_value_to_workflow(k, output_object[k]["value"])
+
+                    except ValueError:
+                        print('Could not parse terraform output')
+
+                if 'err' in json_status:
+                    err = json_status['err']
+
+            except ValueError as ve:
+                print(ve)
+                print('Could not get outputs')
+
+            context['title'] = 'Collecting Terraform Outputs'
+            if err and not output:
+                context['results'] = err
+            else:
+                context['results'] = output
+
+            context['completed'] = True
+            self.request.session['task_id'] = ''
+            self.request.session['task_next'] = ''
+            return context
+
         else:
             self.request.session['task_next'] = ''
             context['results'] = 'Could not launch init task!'
@@ -1222,6 +1425,93 @@ class TaskLogsView(CNCBaseAuth, View):
             logs_output['status'] = 'no task found'
 
         return HttpResponse(json.dumps(logs_output), content_type="application/json")
+
+
+#
+#
+# Workflow Views
+#
+#
+
+class WorkflowView(CNCBaseAuth, RedirectView):
+    """
+    Load a workflow and redirect to the next step
+    """
+    meta = dict()
+
+    def get_redirect_url(self, *args, **kwargs):
+
+        current_step_str = self.kwargs.get('step')
+        current_step = 0
+        print(f"Current step is {current_step_str}")
+        try:
+            current_step = int(current_step_str)
+        except ValueError as ve:
+            print('Could not parse current step index!')
+            print(ve)
+
+        next_step = current_step + 1
+
+        print(f"next step is {next_step}")
+        if current_step == 0:
+            # get the actual workflow skillet what was selected
+            skillet_name = self.get_value_from_workflow('snippet_name', '')
+            # let's save this for later when we are on step #2 or later
+            self.save_value_to_workflow('workflow_name', skillet_name)
+        else:
+            # no longer on step 0, so the saved snippet name will not point us back to the origin
+            # workflow we need
+            print(f"Getting our original workflow name out of the session")
+            skillet_name = self.get_value_from_workflow('workflow_name', '')
+
+        print(f"found skillet name {skillet_name}")
+        self.meta = snippet_utils.load_snippet_with_name(skillet_name, self.app_dir)
+
+        if 'snippets' not in self.meta or 'type' not in self.meta:
+            messages.add_message(self.request, messages.ERROR, 'Malformed .meta-cnc')
+            return '/'
+
+        if self.meta['type'] != 'workflow':
+            messages.add_message(self.request, messages.ERROR, 'Process Error - not a workflow skillet!')
+            return '/'
+
+        if len(self.meta['snippets']) <= current_step:
+            print('All done here! Redirect Home')
+            self.request.session['next_step'] = None
+            self.request.session['last_step'] = None
+            self.request.session.pop('next_step')
+            self.request.session.pop('last_step')
+            return '/'
+
+        if 'name' not in self.meta['snippets'][current_step]:
+            messages.add_message(self.request, messages.ERROR, 'Malformed .meta-cnc workflow step')
+            return '/'
+
+        current_skillet_name = self.meta['snippets'][current_step]['name']
+        print(f"Current skillet name is {current_skillet_name}")
+
+        self.save_value_to_workflow('snippet_name', current_skillet_name)
+        # we don't have access to the workflow cache from the view, so save our next step directly to the
+        # session - We might have to revisit this once we allow multi apps per instance
+        if next_step == len(self.meta['snippets']):
+            print('SETTING LAST STEP')
+            self.request.session['last_step'] = next_step
+            self.request.session['next_step'] = next_step
+        elif next_step > len(self.meta['snippets']):
+            print('All done here!')
+            self.request.session['next_step'] = None
+            self.request.session['last_step'] = None
+            self.request.session.pop('next_step')
+            self.request.session.pop('last_step')
+
+        else:
+            print('No last step here!')
+            self.request.session.pop('last_step', None)
+            self.request.session['next_step'] = next_step
+
+        self.save_workflow_to_session()
+
+        return '/provision'
 
 
 #
