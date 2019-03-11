@@ -46,7 +46,7 @@ from pan_cnc.lib import output_utils
 from pan_cnc.lib import pan_utils
 from pan_cnc.lib import rest_utils
 from pan_cnc.lib import snippet_utils
-from pan_cnc.lib import terraform_utils
+from pan_cnc.lib import task_utils
 from pan_cnc.lib.exceptions import SnippetRequiredException, CCFParserError
 
 
@@ -125,6 +125,25 @@ class CNCBaseAuth(LoginRequiredMixin, View):
         else:
             self.request.session[self.app_dir] = dict()
             return self.request.session[self.app_dir]
+
+    def get_snippet_variables_from_workflow(self, skillet=None):
+
+        workflow = self.get_workflow()
+        snippet_vars = dict()
+        if skillet is None:
+            if hasattr(self, 'service'):
+                skillet = self.service
+            else:
+                return snippet_vars
+
+        for variable in skillet['variables']:
+            if 'name' not in variable:
+                continue
+            var_name = variable['name']
+            if var_name in workflow:
+                snippet_vars[var_name] = workflow[var_name]
+
+        return snippet_vars
 
     def get_snippet_context(self) -> dict:
         """
@@ -788,6 +807,18 @@ class ProvisionSnippetView(CNCBaseFormView):
         elif self.service['type'] == 'rest':
             # Found a skillet type of 'rest'
             return HttpResponseRedirect('/editRestTarget')
+        elif self.service['type'] == 'python3':
+            print('Launching python3 init')
+            context = super().get_context_data()
+            context['base_html'] = self.base_html
+            context['title'] = f"Preparing environment for: {self.service['label']}"
+            r = task_utils.python3_init(self.service)
+            self.request.session['task_id'] = r.id
+            self.request.session['task_next'] = 'python3_execute'
+            self.request.session['task_app_dir'] = self.app_dir
+            self.request.session['task_base_html'] = self.base_html
+            return render(self.request, 'pan_cnc/results_async.html', context)
+
         elif self.service['type'] == 'workflow':
             # Found a skillet type of 'workflow'
             return HttpResponseRedirect('/workflow/0')
@@ -871,7 +902,7 @@ class EditTargetView(CNCBaseAuth, FormView):
                     target_password_label = 'Panorama Password'
 
         workflow = self.get_workflow()
-        print(workflow)
+        # print(workflow)
 
         target_ip = self.get_value_from_workflow('TARGET_IP', '')
         target_username = self.get_value_from_workflow('TARGET_USERNAME', '')
@@ -1069,7 +1100,7 @@ class EditRestTargetView(CNCBaseAuth, FormView):
 
         target_ip = self.request.POST.get('TARGET_IP', None)
         if target_ip is None:
-            messages.add(self.request, messages.ERROR, 'Endpoint cannot be blank')
+            messages.add_message(self.request, messages.ERROR, 'Endpoint cannot be blank')
             return self.form_invalid(self.form)
 
         if not str(target_ip).startswith('http'):
@@ -1176,17 +1207,17 @@ class EditTerraformView(CNCBaseAuth, FormView):
         if terraform_action == 'validate':
             print('Launching terraform init')
             context['title'] = 'Executing Task: Terraform Init'
-            r = terraform_utils.perform_init(meta, self.get_snippet_context())
+            r = task_utils.perform_init(meta, self.get_snippet_context())
             self.request.session['task_next'] = 'terraform_validate'
         elif terraform_action == 'refresh':
             print('Launching terraform refresh')
             context['title'] = 'Executing Task: Terraform Refresh'
-            r = terraform_utils.perform_refresh(meta, self.get_snippet_context())
+            r = task_utils.perform_refresh(meta, self.get_snippet_context())
             self.request.session['task_next'] = 'terraform_output'
         elif terraform_action == 'destroy':
             print('Launching terraform destroy')
             context['title'] = 'Executing Task: Terraform Destroy'
-            r = terraform_utils.perform_destroy(meta, self.get_snippet_context())
+            r = task_utils.perform_destroy(meta, self.get_snippet_context())
             self.request.session['task_next'] = ''
         else:
             self.request.session['task_next'] = ''
@@ -1291,10 +1322,9 @@ class NextTaskView(CNCView):
 
     def get_context_data(self, **kwargs):
         app_dir = self.get_app_dir()
-        service = snippet_utils.load_snippet_with_name(self.get_snippet(), app_dir)
+        skillet = snippet_utils.load_snippet_with_name(self.get_snippet(), app_dir)
         context = dict()
         context['base_html'] = self.base_html
-        context['header'] = 'Terraform Template'
 
         if 'task_next' not in self.request.session or \
                 self.request.session['task_next'] == '':
@@ -1304,21 +1334,32 @@ class NextTaskView(CNCView):
             return context
 
         task_next = self.request.session['task_next']
+
+        if 'terraform' in task_next:
+            context['header'] = 'Terraform execution progress'
+        elif 'python' in task_next:
+            context['header'] = 'Script execution progress'
+        else:
+            context['header'] = 'Task execution progress'
+
+        #
+        # terraform tasks
+        #
         if task_next == 'terraform_validate':
-            r = terraform_utils.perform_validate(service, self.get_snippet_context())
+            r = task_utils.perform_validate(skillet, self.get_snippet_context())
             new_next = 'terraform_plan'
             title = 'Executing Task: Validate'
         elif task_next == 'terraform_plan':
-            r = terraform_utils.perform_plan(service, self.get_snippet_context())
+            r = task_utils.perform_plan(skillet, self.get_snippet_context())
             new_next = 'terraform_apply'
             title = 'Executing Task: Plan'
 
         elif task_next == 'terraform_apply':
-            r = terraform_utils.perform_apply(service, self.get_snippet_context())
+            r = task_utils.perform_apply(skillet, self.get_snippet_context())
             new_next = 'terraform_output'
             title = 'Executing Task: Apply'
         elif task_next == 'terraform_output':
-            r = terraform_utils.perform_output(service, {})
+            r = task_utils.perform_output(skillet, {})
             # output is run synch so we have the results here
             # capture outputs before returning to the results_async page
 
@@ -1362,6 +1403,19 @@ class NextTaskView(CNCView):
             self.request.session['task_next'] = ''
             return context
 
+        #
+        # python3 tasks
+        #
+
+        elif task_next == 'python3_execute':
+            r = task_utils.python3_execute(skillet, self.get_snippet_variables_from_workflow(skillet))
+            new_next = ''
+            title = f"Executing Script: {skillet['label']}"
+
+        #
+        # Default catch all
+        #
+
         else:
             self.request.session['task_next'] = ''
             context['results'] = 'Could not launch init task!'
@@ -1381,10 +1435,9 @@ class TaskLogsView(CNCBaseAuth, View):
         logs_output = dict()
         if 'task_id' in request.session:
             task_id = request.session['task_id']
+            task_next = request.session.get('task_next', '')
             logs_output['task_id'] = task_id
             task_result = AsyncResult(task_id)
-
-            print(type(task_result))
 
             print(task_result.info)
 
@@ -1395,10 +1448,41 @@ class TaskLogsView(CNCBaseAuth, View):
                     err = res.get('err', '')
                     rc = res.get('returncode', '250')
 
+                    outputs = dict()
+                    if task_next == '':
+                        print('Last task, checking for output')
+                        # The task is complete, now check if we need to do any output capturing from this task
+                        # first, load the correct skillet from the session, check for 'snippets' stanza and
+                        # and if any of them require output parsing
+                        # if outputs remains blank (no output parsing for any snippet, then discard and return the 'out'
+                        # directly
+                        skillet_name = self.get_value_from_workflow('snippet_name', '')
+                        if skillet_name != '':
+                            print('loaded skillet from session')
+                            meta = snippet_utils.load_snippet_with_name(skillet_name, self.app_dir)
+                            if 'snippets' in meta:
+                                for snippet in meta['snippets']:
+                                    if 'output_type' in snippet and 'name' in snippet:
+                                        print('getting output from last task')
+                                        snippet_output = output_utils.parse_outputs(meta, snippet, out)
+                                        outputs[snippet['name']] = snippet_output
+
+                                        # save all captured output to the workflow / session
+                                        for o in outputs:
+                                            d = outputs[o]
+                                            self.save_dict_to_workflow(d)
+
+                        else:
+                            print('Could not load a valid snippet for output capture!')
+
                     if out == '' and err == '' and rc == 0:
                         logs_output['output'] = 'Task Completed Successfully'
                     else:
-                        logs_output['output'] = f'{out}\n{err}'
+                        if outputs:
+                            logs_output['output'] = f'{out}\n{err}'
+                            logs_output['captured_output'] = json.dumps(outputs)
+                        else:
+                            logs_output['output'] = f'{out}\n{err}'
 
                     logs_output['returncode'] = rc
 
@@ -1424,7 +1508,18 @@ class TaskLogsView(CNCBaseAuth, View):
         else:
             logs_output['status'] = 'no task found'
 
-        return HttpResponse(json.dumps(logs_output), content_type="application/json")
+        try:
+            logs_out_str = json.dumps(logs_output)
+        except TypeError:
+            print('Error serializing json output!')
+            # smother all issues
+            logs_output['output'] = 'Error converting object'
+            logs_output['status'] = 'exited'
+            logs_output['returncode'] = 255
+
+            return HttpResponse(json.dumps(logs_output), content_type="application/json")
+
+        return HttpResponse(logs_out_str, content_type="application/json")
 
 
 #

@@ -135,7 +135,8 @@ def load_snippets_of_type_from_dir(directory, snippet_type=None) -> list:
                     service_config = oyaml.safe_load(sc.read())
                     service_config['snippet_path'] = snippet_path
                     if snippet_type is not None:
-                        if 'type' in service_config and service_config['type'] == snippet_type:
+                        if 'type' in service_config and service_config['type'] == snippet_type \
+                                and 'name' in service_config:
                             snippet_list.append(service_config)
                     else:
                         snippet_list.append(service_config)

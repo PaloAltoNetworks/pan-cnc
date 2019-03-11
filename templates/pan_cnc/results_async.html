@@ -14,6 +14,12 @@
                     let msg = json_data['output'];
                     let status = json_data['status'];
                     let returncode = json_data['returncode'];
+
+                    if ('captured_output' in json_data) {
+                        console.log('Found captured output to use here')
+                        msg = json_data['captured_output'];
+                    }
+
                     $('#results').html(msg);
                     if (status !== 'exited') {
                         console.log('checking again');
@@ -22,10 +28,16 @@
                     } else {
                         let c = $('#countdown');
                         c.empty();
+                        let f = $('#footer');
+
                         let next_link = $('<a/>');
                         if (returncode === 0) {
                             {% if request.session.task_next %}
                                 next_link.attr('href', '/next_task');
+                                next_link.html('Continue');
+                                next_link.addClass('btn').addClass('btn-primary');
+                            {% else %}
+                                next_link.attr('href', '/');
                                 next_link.html('Continue');
                                 next_link.addClass('btn').addClass('btn-primary');
                             {% endif %}
@@ -36,7 +48,7 @@
                             c.append('Error Executing Task');
                             c.append('<br>');
                         }
-                        c.append(next_link);
+                        f.append(next_link);
                     }
                 },
                 'headers': {"X-CSRFToken": "{{ csrf_token }}"}
@@ -82,19 +94,20 @@
                 <pre id="results">{{ results }}</pre>
                 <pre id="countdown"></pre>
             </div>
-            <div class="card-footer text-right">
-                <p class="card-text">
-                    {% if request.session.next_step %}
-                        {% if request.session.last_step %}
-                            <a href="/workflow/{{ request.session.next_step }}" class="btn btn-primary">Complete</a>
-                        {% else %}
-                            <a href="/workflow/{{ request.session.next_step }}" class="btn btn-primary">Continue</a>
-                        {% endif %}
-                    {% elif completed %}
-                        <a href="/" class="btn btn-primary">Continue</a>
+
+        </div>
+        <div class="card-footer text-right">
+            <p class="card-text" id="footer">
+                {% if request.session.next_step %}
+                    {% if request.session.last_step %}
+                        <a href="/workflow/{{ request.session.next_step }}" class="btn btn-primary">Complete</a>
+                    {% else %}
+                        <a href="/workflow/{{ request.session.next_step }}" class="btn btn-primary">Continue</a>
                     {% endif %}
-                </p>
-            </div>
+                {% elif completed %}
+                    <a href="/" class="btn btn-primary">Continue</a>
+                {% endif %}
+            </p>
         </div>
     </div>
 {% endblock %}

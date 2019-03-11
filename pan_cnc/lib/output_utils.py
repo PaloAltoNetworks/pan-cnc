@@ -18,6 +18,8 @@ import xml.etree.ElementTree as elementTree
 from xml.etree.ElementTree import ParseError
 from pan_cnc.lib.exceptions import CCFParserError
 from base64 import urlsafe_b64encode
+from jsonpath_ng import jsonpath, parse
+import json
 
 
 def parse_outputs(meta: dict, snippet: dict, results: str) -> dict:
@@ -38,6 +40,9 @@ def parse_outputs(meta: dict, snippet: dict, results: str) -> dict:
         outputs = _handle_xml_outputs(snippet, results)
     elif snippet['output_type'] == 'base64':
         outputs = _handle_base64_outputs(snippet, results)
+    elif snippet['output_type'] == 'json':
+        print('GOT JSON OUTPUT')
+        outputs = _handle_json_outputs(snippet, results)
 
     return outputs
 
@@ -123,3 +128,47 @@ def _handle_base64_outputs(snippet: dict, results: str) -> dict:
         raise CCFParserError(f'Could not base64 encode results {snippet_name}')
 
     return outputs
+
+
+def _handle_json_outputs(snippet: dict, results: str) -> dict:
+    outputs = dict()
+
+    snippet_name = 'unknown'
+
+    if 'name' in snippet:
+        snippet_name = snippet['name']
+
+    try:
+        if 'outputs' not in snippet:
+            print(f'No output defined in this snippet {snippet_name}')
+            return outputs
+
+        for output in snippet['outputs']:
+            if 'name' not in output:
+                print('malformed outputs in skillet definition')
+                continue
+
+            print(results)
+            print(type(results))
+            json_object = json.loads(results)
+            print(json_object)
+            var_name = output['name']
+            capture_pattern = output['capture_pattern']
+            jsonpath_expr = parse(capture_pattern)
+            result = jsonpath_expr.find(json_object)
+            if len(result) == 1:
+                outputs[var_name] = str(result[0].value)
+            else:
+                outputs[var_name] = ''
+
+    except ValueError as ve:
+        print('Caught error converting results to json')
+        outputs['system'] = str(ve)
+    except Exception as e:
+        print('Unknown exception here!')
+        print(e)
+        outputs['system'] = str(e)
+
+    return outputs
+
+

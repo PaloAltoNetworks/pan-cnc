@@ -25,10 +25,11 @@ This software is provided without support, warranty, or guarantee.
 Use at your own risk.
 """
 
-from celery import shared_task
+from celery import shared_task, current_task
 import time
 import json
 from subprocess import Popen, PIPE
+import os
 
 
 @shared_task
@@ -42,8 +43,14 @@ def test(count: int) -> str:
     return f'Counted up to {count}'
 
 
-def exec_local_task(cmd_seq, cwd):
-    p = Popen(cmd_seq, cwd=cwd, stdout=PIPE, stderr=PIPE, universal_newlines=True)
+def exec_local_task(cmd_seq, cwd, env=None):
+
+    print(f'My task id is: {current_task.request.id}')
+    process_env = os.environ.copy()
+    if env is not None and type(env) is dict:
+        process_env.update(env)
+
+    p = Popen(cmd_seq, cwd=cwd, stdout=PIPE, stderr=PIPE, universal_newlines=True, env=process_env)
     o, e = p.communicate()
     state = dict()
     state['returncode'] = p.returncode
@@ -51,6 +58,36 @@ def exec_local_task(cmd_seq, cwd):
     state['err'] = e
     return json.dumps(state)
 
+# def exec_local_task(cmd_seq, cwd, env=None):
+#
+#     print(f'My task id is: {current_task.request.id}')
+#     process_env = os.environ.copy()
+#     if env is not None and type(env) is dict:
+#         process_env.update(env)
+#
+#     with Popen(cmd_seq, cwd=cwd, stdout=PIPE, stderr=PIPE, bufsize=1, universal_newlines=True, env=process_env) as p:
+#         full_output = ''
+#         for line in p.stdout:
+#             full_output = full_output + line
+#             print('Updating progress')
+#             current_task.update_state(state='PROGRESS', meta=full_output)
+#
+#     rc = p.returncode
+#     print(f'RETURN CODE IS {rc}')
+#     err = ''
+#     if p.returncode != 0:
+#         try:
+#             err = p.stderr.readlines()
+#         except ValueError as ve:
+#             print('stderr is already closed!')
+#             err = 'Unknown error'
+#
+#     # o, e = p.communicate()
+#     state = dict()
+#     state['returncode'] = p.returncode
+#     state['out'] = full_output
+#     state['err'] = err
+#     return json.dumps(state)
 
 @shared_task
 def terraform_validate(terraform_dir, tf_vars):
@@ -127,3 +164,60 @@ def terraform_refresh(terraform_dir, tf_vars):
         cmd_seq.append(f'{k}={v}')
 
     return exec_local_task(cmd_seq, terraform_dir)
+
+
+@shared_task
+def python3_init_env(working_dir):
+    print('Executing task Python3 init')
+    cmd_seq = ['pipenv', 'install']
+    env = dict()
+    env['PIPENV_IGNORE_VIRTUALENVS'] = "1"
+    env['PIPENV_VENV_IN_PROJECT'] = "1"
+    env['PIPENV_DEFAULT_PYTHON_VERSION'] = "3.6"
+    env['PIPENV_NOSPIN'] = "1"
+    env['PIPENV_YES'] = "1"
+    return exec_local_task(cmd_seq, working_dir, env)
+
+
+@shared_task
+def python3_init_with_deps(working_dir):
+    print('Executing task Python3 init with Dependencies')
+    cmd_seq = ['pipenv', 'install', '-r', 'requirements.txt']
+    env = dict()
+    env['PIPENV_IGNORE_VIRTUALENVS'] = "1"
+    env['PIPENV_VENV_IN_PROJECT'] = "1"
+    env['PIPENV_DEFAULT_PYTHON_VERSION'] = "3.6"
+    env['PIPENV_NOSPIN'] = "1"
+    env['PIPENV_YES'] = "1"
+    return exec_local_task(cmd_seq, working_dir, env)
+
+
+@shared_task
+def python3_init_existing(working_dir):
+    print('Executing task Python3 init with Dependencies')
+    cmd_seq = ['pipenv', 'update', '--bare']
+    env = dict()
+    env['PIPENV_IGNORE_VIRTUALENVS'] = "1"
+    env['PIPENV_VENV_IN_PROJECT'] = "1"
+    env['PIPENV_DEFAULT_PYTHON_VERSION'] = "3.6"
+    env['PIPENV_NOSPIN'] = "1"
+    env['PIPENV_YES'] = "1"
+    return exec_local_task(cmd_seq, working_dir, env)
+
+
+@shared_task
+def python3_execute_script(working_dir, script, args):
+    print(f'Executing task Python3 {script}')
+    cmd_seq = ['pipenv', 'run', 'python3', script]
+
+    for k, v in args.items():
+        cmd_seq.append(f'--{k}={v}')
+
+    env = dict()
+    env['PIPENV_IGNORE_VIRTUALENVS'] = "1"
+    env['PIPENV_VENV_IN_PROJECT'] = "1"
+    env['PIPENV_DEFAULT_PYTHON_VERSION'] = "3.6"
+    env['PIPENV_NOSPIN'] = "1"
+    env['PIPENV_YES'] = "1"
+    return exec_local_task(cmd_seq, working_dir, env)
+

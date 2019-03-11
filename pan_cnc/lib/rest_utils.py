@@ -129,3 +129,8 @@ def execute_all(meta_cnc, app_dir, context):
         response['status'] = 'error'
         response['message'] = str(he)
         return response
+    except requests.exceptions.ConnectionError as ce:
+        response['status'] = 'error'
+        response['message'] = str(ce)
+        return response
+

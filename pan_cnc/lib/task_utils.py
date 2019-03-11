@@ -1,10 +1,16 @@
 import json
+import os
 from pathlib import Path
-from celery.result import EagerResult
+
 from celery.result import AsyncResult
+from celery.result import EagerResult
 
 from pan_cnc.tasks import terraform_init, terraform_validate, terraform_plan, terraform_apply, terraform_refresh, \
-    terraform_destroy, terraform_output
+    terraform_destroy, terraform_output, python3_init_env, python3_init_with_deps, python3_execute_script, \
+    python3_init_existing
+
+from pan_cnc.lib.exceptions import CCFParserError
+from pathlib import Path
 
 
 def __build_cmd_seq_vars(resource_def, snippet_context):
@@ -64,6 +70,63 @@ def perform_destroy(resource_def, snippet_context) -> AsyncResult:
     resource_dir = resource_def['snippet_path']
     tf_vars = __build_cmd_seq_vars(resource_def, snippet_context)
     return terraform_destroy.delay(resource_dir, tf_vars)
+
+
+def python3_init(resource_def) -> AsyncResult:
+    print(f"Performing python3 init")
+    (resource_dir, script_name) = _normalize_python_script_path(resource_def)
+
+    print(f"Resource dir is {resource_dir}")
+    req_file = os.path.join(resource_dir, 'requirements.txt')
+    print(f"req_file is {req_file}")
+
+    pip_lock_file = os.path.join(resource_dir, 'Pipfile.lock')
+    if os.path.exists(pip_lock_file):
+        print('pipenv already exists')
+        return python3_init_existing.delay(resource_dir)
+
+    if os.path.exists(req_file):
+        print('requirements.txt exists')
+        return python3_init_with_deps.delay(resource_dir)
+    else:
+        print('no requirements.txt exists')
+        return python3_init_env.delay(resource_dir)
+
+
+def python3_execute(resource_def, args) -> AsyncResult:
+    (script_path, script_name) = _normalize_python_script_path(resource_def)
+    return python3_execute_script.delay(script_path, script_name, args)
+
+
+def _normalize_python_script_path(resource_def: dict) -> tuple:
+    if 'snippet_path' not in resource_def:
+        raise CCFParserError('Malformed .meta-cnc file for python3 execution')
+
+    resource_dir = resource_def['snippet_path']
+    if 'snippets' in resource_def and len(resource_def['snippets']) > 0:
+        # python type only uses first snippet from list
+        snippet = resource_def['snippets'][0]
+        if 'file' in snippet and 'name' in snippet:
+            script = snippet['file']
+
+            if '/' not in script:
+                script = f"./{script}"
+
+            # ensure no funny business
+            skillet_base_path = Path(resource_dir)
+            print(skillet_base_path)
+            script_path = skillet_base_path.joinpath(script).resolve()
+            print(script_path)
+            # # if skillet_base_path not in script_path.parents:
+            #     raise CCFParserError('Malformed .meta-cnc file for python3 execution - Refusing to jump out of dir')
+
+            return str(script_path.parent), script_path.name
+        else:
+            raise CCFParserError('Malformed .meta-cnc file for python3 execution - Malformed snippet')
+    else:
+        raise CCFParserError('Malformed .meta-cnc file for python3 execution - Malformed snippet')
+
+
 
 
 def verify_clean_state(resource_def) -> bool:
