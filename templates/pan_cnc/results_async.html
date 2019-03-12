@@ -37,7 +37,7 @@
                                 next_link.html('Continue');
                                 next_link.addClass('btn').addClass('btn-primary');
                             {% else %}
-                                next_link.attr('href', '/');
+                                next_link.attr('href', '{{ request.session.last_page|urlencode }}');
                                 next_link.html('Continue');
                                 next_link.addClass('btn').addClass('btn-primary');
                             {% endif %}
@@ -105,7 +105,7 @@
                         <a href="/workflow/{{ request.session.next_step }}" class="btn btn-primary">Continue</a>
                     {% endif %}
                 {% elif completed %}
-                    <a href="/" class="btn btn-primary">Continue</a>
+                    <a href="{{ request.session.last_page|urlencode }}" class="btn btn-primary">Continue</a>
                 {% endif %}
             </p>
         </div>

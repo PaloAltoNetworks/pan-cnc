@@ -65,6 +65,11 @@ class CNCBaseAuth(LoginRequiredMixin, View):
         else:
             self.app_dir = self.request.session.get('current_app_dir', '')
 
+        if request.method.lower() == 'get':
+            if 'last_page' not in self.request.session:
+                print('Seeding last_page session atrribute')
+                self.request.session['last_page'] = '/'
+
         return super().dispatch(request, *args, **kwargs)
 
     def save_workflow_to_session(self) -> None:
@@ -248,13 +253,10 @@ class CNCBaseAuth(LoginRequiredMixin, View):
         return default
 
     def get_header(self):
-        print('HERE WE GO')
         next_step = self.request.session.get('next_step', None)
         if next_step is None:
-            print('No next step found!')
             return self.header
         else:
-            print('Found next step, ok')
             return f"Step {next_step}: {self.header}"
 
 
@@ -269,6 +271,18 @@ class CNCView(CNCBaseAuth, TemplateView):
     app_dir = 'pan_cnc'
     help_text = ''
 
+    def set_last_page_visit(self) -> None:
+        """
+        Called on all templateView children (CNCView). Will track the last page visited. Override this in children
+        to not track that pageview
+
+        By default always called on get_context_data
+
+        :return: None
+        """
+        print(f'Capturing last page visit to {self.request.path}')
+        self.request.session['last_page'] = self.request.path
+
     def get_context_data(self, **kwargs):
         """
         This gets called just before the template is rendered. Use this to add any data to the context dict that will
@@ -282,6 +296,9 @@ class CNCView(CNCBaseAuth, TemplateView):
         context = super().get_context_data(**kwargs)
         context['base_html'] = self.base_html
         context['app_dir'] = self.app_dir
+
+        self.set_last_page_visit()
+
         return context
 
 

@@ -27,7 +27,7 @@
                     <a href="/workflow/{{ request.session.next_step }}" class="btn btn-primary">Continue</a>
                 {% endif %}
                 {%  else %}
-                <a href="/" class="btn btn-primary">Continue</a>
+                <a href="{{ request.session.last_page|urlencode }}" class="btn btn-primary">Continue</a>
             {% endif %}
         </p>
     </div>
