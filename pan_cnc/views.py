@@ -1654,6 +1654,12 @@ class EnvironmentBase(CNCBaseAuth, View):
 
         return super().dispatch(request, *args, **kwargs)
 
+    def get_header(self):
+        if hasattr(self, 'header'):
+            return self.header
+        else:
+            return 'PAN-CNC'
+
 
 class GetSecretView(EnvironmentBase):
 
@@ -1854,6 +1860,7 @@ class CreateEnvironmentsView(EnvironmentBase, FormView):
     # base form class, you should not need to override this
     form_class = forms.Form
     base_html = 'pan_cnc/base.html'
+    header = 'Manage Environment'
 
     def get_context_data(self, **kwargs) -> dict:
         context = super().get_context_data(**kwargs)
@@ -1868,6 +1875,7 @@ class CreateEnvironmentsView(EnvironmentBase, FormView):
         else:
             context['title'] = f'Create New Environment'
 
+        context['header'] = self.header
         form.fields['name'] = environment_name
         form.fields['description'] = environment_description
         context['form'] = form
