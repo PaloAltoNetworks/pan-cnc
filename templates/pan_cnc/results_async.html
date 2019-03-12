@@ -42,7 +42,7 @@
                                 next_link.addClass('btn').addClass('btn-primary');
                             {% endif %}
                         } else {
-                            next_link.attr('href', '/');
+                            next_link.attr('href', '{{ request.session.last_page|urlencode }}');
                             next_link.html('Continue');
                             next_link.addClass('btn').addClass('btn-danger');
                             c.append('Error Executing Task');
