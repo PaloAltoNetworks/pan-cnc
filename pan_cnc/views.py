@@ -1514,6 +1514,10 @@ class TaskLogsView(CNCBaseAuth, View):
             elif task_result.failed():
                 logs_output['status'] = 'exited'
                 logs_output['output'] = 'Task Failed, check logs for details'
+            elif task_result.status == 'PROGRESS':
+                logs_output['status'] = task_result.state
+                logs_output['output'] = task_result.info
+
             else:
                 logs_output['output'] = 'Task is still Running'
                 logs_output['status'] = task_result.state
