@@ -1133,6 +1133,12 @@ class EditRestTargetView(CNCBaseAuth, FormView):
         context['results'] = results
         context['view'] = self
 
+        # Most REST actions will only have a single action/path taken. If so, we can simplify the results
+        # shown to the user by default
+        if len(results['snippets']) == 1:
+            first_key = list(results['snippets'].keys())[0]
+            context['results'] = results['snippets'][first_key]['results']
+
         # results is a dict containing 'snippets' 'status' 'message'
         if 'snippets' not in results or 'status' not in results or 'message' not in results:
             print('Results from rest_utils is malformed')

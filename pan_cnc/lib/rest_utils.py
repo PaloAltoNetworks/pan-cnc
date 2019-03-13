@@ -70,6 +70,10 @@ def execute_all(meta_cnc, app_dir, context):
             content_type = snippet.get('content_type', '')
             accepts_type = snippet.get('accepts_type', '')
 
+            headers = dict()
+            headers["Content-Type"] = content_type
+            headers['Accetps-Type'] = accepts_type
+
             environment = Environment(loader=BaseLoader())
 
             for f in jinja_filters.defined_filters:
@@ -94,7 +98,7 @@ def execute_all(meta_cnc, app_dir, context):
                     payload = payload_template.render(context)
                     # FIXME - assumes JSON content_type and accepts, should take into account the values
                     # FIXME - of content-type and accepts_type from above if they were supplied
-                    res = requests.post(full_rest_url, json=payload, verify=False)
+                    res = requests.post(full_rest_url, data=payload, verify=False, headers=headers)
                     if res.status_code != 200:
                         print('Found a non-200 response status_code!')
                         print(res.status_code)
