@@ -258,7 +258,7 @@ def get_vm_auth_key_from_panorama():
     xapi = panos_login()
 
     if xapi is None:
-        print('Could not login into Pan-OS target')
+        print('Could not login into PAN-OS target')
         raise TargetConnectionException
 
     try:

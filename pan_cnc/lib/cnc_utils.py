@@ -60,8 +60,8 @@ def create_new_user_environment_set(user_id, passphrase):
                                                            'TARGET_PASSWORD': 'admin',
                                                        })
 
-    secret_dict['Local Pan-OS'] = create_environment('Local VM-Series Pan-OS',
-                                                     'PaloAltoNetworks Pan-OS VM50',
+    secret_dict['Local PAN-OS'] = create_environment('Local VM-Series PAN-OS',
+                                                     'PaloAltoNetworks PAN-OS VM50',
                                                      {
                                                          'TARGET_IP': '192.168.55.10',
                                                          'TARGET_USERNAME': 'admin',
