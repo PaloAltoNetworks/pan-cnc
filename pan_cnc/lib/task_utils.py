@@ -80,6 +80,11 @@ def python3_init(resource_def) -> AsyncResult:
     req_file = os.path.join(resource_dir, 'requirements.txt')
     print(f"req_file is {req_file}")
 
+    init_done_file = os.path.join(resource_dir, '.pipenv_init_done')
+
+    with open(init_done_file, 'w+') as init_done:
+        init_done.write('y')
+
     pip_lock_file = os.path.join(resource_dir, 'Pipfile.lock')
     if os.path.exists(pip_lock_file):
         print('pipenv already exists')
@@ -96,6 +101,17 @@ def python3_init(resource_def) -> AsyncResult:
 def python3_execute(resource_def, args) -> AsyncResult:
     (script_path, script_name) = _normalize_python_script_path(resource_def)
     return python3_execute_script.delay(script_path, script_name, args)
+
+
+def python3_init_complete(resource_def) -> bool:
+    print(f"Performing python3 check")
+    (resource_dir, script_name) = _normalize_python_script_path(resource_def)
+    init_done_file = os.path.join(resource_dir, '.pipenv_init_done')
+    if os.path.exists(init_done_file):
+        print('pipenv already init')
+        return True
+    else:
+        return False
 
 
 def _normalize_python_script_path(resource_def: dict) -> tuple:
@@ -125,8 +141,6 @@ def _normalize_python_script_path(resource_def: dict) -> tuple:
             raise CCFParserError('Malformed .meta-cnc file for python3 execution - Malformed snippet')
     else:
         raise CCFParserError('Malformed .meta-cnc file for python3 execution - Malformed snippet')
-
-
 
 
 def verify_clean_state(resource_def) -> bool:
