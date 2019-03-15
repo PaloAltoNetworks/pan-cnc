@@ -75,7 +75,7 @@ def exec_local_task(cmd_seq: list, cwd: str, env=None) -> str:
             current_task.update_state(state='PROGRESS', meta=full_output)
 
     rc = p.wait()
-    print(f'Task {current_task.id} return code is {rc}')
+    print(f'Task {current_task.request.id} return code is {rc}')
     state = dict()
     state['returncode'] = rc
     state['out'] = full_output
