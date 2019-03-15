@@ -148,10 +148,7 @@ def _handle_json_outputs(snippet: dict, results: str) -> dict:
                 print('malformed outputs in skillet definition')
                 continue
 
-            print(results)
-            print(type(results))
             json_object = json.loads(results)
-            print(json_object)
             var_name = output['name']
             capture_pattern = output['capture_pattern']
             jsonpath_expr = parse(capture_pattern)
