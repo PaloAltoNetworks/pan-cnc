@@ -90,11 +90,14 @@ class CNCBaseAuth(LoginRequiredMixin, View):
             current_workflow = dict()
 
         if hasattr(self, 'service'):
-            for variable in self.service['variables']:
-                var_name = variable['name']
-                if var_name in self.request.POST:
-                    print('Adding variable %s to session' % var_name)
-                    current_workflow[var_name] = self.request.POST.get(var_name)
+            if 'variables' in self.service and self.service['variables'] is not None and \
+                    type(self.service['variables']) is list:
+
+                for variable in self.service['variables']:
+                    var_name = variable['name']
+                    if var_name in self.request.POST:
+                        print('Adding variable %s to session' % var_name)
+                        current_workflow[var_name] = self.request.POST.get(var_name)
 
         self.request.session[self.app_dir] = current_workflow
 
@@ -120,6 +123,9 @@ class CNCBaseAuth(LoginRequiredMixin, View):
         for k in dict_to_save:
             workflow[k] = dict_to_save[k]
 
+        # explicitly set this here
+        self.request.session[self.app_dir] = workflow
+
     def get_workflow(self) -> dict:
         """
         Return the workflow from the session cache
@@ -141,12 +147,15 @@ class CNCBaseAuth(LoginRequiredMixin, View):
             else:
                 return snippet_vars
 
-        for variable in skillet['variables']:
-            if 'name' not in variable:
-                continue
-            var_name = variable['name']
-            if var_name in workflow:
-                snippet_vars[var_name] = workflow[var_name]
+        if 'variables' in skillet and skillet['variables'] is not None and \
+                type(skillet['variables']) is list:
+
+            for variable in skillet['variables']:
+                if 'name' not in variable:
+                    continue
+                var_name = variable['name']
+                if var_name in workflow:
+                    snippet_vars[var_name] = workflow[var_name]
 
         return snippet_vars
 
@@ -174,10 +183,8 @@ class CNCBaseAuth(LoginRequiredMixin, View):
         secrets = self.get_environment_secrets()
 
         if var_name in secrets:
-            print('returning variable from environment')
             return secrets[var_name]
         elif var_name in session_cache:
-            print('returning var from session')
             return session_cache[var_name]
         else:
             return default
@@ -501,6 +508,14 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
 
         if 'variables' not in self.service:
             print('No variables defined in metadata')
+            return dynamic_form
+
+        if self.service['variables'] is None:
+            print('No variables defined in metadata')
+            return dynamic_form
+
+        if type(self.service['variables']) is not list:
+            print('Malformed variables defined in metadata')
             return dynamic_form
 
         if 'type' not in self.service:
@@ -828,10 +843,17 @@ class ProvisionSnippetView(CNCBaseFormView):
             print('Launching python3 init')
             context = super().get_context_data()
             context['base_html'] = self.base_html
-            context['title'] = f"Preparing environment for: {self.service['label']}"
-            r = task_utils.python3_init(self.service)
+
+            if task_utils.python3_init_complete(self.service):
+                context['title'] = f"Executing Skillet: {self.service['label']}"
+                r = task_utils.python3_execute(self.service, self.get_snippet_variables_from_workflow())
+                self.request.session['task_next'] = ''
+            else:
+                context['title'] = f"Preparing environment for: {self.service['label']}"
+                r = task_utils.python3_init(self.service)
+                self.request.session['task_next'] = 'python3_execute'
+
             self.request.session['task_id'] = r.id
-            self.request.session['task_next'] = 'python3_execute'
             self.request.session['task_app_dir'] = self.app_dir
             self.request.session['task_base_html'] = self.base_html
             return render(self.request, 'pan_cnc/results_async.html', context)
@@ -1137,7 +1159,8 @@ class EditRestTargetView(CNCBaseAuth, FormView):
         # shown to the user by default
         if len(results['snippets']) == 1:
             first_key = list(results['snippets'].keys())[0]
-            context['results'] = results['snippets'][first_key]['results']
+            if type(results['snippets'][first_key]) is dict and 'results' in results['snippets'][first_key]:
+                context['results'] = results['snippets'][first_key]['results']
 
         # results is a dict containing 'snippets' 'status' 'message'
         if 'snippets' not in results or 'status' not in results or 'message' not in results:
@@ -1481,20 +1504,17 @@ class TaskLogsView(CNCBaseAuth, View):
                         # directly
                         skillet_name = self.get_value_from_workflow('snippet_name', '')
                         if skillet_name != '':
-                            print('loaded skillet from session')
                             meta = snippet_utils.load_snippet_with_name(skillet_name, self.app_dir)
                             if 'snippets' in meta:
                                 for snippet in meta['snippets']:
                                     if 'output_type' in snippet and 'name' in snippet:
                                         print('getting output from last task')
                                         snippet_output = output_utils.parse_outputs(meta, snippet, out)
-                                        outputs[snippet['name']] = snippet_output
+                                        outputs.update(snippet_output)
 
-                                        # save all captured output to the workflow / session
-                                        for o in outputs:
-                                            d = outputs[o]
-                                            self.save_dict_to_workflow(d)
-
+                                if outputs:
+                                    self.save_dict_to_workflow(outputs)
+                                    print(self.request.session)
                         else:
                             print('Could not load a valid snippet for output capture!')
 
@@ -1503,7 +1523,8 @@ class TaskLogsView(CNCBaseAuth, View):
                     else:
                         if outputs:
                             logs_output['output'] = f'{out}\n{err}'
-                            logs_output['captured_output'] = json.dumps(outputs)
+                            logs_output['captured_output'] = "Successfully captured the following variables:\n\n"
+                            logs_output['captured_output'] += json.dumps(outputs, indent=4)
                         else:
                             logs_output['output'] = f'{out}\n{err}'
 
