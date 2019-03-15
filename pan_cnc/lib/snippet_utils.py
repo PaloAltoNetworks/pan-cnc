@@ -14,14 +14,17 @@
 
 # Author: Nathan Embery nembery@paloaltonetworks.com
 
-import oyaml
 import os
+from collections import OrderedDict
+from pathlib import Path
+
+import oyaml
 from django.conf import settings
 from django.core.cache import cache
-from pathlib import Path
 from jinja2 import Environment
 from jinja2.loaders import BaseLoader
 from yaml.parser import ParserError
+
 from . import jinja_filters
 from .exceptions import CCFParserError, SnippetNotFoundException
 
@@ -53,7 +56,7 @@ def load_all_snippets(app_dir) -> list:
         snippet_list = cache.get('all_snippets', [])
         if snippet_list:
             return snippet_list
-    
+
     snippet_list = load_snippets_of_type(snippet_type=None, app_dir=app_dir)
     cache.set('all_snippets', snippet_list)
     return snippet_list
@@ -77,7 +80,7 @@ def load_snippets_of_type(snippet_type=None, app_dir=None) -> list:
     :param app_dir: name of the app to load the snippets from
     :return: list of snippet dicts
     """
- 
+
     snippets_dir = Path(os.path.join(settings.SRC_PATH, app_dir, 'snippets'))
     return load_snippets_of_type_from_dir(snippets_dir, snippet_type)
 
@@ -132,7 +135,8 @@ def load_snippets_of_type_from_dir(directory, snippet_type=None) -> list:
             snippet_path = str(d.parent.absolute())
             try:
                 with d.open(mode='r') as sc:
-                    service_config = oyaml.safe_load(sc.read())
+                    raw_service_config = oyaml.safe_load(sc.read())
+                    service_config = _normalize_snippet_structure(raw_service_config)
                     service_config['snippet_path'] = snippet_path
                     if snippet_type is not None:
                         if 'type' in service_config and service_config['type'] == snippet_type \
@@ -355,7 +359,7 @@ def load_all_snippets_with_label_key(app_dir: str, label: str):
     return snippets_with_label
 
 
-def load_all_snippets_without_label_key(app_dir: str, label: str):
+def load_all_snippets_without_label_key(app_dir: str, label: str) -> list:
     """
     Returns a list of snippets that do not have a label key == label
     :param app_dir: application directory where to search for snippets
@@ -381,3 +385,42 @@ def load_all_snippets_without_label_key(app_dir: str, label: str):
 
     return snippets_with_label
 
+
+def _normalize_snippet_structure(skillet: dict) -> dict:
+    """
+    Attempt to resolve common configuration file format errors
+    :param skillet: a loaded skillet/snippet
+    :return: skillet/snippet that has been 'fixed'
+    """
+
+    # first verify the variables stanza is present and is a list
+    if 'variables' not in skillet:
+        skillet['variables'] = list()
+
+    elif skillet['variables'] is None:
+        skillet['variables'] = list()
+
+    elif type(skillet['variables']) is not list:
+        skillet['variables'] = list()
+
+    # verify labels stanza is present and is a OrderedDict
+    if 'labels' not in skillet:
+        skillet['labels'] = OrderedDict
+
+    elif skillet['labels'] is None:
+        skillet['labels'] = OrderedDict
+
+    elif type(skillet['labels']) is not OrderedDict:
+        skillet['labels'] = OrderedDict
+
+    # verify snippets stanza is present and is a list
+    if 'snippets' not in skillet:
+        skillet['snippets'] = list()
+
+    elif skillet['snippets'] is None:
+        skillet['snippets'] = list()
+
+    elif type(skillet['snippets']) is not list:
+        skillet['snippets'] = list()
+
+    return skillet
