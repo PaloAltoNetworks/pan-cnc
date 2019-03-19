@@ -1,4 +1,4 @@
-{% extends base_html %}
+{% extends base_html|default:'pan_cnc/base.html' %}
 {% load static %}
 
 {% block content %}
@@ -10,7 +10,11 @@
             $('#dynamic_form').submit();
         }
     </script>
-    <div class="card border-primary mb-6 shadow-lg rounded">
+
+    {%  block before_form %}
+    {% endblock %}
+
+    <div class="card border-primary mb-5 shadow-lg rounded">
         <div class="card-header">
             {{ view.get_header|default:header }}
             <div class="float-right">
@@ -44,7 +48,8 @@
             <button type="submit" class="btn btn-primary" id="submit_button" onclick="set_cursor()">Submit</button>
         </div>
     </div>
-
+{%  block after_form %}
+{% endblock %}
     <!-- Modal -->
     <div class="modal fade border-top border-primary" id="helpTextModal" tabindex="-1" role="dialog" aria-labelledby="helpTextModalLabel"
          aria-hidden="true">

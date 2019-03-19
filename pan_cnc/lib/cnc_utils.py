@@ -180,7 +180,7 @@ def load_panrc():
 
 
 def get_cached_value(key):
-    return cache.get(key)
+    return cache.get(key, None)
 
 
 def set_cached_value(key, val):
