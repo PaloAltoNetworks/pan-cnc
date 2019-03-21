@@ -32,9 +32,14 @@ from django.contrib.auth import views as auth_views
 from django.urls import path
 from pan_cnc import views as pan_cnc_views
 from pan_cnc.lib import cnc_utils
+import sys
 
 # ensure every view gets this in the context, even django default views
 app_settings = settings.INSTALLED_APPS_CONFIG
+
+if settings.SRC_PATH not in sys.path:
+    print('Ensuring pan-cnc apps are in system search path')
+    sys.path.insert(0, settings.SRC_PATH)
 
 urlpatterns = [
     path('login', auth_views.LoginView.as_view(template_name='pan_cnc/login.html'), name='login'),
