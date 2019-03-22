@@ -48,7 +48,8 @@ def execute_all(meta_cnc, app_dir, context):
     if 'snippet_path' in meta_cnc:
         snippets_dir = meta_cnc['snippet_path']
     else:
-        snippets_dir = Path(os.path.join(settings.BASE_DIR, app_dir, 'snippets', meta_cnc['name']))
+        # snippets_dir = Path(os.path.join(settings.BASE_DIR, app_dir, 'snippets', meta_cnc['name']))
+        raise CCFParserError('Could not locate .meta-cnc for REST execution')
 
     response = dict()
     response['status'] = 'success'

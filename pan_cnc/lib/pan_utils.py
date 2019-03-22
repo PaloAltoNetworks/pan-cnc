@@ -145,7 +145,8 @@ def push_service(service, context, force_sync=False) -> bool:
     if 'snippet_path' in service:
         snippets_dir = service['snippet_path']
     else:
-        snippets_dir = Path(os.path.join(settings.BASE_DIR, 'mssp', 'snippets', service['name']))
+        # snippets_dir = Path(os.path.join(settings.BASE_DIR, 'mssp', 'snippets', service['name']))
+        raise CCFParserError('Could not locate .meta-cnc file')
 
     if 'type' not in service:
         commit_type = 'commit'

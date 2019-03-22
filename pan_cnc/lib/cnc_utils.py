@@ -200,10 +200,14 @@ def init_app(app_cnc_config):
             print('Invalid repository app_cnc_configuration')
             continue
 
-        repo_dir = os.path.join(app_cnc_config['app_dir'], 'snippets', r['destination_directory'])
+        user_dir = os.path.expanduser('~')
+        repo_base_dir = os.path.join(user_dir, '.pan_cnc', 'panhandler', 'repositories')
+        repo_dir = os.path.join(repo_base_dir, r['destination_directory'])
+
         repo_path = Path(repo_dir)
-        app_dir_path = Path(app_cnc_config['app_dir'])
-        if app_dir_path not in repo_path.parents:
+        repo_base_path = Path(repo_base_dir)
+
+        if repo_base_path not in repo_path.parents:
             print('Will not allow destination directory to be outside of our application dir')
             continue
 

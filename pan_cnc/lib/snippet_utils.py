@@ -89,7 +89,15 @@ def load_snippets_of_type(snippet_type=None, app_dir=None) -> list:
     """
 
     snippets_dir = Path(os.path.join(settings.SRC_PATH, app_dir, 'snippets'))
-    return load_snippets_of_type_from_dir(snippets_dir, snippet_type)
+
+    user_dir = os.path.expanduser('~/.pan_cnc')
+    user_snippets_dir = os.path.join(user_dir, 'panhandler/repositories')
+
+    app_snippets = load_snippets_of_type_from_dir(snippets_dir, snippet_type)
+    user_snippets = load_snippets_of_type_from_dir(user_snippets_dir, snippet_type)
+
+    all_snippets = app_snippets + user_snippets
+    return all_snippets
 
 
 def load_snippets_of_type_from_dir(directory, snippet_type=None) -> list:
@@ -105,10 +113,15 @@ def load_snippets_of_type_from_dir(directory, snippet_type=None) -> list:
     snippets_dir = Path(directory)
     src_path = Path(settings.SRC_PATH)
 
-    if src_path not in snippets_dir.parents:
-        # do not allow relative paths from going outside of our app root
-        print('Not allowing escape from application source path')
-        return snippet_list
+    # user_dir = os.path.expanduser('~/.pan_cnc')
+    # user_snippets_dir = os.path.join(user_dir, 'panhandler/repositories')
+
+    # if src_path not in snippets_dir.parents and user_snippets_dir not in snippets_dir.parents:
+    #     # do not allow relative paths from going outside of our app root
+    #     print('Not allowing escape from application source path')
+    #     print(src_path)
+    #     print(user_snippets_dir)
+    #     return snippet_list
 
     if not snippets_dir.exists():
         print(f'Could not find meta-cnc files in dir {directory}')
@@ -190,26 +203,31 @@ def get_snippet_metadata(snippet_name, app_dir) -> (str, None):
     :param app_dir: current app
     :return: str of .meta-cnc.yaml file
     """
-    snippets_dir = Path(os.path.join(settings.SRC_PATH, app_dir, 'snippets'))
-    for d in snippets_dir.rglob('./*'):
-        mdf = os.path.join(d, '.meta-cnc.yaml')
-        if os.path.isfile(mdf):
-            snippet_path = os.path.dirname(mdf)
-            try:
-                with open(mdf, 'r') as sc:
-                    snippet_data = oyaml.safe_load(sc.read())
-                    if 'name' in snippet_data and snippet_data['name'] == snippet_name:
-                        print(f'Found {snippet_name} at {snippet_path}')
-                        sc.seek(0)
-                        return sc.read()
-            except IOError as ioe:
-                print('Could not open metadata file in dir %s' % mdf)
-                print(ioe)
-                return None
-            except ParserError as pe:
-                print(pe)
-                print('Could not parse metadata file')
-                return None
+    app_dir = Path(os.path.join(settings.SRC_PATH, app_dir, 'snippets'))
+
+    home_dir = os.path.expanduser('~')
+    user_dir = Path(os.path.join(home_dir, '.pan_cnc', 'panhandler', 'repositories'))
+
+    for snippets_dir in [app_dir, user_dir]:
+        for d in snippets_dir.rglob('./*'):
+            mdf = os.path.join(d, '.meta-cnc.yaml')
+            if os.path.isfile(mdf):
+                snippet_path = os.path.dirname(mdf)
+                try:
+                    with open(mdf, 'r') as sc:
+                        snippet_data = oyaml.safe_load(sc.read())
+                        if 'name' in snippet_data and snippet_data['name'] == snippet_name:
+                            print(f'Found {snippet_name} at {snippet_path}')
+                            sc.seek(0)
+                            return sc.read()
+                except IOError as ioe:
+                    print('Could not open metadata file in dir %s' % mdf)
+                    print(ioe)
+                    return None
+                except ParserError as pe:
+                    print(pe)
+                    print('Could not parse metadata file')
+                    return None
 
     return None
 
@@ -228,7 +246,7 @@ def render_snippet_template(service, app_dir, context, template_file='') -> str:
         if 'snippet_path' in service:
             template_full_path = os.path.join(service['snippet_path'], template_name)
         else:
-            template_full_path = Path(os.path.join(settings.SRC_PATH, app_dir, 'snippets', template_name))
+            raise CCFParserError('Could not locate .meta-cnc')
 
         print(template_full_path)
         with open(template_full_path, 'r') as template:
