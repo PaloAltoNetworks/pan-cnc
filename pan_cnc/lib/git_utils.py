@@ -164,12 +164,16 @@ def get_repo_upstream_details(repo_name: str, repo_url: str) -> dict:
     :param repo_url:
     :return:
     """
+
+    details = dict()
+
+    if cnc_utils.is_testing():
+        return details
+
     cache_repo_name = repo_name.replace(' ', '_')
     details = cnc_utils.get_cached_value(f'git_utils_upstream_{cache_repo_name}')
     if details is not None:
         return details
-
-    details = dict()
 
     url_details = parse_repo_origin_url(repo_url)
     owner = url_details.get('owner', '')

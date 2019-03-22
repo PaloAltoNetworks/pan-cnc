@@ -234,3 +234,15 @@ def get_app_config(app_name):
 
     print('Could not load app_config')
     return None
+
+
+def is_testing() -> bool:
+    """
+    Check for an environment variable that determines if we are in test mode
+    :return: bool
+    """
+    if os.environ.get('CNC_TEST', '') == 'TRUE':
+        return True
+    else:
+        print(os.environ)
+        return False
