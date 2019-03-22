@@ -67,8 +67,15 @@ def load_snippets_by_label(label_name, label_value, app_dir) -> list:
     filtered_services = list()
     for service in services:
         if 'labels' in service and label_name in service['labels']:
-            if service['labels'][label_name] == label_value:
-                filtered_services.append(service)
+            if type(service['labels'][label_name]) is str:
+                if service['labels'][label_name] == label_value:
+                    filtered_services.append(service)
+            elif type(service['labels'][label_name]) is list:
+                for label_list_value in service['labels'][label_name]:
+                    if label_list_value == label_value:
+                        filtered_services.append(service)
+            else:
+                print(f"Unknown label type in .meta-cnc for skillet: {service['name']}")
 
     return filtered_services
 
@@ -331,9 +338,14 @@ def load_all_label_values(app_dir: str, label_name: str) -> list:
         labels = snippet.get('labels', [])
         for label_key in labels:
             if label_key == label_name:
-                label_value = labels[label_name]
-                if label_value not in labels_list:
-                    labels_list.append(label_value)
+                if type(labels[label_name]) is str:
+                    label_value = labels[label_name]
+                    if label_value not in labels_list:
+                        labels_list.append(label_value)
+                elif type(labels[label_name]) is list:
+                    for label_list_value in labels[label_name]:
+                        if label_list_value not in labels_list:
+                            labels_list.append(label_list_value)
 
     return labels_list
 
