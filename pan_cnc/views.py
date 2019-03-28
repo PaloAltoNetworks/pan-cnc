@@ -524,7 +524,7 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
 
         # Get all of the variables defined in the self.service
         for variable in self.service['variables']:
-            if type(variable) is not OrderedDict:
+            if type(variable) is not OrderedDict and type(variable) is not dict:
                 print('Variable configuration is incorrect')
                 print(type(variable))
                 continue
