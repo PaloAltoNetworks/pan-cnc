@@ -1959,6 +1959,17 @@ class LoadEnvironmentView(EnvironmentBase, RedirectView):
             print(f'Loading Environment {env_name}')
             messages.add_message(self.request, messages.SUCCESS, 'Environment Loaded and ready to rock')
             self.request.session['current_env'] = env_name
+
+            saved_workflow = self.get_workflow()
+            if 'secrets' not in self.e[env_name]:
+                print('No secrets here to reset')
+                return '/list_envs'
+
+            for s in self.e[env_name]['secrets'].keys():
+                if s in saved_workflow:
+                    print('removing saved value %s' % s)
+                    saved_workflow.pop(s)
+
         else:
             print('Desired env was not found')
             messages.add_message(self.request, messages.ERROR, 'Could not load environment!')
