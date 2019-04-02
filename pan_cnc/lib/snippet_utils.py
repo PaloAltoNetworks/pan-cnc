@@ -435,13 +435,13 @@ def _normalize_snippet_structure(skillet: dict) -> dict:
 
     # verify labels stanza is present and is a OrderedDict
     if 'labels' not in skillet:
-        skillet['labels'] = OrderedDict
+        skillet['labels'] = OrderedDict()
 
     elif skillet['labels'] is None:
-        skillet['labels'] = OrderedDict
+        skillet['labels'] = OrderedDict()
 
-    elif type(skillet['labels']) is not OrderedDict:
-        skillet['labels'] = OrderedDict
+    elif type(skillet['labels']) is not OrderedDict and type(skillet['labels']) is not dict:
+        skillet['labels'] = OrderedDict()
 
     # verify snippets stanza is present and is a list
     if 'snippets' not in skillet:
