@@ -7,7 +7,8 @@ from celery.result import EagerResult
 
 from pan_cnc.tasks import terraform_init, terraform_validate, terraform_plan, terraform_apply, terraform_refresh, \
     terraform_destroy, terraform_output, python3_init_env, python3_init_with_deps, python3_execute_script, \
-    python3_init_existing
+    python3_init_existing, python3_execute_bare_script
+
 
 from pan_cnc.lib.exceptions import CCFParserError
 from pathlib import Path
@@ -70,6 +71,21 @@ def perform_destroy(resource_def, snippet_context) -> AsyncResult:
     resource_dir = resource_def['snippet_path']
     tf_vars = __build_cmd_seq_vars(resource_def, snippet_context)
     return terraform_destroy.delay(resource_dir, tf_vars)
+
+
+def python3_check_no_requirements(resource_def) -> bool:
+    (resource_dir, script_name) = _normalize_python_script_path(resource_def)
+    req_file = os.path.join(resource_dir, 'requirements.txt')
+    if os.path.exists(req_file):
+        print('requirements.txt exists')
+        return False
+    else:
+        return True
+
+
+def python3_execute_base_script(resource_def, args) -> AsyncResult:
+    (script_path, script_name) = _normalize_python_script_path(resource_def)
+    return python3_execute_bare_script.delay(script_path, script_name, args)
 
 
 def python3_init(resource_def) -> AsyncResult:

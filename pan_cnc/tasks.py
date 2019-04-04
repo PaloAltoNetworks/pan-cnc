@@ -214,3 +214,14 @@ def python3_execute_script(working_dir, script, args):
     env['PIPENV_NOSPIN'] = "1"
     env['PIPENV_YES'] = "1"
     return exec_local_task(cmd_seq, working_dir, env)
+
+
+@shared_task
+def python3_execute_bare_script(working_dir, script, args):
+    print(f'Executing task Python3 {script}')
+    cmd_seq = ['python3', '-u', script]
+
+    for k, v in args.items():
+        cmd_seq.append(f'--{k}={v}')
+
+    return exec_local_task(cmd_seq, working_dir)
