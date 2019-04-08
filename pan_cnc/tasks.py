@@ -70,7 +70,7 @@ def exec_local_task(cmd_seq: list, cwd: str, env=None) -> str:
         process_env.update(env)
 
     o = OutputHolder()
-    loop = asyncio.get_event_loop()
+    loop = asyncio.new_event_loop()
     r = loop.run_until_complete(run(cmd_seq, cwd, process_env, o))
     loop.close()
     print(f'Task {current_task.request.id} return code is {r}')
