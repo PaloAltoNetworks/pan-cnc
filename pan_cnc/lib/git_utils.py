@@ -89,8 +89,13 @@ def get_repo_details(repo_name, repo_dir):
     """
     repo = Repo(repo_dir)
 
-    url = repo.remotes.origin.url
+    url = str(repo.remotes.origin.url)
     url_details = parse_repo_origin_url(url)
+
+    if 'github' in url:
+        link = f"https://github.com/{url_details['owner']}/{url_details['repo']}"
+    else:
+        link = url
 
     if 'repo' not in url_details or url_details['repo'] is None or url_details['repo'] == '':
         url_details['repo'] = repo_name
@@ -110,6 +115,7 @@ def get_repo_details(repo_name, repo_dir):
     repo_detail = dict()
     repo_detail['name'] = repo_name
     repo_detail['label'] = url_details['repo']
+    repo_detail['link'] = link
     repo_detail['dir'] = repo_name
     repo_detail['url'] = url
     repo_detail['branch'] = branch
@@ -211,7 +217,12 @@ def parse_repo_origin_url(repo_url):
     url_details = dict()
 
     try:
-        if repo_url.endswith('.git'):
+        if repo_url.endswith('.git') and repo_url.startswith('git@'):
+            # git@github.com:nembery/Skillets.git
+            url_parts = repo_url.split(':')[1].split('/')
+            owner = url_parts[0]
+            repo = url_parts[1].split('.git')[0]
+        elif repo_url.endswith('.git'):
             # https://github.com/owner/repo.git
             url_parts = repo_url.split('/')[-2:]
             owner = url_parts[0]

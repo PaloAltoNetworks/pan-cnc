@@ -330,7 +330,7 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
     title = 'Title'
     # where to go after this? once the form has been submitted, redirect to where?
     # this should match a 'view name' from the pan_cnc.yaml file
-    next_url = 'provision'
+    next_url = '/provision'
     # the action of the form if it needs to differ (it shouldn't)
     action = '/'
     # the app dir should match the app name and is used to load app specific snippets
@@ -817,6 +817,10 @@ class ProvisionSnippetView(CNCBaseFormView):
     def form_valid(self, form):
         service_name = self.get_value_from_workflow('snippet_name', '')
 
+        # Check if the user has configured a snippet via the .pan-cnc.yaml file
+        if self.snippet != '':
+            service_name = self.snippet
+
         if service_name == '':
             # FIXME - add an ERROR page and message here
             print('No Service ID found!')
@@ -824,13 +828,15 @@ class ProvisionSnippetView(CNCBaseFormView):
 
         if self.service['type'] == 'template':
             template = snippet_utils.render_snippet_template(self.service, self.app_dir, self.get_workflow())
-            snippet = self.service['snippets'][0]
-
-            # check for and handle outputs
-            if 'outputs' in snippet:
-                # template type only has 1 snippet defined, which is the template to render
-                outputs = output_utils.parse_outputs(self.service, snippet, template)
-                self.save_dict_to_workflow(outputs)
+            if len(self.service['snippets']) == 0:
+                template = 'Could not find a valid template to load!'
+            else:
+                snippet = self.service['snippets'][0]
+                # check for and handle outputs
+                if 'outputs' in snippet:
+                    # template type only has 1 snippet defined, which is the template to render
+                    outputs = output_utils.parse_outputs(self.service, snippet, template)
+                    self.save_dict_to_workflow(outputs)
 
             context = dict()
             context['base_html'] = self.base_html
@@ -848,7 +854,12 @@ class ProvisionSnippetView(CNCBaseFormView):
             context = super().get_context_data()
             context['base_html'] = self.base_html
 
-            if task_utils.python3_init_complete(self.service):
+            if task_utils.python3_check_no_requirements(self.service):
+                context['title'] = f"Executing Skillet: {self.service['label']}"
+                r = task_utils.python3_execute_bare(self.service, self.get_snippet_variables_from_workflow())
+                self.request.session['task_next'] = ''
+
+            elif task_utils.python3_init_complete(self.service):
                 context['title'] = f"Executing Skillet: {self.service['label']}"
                 r = task_utils.python3_execute(self.service, self.get_snippet_variables_from_workflow())
                 self.request.session['task_next'] = ''
