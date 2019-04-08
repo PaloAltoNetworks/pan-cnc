@@ -83,7 +83,7 @@ def python3_check_no_requirements(resource_def) -> bool:
         return True
 
 
-def python3_execute_base_script(resource_def, args) -> AsyncResult:
+def python3_execute_bare(resource_def, args) -> AsyncResult:
     (script_path, script_name) = _normalize_python_script_path(resource_def)
     return python3_execute_bare_script.delay(script_path, script_name, args)
 

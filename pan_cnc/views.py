@@ -847,7 +847,7 @@ class ProvisionSnippetView(CNCBaseFormView):
 
             if task_utils.python3_check_no_requirements(self.service):
                 context['title'] = f"Executing Skillet: {self.service['label']}"
-                r = task_utils.python3_execute_bare_script(self.service, self.get_snippet_variables_from_workflow())
+                r = task_utils.python3_execute_bare(self.service, self.get_snippet_variables_from_workflow())
                 self.request.session['task_next'] = ''
 
             elif task_utils.python3_init_complete(self.service):

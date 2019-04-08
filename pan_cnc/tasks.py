@@ -25,12 +25,60 @@ This software is provided without support, warranty, or guarantee.
 Use at your own risk.
 """
 
+import asyncio
 import json
 import os
 import time
-from subprocess import Popen, PIPE, STDOUT
+from asyncio.subprocess import PIPE, STDOUT
 
 from celery import shared_task, current_task
+
+
+class OutputHolder(object):
+    full_output = ''
+
+    def __init__(self):
+        self.full_output = ''
+
+    def add_output(self, message):
+        self.full_output += message
+
+    def get_output(self):
+        return self.full_output
+
+
+async def run(cmd_seq, cwd, env, o: OutputHolder):
+    p = await asyncio.create_subprocess_shell(' '.join(cmd_seq),
+                                              stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT,
+                                              cwd=cwd, env=env)
+
+    while True:
+        line = await p.stdout.readline()
+        if line == b'':
+            break
+
+        o.add_output(line.decode())
+        current_task.update_state(state='PROGRESS', meta=o.get_output())
+
+    await p.wait()
+    return p.returncode
+
+
+def exec_local_task(cmd_seq: list, cwd: str, env=None) -> str:
+    process_env = os.environ.copy()
+    if env is not None and type(env) is dict:
+        process_env.update(env)
+
+    o = OutputHolder()
+    loop = asyncio.get_event_loop()
+    r = loop.run_until_complete(run(cmd_seq, cwd, process_env, o))
+    loop.close()
+    print(f'Task {current_task.request.id} return code is {r}')
+    state = dict()
+    state['returncode'] = r
+    state['out'] = o.get_output()
+    state['err'] = ''
+    return json.dumps(state)
 
 
 @shared_task
@@ -44,7 +92,7 @@ def test(count: int) -> str:
     return f'Counted up to {count}'
 
 
-def exec_local_task(cmd_seq: list, cwd: str, env=None) -> str:
+def exec_local_task_old(cmd_seq: list, cwd: str, env=None) -> str:
     """
     Execute local Task in a subprocess thread. Capture stdout and stderr together
     and update the task every five seconds from the collected stdout pipe.
@@ -62,10 +110,11 @@ def exec_local_task(cmd_seq: list, cwd: str, env=None) -> str:
     full_output = ''
     time_mark = time.time()
     p = Popen(cmd_seq, cwd=cwd, stdout=PIPE, stderr=STDOUT, bufsize=1, universal_newlines=True, env=process_env)
+    # p = Popen(cmd_seq, cwd=cwd, stdout=PIPE, bufsize=1, universal_newlines=True, env=process_env)
     while True:
         line = p.stdout.readline()
-        if not line:
-            break
+        # if not line:
+        #     break
 
         full_output = full_output + line
         latest_time_mark = time.time()
@@ -73,6 +122,9 @@ def exec_local_task(cmd_seq: list, cwd: str, env=None) -> str:
             time_mark = latest_time_mark
             print('Updating progress')
             current_task.update_state(state='PROGRESS', meta=full_output)
+
+        if line == '' and p.poll() is not None:
+            break
 
     rc = p.wait()
     print(f'Task {current_task.request.id} return code is {rc}')
@@ -224,4 +276,6 @@ def python3_execute_bare_script(working_dir, script, args):
     for k, v in args.items():
         cmd_seq.append(f'--{k}={v}')
 
-    return exec_local_task(cmd_seq, working_dir)
+    env = dict()
+    env['PYTHONUNBUFFERED'] = "1"
+    return exec_local_task(cmd_seq, working_dir, env)
