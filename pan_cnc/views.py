@@ -341,6 +341,9 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
     documentation_link = ''
     # help text - inline documentation text
     help_text = ''
+    # help link is a link that will provide more context to the user
+    help_link_title = ''
+    help_link = ''
     # where to redirect to
     success_url = '/'
 
