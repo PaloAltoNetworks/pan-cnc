@@ -1424,8 +1424,6 @@ class NextTaskView(CNCView):
             # output is run synch so we have the results here
             # capture outputs before returning to the results_async page
 
-            print(type(r))
-
             result = r.result
             output = 'Captured output from terraform'
             err = ''

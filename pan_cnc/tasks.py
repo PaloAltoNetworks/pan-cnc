@@ -28,8 +28,8 @@ Use at your own risk.
 import asyncio
 import json
 import os
-import time
-from asyncio.subprocess import PIPE, STDOUT
+import subprocess
+from subprocess import Popen
 
 from celery import shared_task, current_task
 
@@ -47,7 +47,7 @@ class OutputHolder(object):
         return self.full_output
 
 
-async def run(cmd_seq, cwd, env, o: OutputHolder):
+async def cmd_runner(cmd_seq, cwd, env, o: OutputHolder):
     p = await asyncio.create_subprocess_shell(' '.join(cmd_seq),
                                               stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT,
                                               cwd=cwd, env=env)
@@ -65,14 +65,16 @@ async def run(cmd_seq, cwd, env, o: OutputHolder):
 
 
 def exec_local_task(cmd_seq: list, cwd: str, env=None) -> str:
+    print('Kicking off new task - exe local task')
     process_env = os.environ.copy()
     if env is not None and type(env) is dict:
         process_env.update(env)
 
     o = OutputHolder()
     loop = asyncio.new_event_loop()
-    r = loop.run_until_complete(run(cmd_seq, cwd, process_env, o))
-    loop.close()
+    asyncio.set_event_loop(loop)
+    r = loop.run_until_complete(cmd_runner(cmd_seq, cwd, process_env, o))
+    loop.stop()
     print(f'Task {current_task.request.id} return code is {r}')
     state = dict()
     state['returncode'] = r
@@ -81,21 +83,10 @@ def exec_local_task(cmd_seq: list, cwd: str, env=None) -> str:
     return json.dumps(state)
 
 
-@shared_task
-def test(count: int) -> str:
-    i = 0
-    while i < count:
-        print(f'{i}')
-        time.sleep(0.1)
-        i = i + 1
-
-    return f'Counted up to {count}'
-
-
-def exec_local_task_old(cmd_seq: list, cwd: str, env=None) -> str:
+def exec_sync_local_task(cmd_seq: list, cwd: str, env=None) -> str:
     """
     Execute local Task in a subprocess thread. Capture stdout and stderr together
-    and update the task every five seconds from the collected stdout pipe.
+    and update the task after the task is done. This should only be used for things we know will happen very fast
     :param cmd_seq: Command to run and all it's arguments
     :param cwd: working directory in which to start the command
     :param env: dict of env variables where k,v == env var name, env var value
@@ -107,31 +98,15 @@ def exec_local_task_old(cmd_seq: list, cwd: str, env=None) -> str:
     if env is not None and type(env) is dict:
         process_env.update(env)
 
-    full_output = ''
-    time_mark = time.time()
-    p = Popen(cmd_seq, cwd=cwd, stdout=PIPE, stderr=STDOUT, bufsize=1, universal_newlines=True, env=process_env)
-    # p = Popen(cmd_seq, cwd=cwd, stdout=PIPE, bufsize=1, universal_newlines=True, env=process_env)
-    while True:
-        line = p.stdout.readline()
-        # if not line:
-        #     break
-
-        full_output = full_output + line
-        latest_time_mark = time.time()
-        if int(latest_time_mark - time_mark) > 5:
-            time_mark = latest_time_mark
-            print('Updating progress')
-            current_task.update_state(state='PROGRESS', meta=full_output)
-
-        if line == '' and p.poll() is not None:
-            break
-
-    rc = p.wait()
+    p = Popen(cmd_seq, cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, bufsize=1, universal_newlines=True,
+              env=process_env)
+    stdout, stderr = p.communicate()
+    rc = p.returncode
     print(f'Task {current_task.request.id} return code is {rc}')
     state = dict()
     state['returncode'] = rc
-    state['out'] = full_output
-    state['err'] = ''
+    state['out'] = stdout
+    state['err'] = stderr
     return json.dumps(state)
 
 
@@ -172,10 +147,6 @@ def terraform_plan(terraform_dir, tf_vars):
 def terraform_apply(terraform_dir, tf_vars):
     print('Executing task terraform apply')
     cmd_seq = ['terraform', 'apply', '-no-color', '-auto-approve', './.cnc_plan']
-    # for k, v in tf_vars.items():
-    #     cmd_seq.append('-var')
-    #     cmd_seq.append(f'{k}={v}')
-
     return exec_local_task(cmd_seq, terraform_dir)
 
 
@@ -183,11 +154,8 @@ def terraform_apply(terraform_dir, tf_vars):
 def terraform_output(terraform_dir, tf_vars):
     print('Executing task terraform output')
     cmd_seq = ['terraform', 'output', '-no-color', '-json']
-    # for k, v in tf_vars.items():
-    #     cmd_seq.append('-var')
-    #     cmd_seq.append(f'{k}={v}')
     print(cmd_seq)
-    return exec_local_task(cmd_seq, terraform_dir)
+    return exec_sync_local_task(cmd_seq, terraform_dir)
 
 
 @shared_task
@@ -209,6 +177,7 @@ def terraform_refresh(terraform_dir, tf_vars):
         cmd_seq.append('-var')
         cmd_seq.append(f'{k}={v}')
 
+    print(cmd_seq)
     return exec_local_task(cmd_seq, terraform_dir)
 
 
