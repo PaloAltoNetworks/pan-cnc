@@ -129,7 +129,7 @@ def save_user_secrets(user_id, secret_dict, passphrase):
             fps.write(secret_output_stream.getvalue())
     except OSError as ose:
         print('Caught Error saving user secrets!')
-        return False
+        return Fals
     except BaseException as be:
         print('Caught Error saving user secrets!')
         return False
@@ -264,6 +264,13 @@ def set_long_term_cached_value(key: str, value: any, life=3600) -> None:
 
 
 def init_app(app_cnc_config):
+
+    if 'name' not in app_cnc_config:
+        print('No name found in app_cnc_config!')
+        return None
+
+    app_name = app_cnc_config['name']
+
     if 'repositories' not in app_cnc_config:
         return None
 
@@ -277,7 +284,7 @@ def init_app(app_cnc_config):
             continue
 
         user_dir = os.path.expanduser('~')
-        repo_base_dir = os.path.join(user_dir, '.pan_cnc', 'panhandler', 'repositories')
+        repo_base_dir = os.path.join(user_dir, '.pan_cnc', app_name, 'repositories')
         repo_dir = os.path.join(repo_base_dir, r['destination_directory'])
 
         repo_path = Path(repo_dir)
