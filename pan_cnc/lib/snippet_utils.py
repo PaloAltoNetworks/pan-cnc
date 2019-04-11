@@ -27,6 +27,7 @@ from yaml.parser import ParserError
 
 from . import jinja_filters
 from .exceptions import CCFParserError, SnippetNotFoundException
+from . import cnc_utils
 
 
 def load_service_snippets() -> list:
@@ -58,7 +59,7 @@ def load_all_snippets(app_dir) -> list:
             return snippet_list
 
     snippet_list = load_snippets_of_type(snippet_type=None, app_dir=app_dir)
-    cache.set('all_snippets', snippet_list)
+    cnc_utils.set_long_term_cached_value('all_snippets', snippet_list, 1800)
     return snippet_list
 
 
@@ -127,23 +128,33 @@ def load_snippets_of_type_from_dir(directory, snippet_type=None) -> list:
         print(f'Could not find meta-cnc files in dir {directory}')
         return snippet_list
 
-    if 'snippet_types' in cache:
+    snippet_dirs_dict = cnc_utils.get_long_term_cached_value('snippet_types')
+    if snippet_dirs_dict is not None:
         # snippet_types is a dict with a key for each directory
         # each directory value is another dict with keys for each snippet_type
-        snippet_dirs_dict = cache.get('snippet_types')
-        if snippets_dir in snippet_dirs_dict:
-            snippet_types_dict = snippet_dirs_dict[snippets_dir]
+        # snippet_dirs_dict = cache.get('snippet_types')
+        if str(snippets_dir) in snippet_dirs_dict:
+            snippet_types_dict = snippet_dirs_dict[str(snippets_dir)]
         else:
             snippet_types_dict = dict()
 
         if snippet_type in snippet_types_dict:
+            print(f'Cache hit for {snippet_type}')
             return snippet_types_dict[snippet_type]
-        else:
-            snippet_types_dict[snippet_type] = dict()
+
+        if snippet_type is None:
+            # check for JSON deserialized None value. Will appear here as string 'null'
+            if 'null' in snippet_types_dict:
+                print(f'Cache hit for {snippet_type}')
+                return snippet_types_dict['null']
+
+        snippet_types_dict[snippet_type] = dict()
+
     else:
         snippet_types_dict = dict()
         snippet_dirs_dict = dict()
 
+    print('Rebuilding Skillet cache')
     for d in snippets_dir.rglob('./*'):
         if d.is_dir() and '.git' in d.name:
             print(f'skipping .git dir {d.parent}')
@@ -175,8 +186,8 @@ def load_snippets_of_type_from_dir(directory, snippet_type=None) -> list:
                 raise CCFParserError
 
     snippet_types_dict[snippet_type] = snippet_list
-    snippet_dirs_dict[snippets_dir] = snippet_types_dict
-    cache.set('snippet_types', snippet_dirs_dict)
+    snippet_dirs_dict[str(snippets_dir)] = snippet_types_dict
+    cnc_utils.set_long_term_cached_value('snippet_types', snippet_dirs_dict, 7200)
     return snippet_list
 
 
@@ -305,8 +316,8 @@ def resolve_dependencies(snippet, app_dir, dependencies) -> list:
 
 
 def invalidate_snippet_caches() -> None:
-    cache.set('all_snippets', list())
-    cache.set('snippet_types', dict())
+    cnc_utils.set_long_term_cached_value('all_snippets', list(), 0)
+    cnc_utils.set_long_term_cached_value('snippet_types', dict(), 0)
 
 
 def load_all_labels(app_dir: str) -> list:

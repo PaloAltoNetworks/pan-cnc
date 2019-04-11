@@ -87,6 +87,11 @@ def get_repo_details(repo_name, repo_dir):
     :param repo_dir:
     :return:
     """
+
+    repo_detail = cnc_utils.get_long_term_cached_value(f'{repo_name}_detail')
+    if repo_detail:
+        return repo_detail
+
     repo = Repo(repo_dir)
 
     url = str(repo.remotes.origin.url)
@@ -131,6 +136,7 @@ def get_repo_details(repo_name, repo_dir):
     else:
         repo_detail['description'] = branch
 
+    cnc_utils.set_long_term_cached_value(f'{repo_name}_detail', repo_detail, 43200)
     return repo_detail
 
 
@@ -177,10 +183,11 @@ def get_repo_upstream_details(repo_name: str, repo_url: str) -> dict:
         return details
 
     cache_repo_name = repo_name.replace(' ', '_')
-    details = cnc_utils.get_cached_value(f'git_utils_upstream_{cache_repo_name}')
+    details = cnc_utils.get_long_term_cached_value(f'git_utils_upstream_{cache_repo_name}')
     if details is not None:
         return details
 
+    print('Not found in cache, loading from upstream')
     url_details = parse_repo_origin_url(repo_url)
     owner = url_details.get('owner', '')
     repo = url_details.get('repo', '')
@@ -189,7 +196,7 @@ def get_repo_upstream_details(repo_name: str, repo_url: str) -> dict:
         api_url = f'https://api.github.com/repos/{owner}/{repo}'
         detail_string = requests.get(api_url, verify=False)
         details = detail_string.json()
-        cnc_utils.set_cached_value(f'git_utils_upstream_{cache_repo_name}', details)
+        cnc_utils.set_long_term_cached_value(f'git_utils_upstream_{cache_repo_name}', details, 86400)
     except ConnectionResetError as cre:
         print('Could not get github details due to ConnectionResetError')
         print(cre)

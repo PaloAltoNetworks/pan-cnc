@@ -15,16 +15,18 @@
 # Author: Nathan Embery nembery@paloaltonetworks.com
 
 import io
+import json
 import os
 import pickle
 import re
 from pathlib import Path
 
 import pyAesCrypt
-from django.core.cache import cache
 from django.conf import settings
-from pan_cnc.lib import git_utils
+from django.core.cache import cache
 
+from pan_cnc.lib import git_utils
+from time import time
 
 def check_user_secret(user_id):
     secret_dir = os.path.expanduser('~/.pan_cnc')
@@ -152,7 +154,6 @@ def get_config_value(config_key, default=None):
 
 
 def load_panrc():
-
     config = dict()
     try:
         path = os.path.expanduser('~')
@@ -185,6 +186,81 @@ def get_cached_value(key):
 
 def set_cached_value(key, val):
     cache.set(key, val)
+
+
+def _load_long_term_cache():
+    path = os.path.expanduser('~')
+    cache_file = os.path.join(path, '.pan_cnc', 'cache')
+    if os.path.exists(cache_file):
+        with open(cache_file, 'r') as cf:
+            cache_contents = cf.read()
+            try:
+                lt_cache = json.loads(cache_contents)
+                cache.set('long_term_cache', lt_cache)
+            except ValueError as ve:
+                print('Could not load long term cache')
+                print(ve)
+                return None
+
+    return None
+
+
+def _save_long_term_cache(contents):
+    json_string = json.dumps(contents)
+
+    path = os.path.expanduser('~')
+    cache_file = os.path.join(path, '.pan_cnc', 'cache')
+    with open(cache_file, 'w+') as cf:
+        cf.write(json_string)
+
+
+def get_long_term_cached_value(key: str) -> any:
+    if 'long_term_cache' not in cache:
+        _load_long_term_cache()
+
+    ltc = cache.get('long_term_cache', dict())
+
+    if 'meta' not in ltc:
+        return None
+
+    if key not in ltc['meta']:
+        return None
+
+    now = time()
+
+    if 'time' not in ltc['meta'][key]:
+        return None
+    if 'life' not in ltc['meta'][key]:
+        return None
+
+    time_added = ltc['meta'][key]['time']
+    life = ltc['meta'][key]['life']
+
+    if (now - time_added) > life:
+        return None
+
+    print(f'Cache hit for {key}')
+    return ltc.get(key, None)
+
+
+def set_long_term_cached_value(key: str, value: any, life=3600) -> None:
+    if 'long_term_cache' not in cache:
+        _load_long_term_cache()
+
+    ltc = cache.get('long_term_cache', dict())
+    ltc[key] = value
+
+    # Ensure all meta values are kept around so we can evict items from the cache
+    if 'meta' not in ltc:
+        ltc['meta'] = dict()
+
+    ltc['meta'][key] = dict()
+    ltc['meta'][key]['time'] = time()
+    ltc['meta'][key]['life'] = life
+
+    cache.set('long_term_cache', ltc)
+    _save_long_term_cache(ltc)
+    return None
 
 
 def init_app(app_cnc_config):
@@ -221,8 +297,12 @@ def init_app(app_cnc_config):
         repo_url = r['url']
         repo_name = r['name']
         repo_branch = r['branch']
-        print(f'Pulling / Refreshing repository: {repo_url}')
-        git_utils.clone_or_update_repo(repo_dir, repo_name, repo_url, repo_branch)
+        cache_key = f"{repo_dir}_life"
+        cached = get_long_term_cached_value(cache_key)
+        if not cached:
+            print(f'Pulling / Refreshing repository: {repo_url}')
+            git_utils.clone_or_update_repo(repo_dir, repo_name, repo_url, repo_branch)
+            set_long_term_cached_value(cache_key, True, 3600)
 
     return None
 
@@ -248,5 +328,4 @@ def is_testing() -> bool:
     if os.environ.get('CNC_TEST', '') == 'TRUE':
         return True
     else:
-        print(os.environ)
         return False
