@@ -207,18 +207,17 @@ def load_snippet_with_name(snippet_name, app_dir) -> (dict, None):
     return None
 
 
-def get_snippet_metadata(snippet_name, app_dir) -> (str, None):
+def get_snippet_metadata(snippet_name, app_name) -> (str, None):
     """
     Returns the snippet metadata as a str
     :param snippet_name: name of the snippet
-    :param app_dir: current app
+    :param app_name: name of the current CNC application
     :return: str of .meta-cnc.yaml file
     """
-    app_dir = Path(os.path.join(settings.SRC_PATH, app_dir, 'snippets'))
+    app_dir = Path(os.path.join(settings.SRC_PATH, app_name, 'snippets'))
 
     home_dir = os.path.expanduser('~')
-    user_dir = Path(os.path.join(home_dir, '.pan_cnc', app_dir, 'repositories'))
-
+    user_dir = Path(os.path.join(home_dir, '.pan_cnc', app_name, 'repositories'))
     for snippets_dir in [app_dir, user_dir]:
         for d in snippets_dir.rglob('./*'):
             mdf = os.path.join(d, '.meta-cnc.yaml')
@@ -316,8 +315,17 @@ def resolve_dependencies(snippet, app_dir, dependencies) -> list:
 
 
 def invalidate_snippet_caches(app_name: str) -> None:
+    """
+    Clears the long term cache file
+    :param app_name: name of the CNC application
+    :return: None
+    """
     cnc_utils.set_long_term_cached_value(app_name, f'all_snippets', list(), 0)
     cnc_utils.set_long_term_cached_value(app_name, f'snippet_types', dict(), 0)
+
+    # also clear the in memory cache as well
+    cache_key = f'{app_name}_cache'
+    cache.set(cache_key, dict())
 
 
 def load_all_labels(app_dir: str) -> list:
