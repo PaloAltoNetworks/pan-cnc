@@ -52,14 +52,12 @@ def load_template_snippets() -> list:
 
 
 def load_all_snippets(app_dir) -> list:
-    # cache and keep all snippets when type == none
-    if 'all_snippets' in cache:
-        snippet_list = cache.get('all_snippets', [])
-        if snippet_list:
-            return snippet_list
+    all_snippets = cnc_utils.get_long_term_cached_value(app_dir, 'all_snippets')
+    if all_snippets is not None:
+        return all_snippets
 
     snippet_list = load_snippets_of_type(snippet_type=None, app_dir=app_dir)
-    cnc_utils.set_long_term_cached_value('all_snippets', snippet_list, 1800)
+    cnc_utils.set_long_term_cached_value(app_dir, 'all_snippets', snippet_list, 1800)
     return snippet_list
 
 
@@ -92,19 +90,20 @@ def load_snippets_of_type(snippet_type=None, app_dir=None) -> list:
     snippets_dir = Path(os.path.join(settings.SRC_PATH, app_dir, 'snippets'))
 
     user_dir = os.path.expanduser('~/.pan_cnc')
-    user_snippets_dir = os.path.join(user_dir, 'panhandler/repositories')
+    user_snippets_dir = os.path.join(user_dir, app_dir, 'repositories')
 
-    app_snippets = load_snippets_of_type_from_dir(snippets_dir, snippet_type)
-    user_snippets = load_snippets_of_type_from_dir(user_snippets_dir, snippet_type)
+    app_snippets = load_snippets_of_type_from_dir(app_dir, snippets_dir, snippet_type)
+    user_snippets = load_snippets_of_type_from_dir(app_dir, user_snippets_dir, snippet_type)
 
     all_snippets = app_snippets + user_snippets
     return all_snippets
 
 
-def load_snippets_of_type_from_dir(directory, snippet_type=None) -> list:
+def load_snippets_of_type_from_dir(app_name: str, directory: str, snippet_type=None) -> list:
     """
     Loads a list of snippets of the given type, or all snippets if snippet_type is None from a specified directory
     This is useful to load all snippets that come from a specific repository for example
+    :param app_name: CNC application name to keep caches seperate by namespace
     :param directory: full path to directory from which to search for meta-cnc files
     :param snippet_type: type of snippet to add to the list if found
     :return: list of snippet objects
@@ -112,7 +111,7 @@ def load_snippets_of_type_from_dir(directory, snippet_type=None) -> list:
     snippet_list = list()
 
     snippets_dir = Path(directory)
-    src_path = Path(settings.SRC_PATH)
+    # src_path = Path(settings.SRC_PATH)
 
     # user_dir = os.path.expanduser('~/.pan_cnc')
     # user_snippets_dir = os.path.join(user_dir, 'panhandler/repositories')
@@ -128,7 +127,8 @@ def load_snippets_of_type_from_dir(directory, snippet_type=None) -> list:
         print(f'Could not find meta-cnc files in dir {directory}')
         return snippet_list
 
-    snippet_dirs_dict = cnc_utils.get_long_term_cached_value('snippet_types')
+    snippet_dirs_dict = cnc_utils.get_long_term_cached_value(app_name, f'snippet_types_in_{directory}')
+
     if snippet_dirs_dict is not None:
         # snippet_types is a dict with a key for each directory
         # each directory value is another dict with keys for each snippet_type
@@ -187,7 +187,7 @@ def load_snippets_of_type_from_dir(directory, snippet_type=None) -> list:
 
     snippet_types_dict[snippet_type] = snippet_list
     snippet_dirs_dict[str(snippets_dir)] = snippet_types_dict
-    cnc_utils.set_long_term_cached_value('snippet_types', snippet_dirs_dict, 7200)
+    cnc_utils.set_long_term_cached_value(app_name, f'snippet_types_in_{directory}', snippet_dirs_dict, 7200)
     return snippet_list
 
 
@@ -217,7 +217,7 @@ def get_snippet_metadata(snippet_name, app_dir) -> (str, None):
     app_dir = Path(os.path.join(settings.SRC_PATH, app_dir, 'snippets'))
 
     home_dir = os.path.expanduser('~')
-    user_dir = Path(os.path.join(home_dir, '.pan_cnc', 'panhandler', 'repositories'))
+    user_dir = Path(os.path.join(home_dir, '.pan_cnc', app_dir, 'repositories'))
 
     for snippets_dir in [app_dir, user_dir]:
         for d in snippets_dir.rglob('./*'):
@@ -315,9 +315,9 @@ def resolve_dependencies(snippet, app_dir, dependencies) -> list:
     return dependencies
 
 
-def invalidate_snippet_caches() -> None:
-    cnc_utils.set_long_term_cached_value('all_snippets', list(), 0)
-    cnc_utils.set_long_term_cached_value('snippet_types', dict(), 0)
+def invalidate_snippet_caches(app_name: str) -> None:
+    cnc_utils.set_long_term_cached_value(app_name, f'all_snippets', list(), 0)
+    cnc_utils.set_long_term_cached_value(app_name, f'snippet_types', dict(), 0)
 
 
 def load_all_labels(app_dir: str) -> list:

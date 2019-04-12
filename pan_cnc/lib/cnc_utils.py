@@ -188,37 +188,60 @@ def set_cached_value(key, val):
     cache.set(key, val)
 
 
-def _load_long_term_cache():
+def _load_long_term_cache(app_name):
     path = os.path.expanduser('~')
-    cache_file = os.path.join(path, '.pan_cnc', 'cache')
-    if os.path.exists(cache_file):
-        with open(cache_file, 'r') as cf:
-            cache_contents = cf.read()
-            try:
-                lt_cache = json.loads(cache_contents)
-                cache.set('long_term_cache', lt_cache)
-            except ValueError as ve:
-                print('Could not load long term cache')
-                print(ve)
-                return None
+
+    cache_dir = os.path.join(path, '.pan_cnc', app_name)
+
+    if not os.path.exists(cache_dir):
+        os.makedirs(cache_dir, mode=600)
+
+    cache_file = os.path.join(cache_dir, 'cache')
+
+    if not os.path.exists(cache_file):
+        with open(cache_file, 'w') as cf:
+            cf.write(json.dumps(dict()))
+
+        cache.set(f'{app_name}_cache', dict())
+        os.chmod(cache_file, mode=0o600)
+        return None
+
+    with open(cache_file, 'r+') as cf:
+        cache_contents = cf.read()
+        try:
+            lt_cache = json.loads(cache_contents)
+            cache.set(f'{app_name}_cache', lt_cache)
+        except ValueError as ve:
+            print('Could not load long term cache')
+            print(ve)
+            return None
 
     return None
 
 
-def _save_long_term_cache(contents):
+def _save_long_term_cache(app_name, contents):
     json_string = json.dumps(contents)
 
     path = os.path.expanduser('~')
-    cache_file = os.path.join(path, '.pan_cnc', 'cache')
+    cache_dir = os.path.join(path, '.pan_cnc', app_name)
+
+    if not os.path.exists(cache_dir):
+        os.makedirs(cache_dir, mode=600)
+
+    cache_file = os.path.join(cache_dir, 'cache')
+
     with open(cache_file, 'w+') as cf:
         cf.write(json_string)
 
 
-def get_long_term_cached_value(key: str) -> any:
-    if 'long_term_cache' not in cache:
-        _load_long_term_cache()
+def get_long_term_cached_value(app_name: str, key: str) -> any:
 
-    ltc = cache.get('long_term_cache', dict())
+    cache_key = f'{app_name}_cache'
+
+    if cache_key not in cache:
+        _load_long_term_cache(app_name)
+
+    ltc = cache.get(cache_key, dict())
 
     if 'meta' not in ltc:
         return None
@@ -243,11 +266,14 @@ def get_long_term_cached_value(key: str) -> any:
     return ltc.get(key, None)
 
 
-def set_long_term_cached_value(key: str, value: any, life=3600) -> None:
-    if 'long_term_cache' not in cache:
-        _load_long_term_cache()
+def set_long_term_cached_value(app_name: str, key: str, value: any, life=3600) -> None:
 
-    ltc = cache.get('long_term_cache', dict())
+    cache_key = f'{app_name}_cache'
+
+    if cache_key not in cache:
+        _load_long_term_cache(app_name)
+
+    ltc = cache.get(cache_key, dict())
     ltc[key] = value
 
     # Ensure all meta values are kept around so we can evict items from the cache
@@ -258,8 +284,8 @@ def set_long_term_cached_value(key: str, value: any, life=3600) -> None:
     ltc['meta'][key]['time'] = time()
     ltc['meta'][key]['life'] = life
 
-    cache.set('long_term_cache', ltc)
-    _save_long_term_cache(ltc)
+    cache.set(cache_key, ltc)
+    _save_long_term_cache(app_name, ltc)
     return None
 
 
@@ -305,11 +331,11 @@ def init_app(app_cnc_config):
         repo_name = r['name']
         repo_branch = r['branch']
         cache_key = f"{repo_dir}_life"
-        cached = get_long_term_cached_value(cache_key)
+        cached = get_long_term_cached_value(app_name, cache_key)
         if not cached:
             print(f'Pulling / Refreshing repository: {repo_url}')
             git_utils.clone_or_update_repo(repo_dir, repo_name, repo_url, repo_branch)
-            set_long_term_cached_value(cache_key, True, 3600)
+            set_long_term_cached_value(app_name, cache_key, True, 3600)
 
     return None
 
