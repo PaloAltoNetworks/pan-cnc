@@ -28,6 +28,7 @@ from django.core.cache import cache
 from pan_cnc.lib import git_utils
 from time import time
 
+
 def check_user_secret(user_id):
     secret_dir = os.path.expanduser('~/.pan_cnc')
     file_path = os.path.join(secret_dir, user_id)
@@ -129,7 +130,7 @@ def save_user_secrets(user_id, secret_dict, passphrase):
             fps.write(secret_output_stream.getvalue())
     except OSError as ose:
         print('Caught Error saving user secrets!')
-        return Fals
+        return False
     except BaseException as be:
         print('Caught Error saving user secrets!')
         return False
@@ -219,7 +220,7 @@ def _load_long_term_cache(app_name):
     return None
 
 
-def _save_long_term_cache(app_name, contents):
+def save_long_term_cache(app_name, contents):
     json_string = json.dumps(contents)
 
     path = os.path.expanduser('~')
@@ -266,7 +267,7 @@ def get_long_term_cached_value(app_name: str, key: str) -> any:
     return ltc.get(key, None)
 
 
-def set_long_term_cached_value(app_name: str, key: str, value: any, life=3600) -> None:
+def set_long_term_cached_value(app_name: str, key: str, value: any, life=3600, cache_type='snippet') -> None:
 
     cache_key = f'{app_name}_cache'
 
@@ -274,19 +275,53 @@ def set_long_term_cached_value(app_name: str, key: str, value: any, life=3600) -
         _load_long_term_cache(app_name)
 
     ltc = cache.get(cache_key, dict())
-    ltc[key] = value
 
-    # Ensure all meta values are kept around so we can evict items from the cache
-    if 'meta' not in ltc:
-        ltc['meta'] = dict()
+    if key in ltc and value is None:
+        ltc.pop(key)
+        if 'meta' in ltc and key in ltc['meta']:
+            ltc['meta'].pop(key)
 
-    ltc['meta'][key] = dict()
-    ltc['meta'][key]['time'] = time()
-    ltc['meta'][key]['life'] = life
+    else:
+        ltc[key] = value
+
+        # Ensure all meta values are kept around so we can evict items from the cache
+        if 'meta' not in ltc:
+            ltc['meta'] = dict()
+
+        ltc['meta'][key] = dict()
+        ltc['meta'][key]['time'] = time()
+        ltc['meta'][key]['life'] = life
+        ltc['meta'][key]['cache_type'] = cache_type
 
     cache.set(cache_key, ltc)
-    _save_long_term_cache(app_name, ltc)
+
+    apps_to_save = cache.get('ltc_dirty', list())
+
+    if type(apps_to_save) is not list:
+        apps_to_save = list()
+
+    if app_name not in apps_to_save:
+        apps_to_save.append(app_name)
+
+    cache.set('ltc_dirty', apps_to_save)
+    # save_long_term_cache(app_name, ltc)
     return None
+
+
+def evict_cache_items_of_type(app_name, cache_type):
+    cache_key = f'{app_name}_cache'
+
+    if cache_key not in cache:
+        _load_long_term_cache(app_name)
+
+    ltc = cache.get(cache_key, dict())
+    if 'meta' in ltc:
+        for key in ltc['meta']:
+            if 'cache_type' in ltc['meta'][key]:
+                if ltc['meta'][key]['cache_type'] == cache_type:
+                    if key in ltc:
+                        print(f'Evicting item {key}')
+                        set_long_term_cached_value(app_name, key, None, 0, cache_type)
 
 
 def init_app(app_cnc_config):
@@ -335,7 +370,8 @@ def init_app(app_cnc_config):
         if not cached:
             print(f'Pulling / Refreshing repository: {repo_url}')
             git_utils.clone_or_update_repo(repo_dir, repo_name, repo_url, repo_branch)
-            set_long_term_cached_value(app_name, cache_key, True, 3600)
+            # only check for updates every 2 hours at most on app reload
+            set_long_term_cached_value(app_name, cache_key, True, 7200, 'imported_repos')
 
     return None
 

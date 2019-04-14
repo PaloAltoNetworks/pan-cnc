@@ -137,7 +137,7 @@ def get_repo_details(repo_name, repo_dir, app_name='cnc'):
     else:
         repo_detail['description'] = branch
 
-    cnc_utils.set_long_term_cached_value(app_name, f'{repo_name}_detail', repo_detail, 43200)
+    cnc_utils.set_long_term_cached_value(app_name, f'{repo_name}_detail', repo_detail, 43200, 'git_repo_details')
     return repo_detail
 
 
@@ -198,7 +198,8 @@ def get_repo_upstream_details(repo_name: str, repo_url: str, app_name: str) -> d
         api_url = f'https://api.github.com/repos/{owner}/{repo}'
         detail_string = requests.get(api_url, verify=False)
         details = detail_string.json()
-        cnc_utils.set_long_term_cached_value(app_name, f'git_utils_upstream_{cache_repo_name}', details, 86400)
+        cnc_utils.set_long_term_cached_value(app_name, f'git_utils_upstream_{cache_repo_name}', details, 86400,
+                                             'git_repo_details')
     except ConnectionResetError as cre:
         print('Could not get github details due to ConnectionResetError')
         print(cre)

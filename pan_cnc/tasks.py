@@ -191,6 +191,7 @@ def python3_init_env(working_dir):
     env['PIPENV_DEFAULT_PYTHON_VERSION'] = "3.6"
     env['PIPENV_NOSPIN'] = "1"
     env['PIPENV_YES'] = "1"
+    env['PIPENV_SKIP_LOCK'] = "1"
     return exec_local_task(cmd_seq, working_dir, env)
 
 
@@ -204,6 +205,7 @@ def python3_init_with_deps(working_dir):
     env['PIPENV_DEFAULT_PYTHON_VERSION'] = "3.6"
     env['PIPENV_NOSPIN'] = "1"
     env['PIPENV_YES'] = "1"
+    env['PIPENV_SKIP_LOCK'] = "1"
     return exec_local_task(cmd_seq, working_dir, env)
 
 
@@ -217,6 +219,7 @@ def python3_init_existing(working_dir):
     env['PIPENV_DEFAULT_PYTHON_VERSION'] = "3.6"
     env['PIPENV_NOSPIN'] = "1"
     env['PIPENV_YES'] = "1"
+    env['PIPENV_SKIP_LOCK'] = "1"
     return exec_local_task(cmd_seq, working_dir, env)
 
 
@@ -234,6 +237,7 @@ def python3_execute_script(working_dir, script, args):
     env['PIPENV_DEFAULT_PYTHON_VERSION'] = "3.6"
     env['PIPENV_NOSPIN'] = "1"
     env['PIPENV_YES'] = "1"
+    env['PIPENV_SKIP_LOCK'] = "1"
     return exec_local_task(cmd_seq, working_dir, env)
 
 

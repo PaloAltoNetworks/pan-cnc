@@ -56,6 +56,7 @@ def load_all_snippets(app_dir) -> list:
     if all_snippets is not None:
         return all_snippets
 
+    print('Getting all snippets again')
     snippet_list = load_snippets_of_type(snippet_type=None, app_dir=app_dir)
     cnc_utils.set_long_term_cached_value(app_dir, 'all_snippets', snippet_list, 1800)
     return snippet_list
@@ -318,14 +319,17 @@ def invalidate_snippet_caches(app_name: str) -> None:
     """
     Clears the long term cache file
     :param app_name: name of the CNC application
+    :param key: name of a specific key to clear, defaults to all
     :return: None
     """
-    cnc_utils.set_long_term_cached_value(app_name, f'all_snippets', list(), 0)
-    cnc_utils.set_long_term_cached_value(app_name, f'snippet_types', dict(), 0)
+    cnc_utils.set_long_term_cached_value(app_name, f'all_snippets', None, 0)
+    cnc_utils.set_long_term_cached_value(app_name, f'snippet_types', None, 0)
 
     # also clear the in memory cache as well
-    cache_key = f'{app_name}_cache'
-    cache.set(cache_key, dict())
+    # FIXME - try to be smarter about what we evict from the cache!
+    cnc_utils.evict_cache_items_of_type(app_name, cache_type='snippet')
+    # cache_key = f'{app_name}_cache'
+    # cache.set(cache_key, dict())
 
 
 def load_all_labels(app_dir: str) -> list:
