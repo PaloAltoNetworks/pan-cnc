@@ -2077,3 +2077,15 @@ class DebugMetadataView(CNCView):
         context['header'] = 'Debug Metadata'
         context['title'] = 'Metadata for %s' % self.snippet_name
         return context
+
+
+class ClearCacheView(CNCBaseAuth, RedirectView):
+    """
+    Clears the long term cache
+    """
+
+    def get_redirect_url(self, *args, **kwargs):
+        cnc_utils.clear_long_term_cache(self.app_dir)
+        messages.add_message(self.request, messages.INFO, 'Long term cache cleared')
+        return '/'
+

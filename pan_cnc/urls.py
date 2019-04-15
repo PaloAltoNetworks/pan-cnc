@@ -60,7 +60,8 @@ urlpatterns = [
     path('editTarget', pan_cnc_views.EditTargetView.as_view()),
     path('editRestTarget', pan_cnc_views.EditRestTargetView.as_view()),
     path('provision', pan_cnc_views.ProvisionSnippetView.as_view()),
-    path('terraform', pan_cnc_views.EditTerraformView.as_view())
+    path('terraform', pan_cnc_views.EditTerraformView.as_view()),
+    path('clearCache', pan_cnc_views.ClearCacheView.as_view())
 ]
 
 print('Configuring URLs for installed apps')

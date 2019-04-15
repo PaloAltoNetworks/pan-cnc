@@ -188,7 +188,7 @@ def python3_init_env(working_dir):
     env = dict()
     env['PIPENV_IGNORE_VIRTUALENVS'] = "1"
     env['PIPENV_VENV_IN_PROJECT'] = "1"
-    env['PIPENV_DEFAULT_PYTHON_VERSION'] = "3.6"
+    # env['PIPENV_DEFAULT_PYTHON_VERSION'] = "3.6"
     env['PIPENV_NOSPIN'] = "1"
     env['PIPENV_YES'] = "1"
     env['PIPENV_SKIP_LOCK'] = "1"
@@ -202,7 +202,7 @@ def python3_init_with_deps(working_dir):
     env = dict()
     env['PIPENV_IGNORE_VIRTUALENVS'] = "1"
     env['PIPENV_VENV_IN_PROJECT'] = "1"
-    env['PIPENV_DEFAULT_PYTHON_VERSION'] = "3.6"
+    # env['PIPENV_DEFAULT_PYTHON_VERSION'] = "3.6"
     env['PIPENV_NOSPIN'] = "1"
     env['PIPENV_YES'] = "1"
     env['PIPENV_SKIP_LOCK'] = "1"
@@ -216,7 +216,7 @@ def python3_init_existing(working_dir):
     env = dict()
     env['PIPENV_IGNORE_VIRTUALENVS'] = "1"
     env['PIPENV_VENV_IN_PROJECT'] = "1"
-    env['PIPENV_DEFAULT_PYTHON_VERSION'] = "3.6"
+    # env['PIPENV_DEFAULT_PYTHON_VERSION'] = "3.6"
     env['PIPENV_NOSPIN'] = "1"
     env['PIPENV_YES'] = "1"
     env['PIPENV_SKIP_LOCK'] = "1"
@@ -234,7 +234,7 @@ def python3_execute_script(working_dir, script, args):
     env = dict()
     env['PIPENV_IGNORE_VIRTUALENVS'] = "1"
     env['PIPENV_VENV_IN_PROJECT'] = "1"
-    env['PIPENV_DEFAULT_PYTHON_VERSION'] = "3.6"
+    # env['PIPENV_DEFAULT_PYTHON_VERSION'] = "3.6"
     env['PIPENV_NOSPIN'] = "1"
     env['PIPENV_YES'] = "1"
     env['PIPENV_SKIP_LOCK'] = "1"

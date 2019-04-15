@@ -308,6 +308,24 @@ def set_long_term_cached_value(app_name: str, key: str, value: any, life=3600, c
     return None
 
 
+def clear_long_term_cache(app_name: str) -> None:
+    ltc = dict()
+    cache_key = f'{app_name}_cache'
+    cache.set(cache_key, ltc)
+
+    apps_to_save = cache.get('ltc_dirty', list())
+
+    if type(apps_to_save) is not list:
+        apps_to_save = list()
+
+    if app_name not in apps_to_save:
+        apps_to_save.append(app_name)
+
+    cache.set('ltc_dirty', apps_to_save)
+    # save_long_term_cache(app_name, ltc)
+    return None
+
+
 def evict_cache_items_of_type(app_name, cache_type):
     cache_key = f'{app_name}_cache'
 
