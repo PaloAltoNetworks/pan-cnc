@@ -27,6 +27,7 @@ from django.core.cache import cache
 
 from pan_cnc.lib import git_utils
 from time import time
+from pan_cnc.lib import snippet_utils
 
 
 def check_user_secret(user_id):
@@ -387,7 +388,10 @@ def init_app(app_cnc_config):
         cached = get_long_term_cached_value(app_name, cache_key)
         if not cached:
             print(f'Pulling / Refreshing repository: {repo_url}')
-            git_utils.clone_or_update_repo(repo_dir, repo_name, repo_url, repo_branch)
+            if git_utils.clone_or_update_repo(repo_dir, repo_name, repo_url, repo_branch):
+                # if we have updated something, then we need to clear the caches
+                snippet_utils.invalidate_snippet_caches(app_name)
+
             # only check for updates every 2 hours at most on app reload
             set_long_term_cached_value(app_name, cache_key, True, 7200, 'imported_repos')
 

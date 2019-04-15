@@ -41,11 +41,14 @@ def clone_or_update_repo(repo_dir, repo_name, repo_url, branch='master'):
         if len(f) > 0:
             flags = f[0].flags
             if flags == 4:
-                return "Already up to date"
+                print("Already up to date")
+                return False
             elif flags == 64:
-                return "Updated to Latest"
+                print("Updated to Latest")
+                return True
             else:
-                return "Unknown flag returned"
+                print("Unknown flag returned")
+                return False
 
         repo.close()
         return True
