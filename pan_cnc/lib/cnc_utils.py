@@ -261,7 +261,12 @@ def get_long_term_cached_value(app_name: str, key: str) -> any:
     time_added = ltc['meta'][key]['time']
     life = ltc['meta'][key]['life']
 
+    # Allow -1 to indicate cached items that should stay cached forever
+    if life == -1:
+        return ltc.get(key, None)
+
     if (now - time_added) > life:
+        print(f'Aging out cache item for {key}')
         return None
 
     print(f'Cache hit for {key}')

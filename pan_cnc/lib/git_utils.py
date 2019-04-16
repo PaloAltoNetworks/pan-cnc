@@ -140,7 +140,7 @@ def get_repo_details(repo_name, repo_dir, app_name='cnc'):
     else:
         repo_detail['description'] = branch
 
-    cnc_utils.set_long_term_cached_value(app_name, f'{repo_name}_detail', repo_detail, 43200, 'git_repo_details')
+    cnc_utils.set_long_term_cached_value(app_name, f'{repo_name}_detail', repo_detail, 604800, 'git_repo_details')
     return repo_detail
 
 

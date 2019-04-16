@@ -58,7 +58,7 @@ def load_all_snippets(app_dir) -> list:
 
     print('Getting all snippets again')
     snippet_list = load_snippets_of_type(snippet_type=None, app_dir=app_dir)
-    cnc_utils.set_long_term_cached_value(app_dir, 'all_snippets', snippet_list, 1800)
+    cnc_utils.set_long_term_cached_value(app_dir, 'all_snippets', snippet_list, -1)
     return snippet_list
 
 
@@ -112,17 +112,6 @@ def load_snippets_of_type_from_dir(app_name: str, directory: str, snippet_type=N
     snippet_list = list()
 
     snippets_dir = Path(directory)
-    # src_path = Path(settings.SRC_PATH)
-
-    # user_dir = os.path.expanduser('~/.pan_cnc')
-    # user_snippets_dir = os.path.join(user_dir, 'panhandler/repositories')
-
-    # if src_path not in snippets_dir.parents and user_snippets_dir not in snippets_dir.parents:
-    #     # do not allow relative paths from going outside of our app root
-    #     print('Not allowing escape from application source path')
-    #     print(src_path)
-    #     print(user_snippets_dir)
-    #     return snippet_list
 
     if not snippets_dir.exists():
         print(f'Could not find meta-cnc files in dir {directory}')
@@ -155,40 +144,68 @@ def load_snippets_of_type_from_dir(app_name: str, directory: str, snippet_type=N
         snippet_types_dict = dict()
         snippet_dirs_dict = dict()
 
-    print('Rebuilding Skillet cache')
-    for d in snippets_dir.rglob('./*'):
-        if d.is_dir() and '.git' in d.name:
-            print(f'skipping .git dir {d.parent}')
-            continue
+    print(f'Rebuilding Skillet cache for dir {directory}')
 
-        if d.is_file() and d.name == '.meta-cnc.yaml':
-            # if os.path.isfile(mdf):
-            # snippet_path = os.path.dirname(mdf)
-            snippet_path = str(d.parent.absolute())
-            try:
-                with d.open(mode='r') as sc:
-                    raw_service_config = oyaml.safe_load(sc.read())
-                    service_config = _normalize_snippet_structure(raw_service_config)
-                    service_config['snippet_path'] = snippet_path
-                    if snippet_type is not None:
-                        if 'type' in service_config and service_config['type'] == snippet_type \
-                                and 'name' in service_config:
-                            snippet_list.append(service_config)
-                    else:
-                        snippet_list.append(service_config)
-
-            except IOError as ioe:
-                print('Could not open metadata file in dir %s' % d.parent)
-                print(ioe)
-                raise CCFParserError
-            except ParserError as pe:
-                print('Could not parse metadata file in dir %s' % d.parent)
-                print(pe)
-                raise CCFParserError
-
+    snippet_list = _check_dir(snippets_dir, snippet_type, list())
     snippet_types_dict[snippet_type] = snippet_list
     snippet_dirs_dict[str(snippets_dir)] = snippet_types_dict
-    cnc_utils.set_long_term_cached_value(app_name, f'snippet_types_in_{directory}', snippet_dirs_dict, 7200)
+    # cache these items indefinitely
+    cnc_utils.set_long_term_cached_value(app_name, f'snippet_types_in_{directory}', snippet_dirs_dict, -1)
+    return snippet_list
+
+
+def _check_dir(directory: Path, snippet_type: str, snippet_list: list) -> list:
+    """
+    Recursive function to look for all files in the current directory with a name matching '.meta-cnc.yaml'
+    otherwise, iterate through all sub-dirs and skip dirs with name that match '.git', '.venv', and '.terraform'
+    will descend into all other dirs and call itself again.
+    Returns a list of compiled skillets
+    :param directory: PosixPath of directory to begin searching
+    :param snippet_type: type of skillet to match
+    :param snippet_list: combined list of all loaded skillets
+    :return: list of dicts containing loaded skillets
+    """
+
+    for d in directory.glob('.meta-cnc.yaml'):
+        snippet_path = str(d.parent.absolute())
+        print(f'snippet_path is {snippet_path}')
+        try:
+            with d.open(mode='r') as sc:
+                raw_service_config = oyaml.safe_load(sc.read())
+                service_config = _normalize_snippet_structure(raw_service_config)
+                service_config['snippet_path'] = snippet_path
+                if snippet_type is not None:
+                    if 'type' in service_config and service_config['type'] == snippet_type \
+                            and 'name' in service_config:
+                        snippet_list.append(service_config)
+                else:
+                    snippet_list.append(service_config)
+
+        except IOError as ioe:
+            print('Could not open metadata file in dir %s' % d.parent)
+            print(ioe)
+            raise CCFParserError
+        except ParserError as pe:
+            print('Could not parse metadata file in dir %s' % d.parent)
+            print(pe)
+            raise CCFParserError
+
+    # Do not descend into sub dirs after a .meta-cnc file has already been found
+    if snippet_list:
+        return snippet_list
+
+    for d in directory.iterdir():
+        if d.is_file():
+            continue
+        if '.git' in d.name:
+            continue
+        if '.venv' in d.name:
+            continue
+        if '.terraform' in d.name:
+            continue
+        if d.is_dir():
+            snippet_list.extend(_check_dir(d, snippet_type, list()))
+
     return snippet_list
 
 
