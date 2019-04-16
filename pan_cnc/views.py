@@ -2087,6 +2087,7 @@ class ClearCacheView(CNCBaseAuth, RedirectView):
     """
 
     def get_redirect_url(self, *args, **kwargs):
+        print('Clearing Cache')
         cnc_utils.clear_long_term_cache(self.app_dir)
         messages.add_message(self.request, messages.INFO, 'Long term cache cleared')
         return '/'

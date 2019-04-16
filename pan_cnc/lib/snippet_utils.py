@@ -232,20 +232,17 @@ def get_snippet_metadata(snippet_name, app_name) -> (str, None):
     :param app_name: name of the current CNC application
     :return: str of .meta-cnc.yaml file
     """
-    app_dir = Path(os.path.join(settings.SRC_PATH, app_name, 'snippets'))
-
-    home_dir = os.path.expanduser('~')
-    user_dir = Path(os.path.join(home_dir, '.pan_cnc', app_name, 'repositories'))
-    for snippets_dir in [app_dir, user_dir]:
-        for d in snippets_dir.rglob('./*'):
-            mdf = os.path.join(d, '.meta-cnc.yaml')
-            if os.path.isfile(mdf):
-                snippet_path = os.path.dirname(mdf)
+    skillet = load_snippet_with_name(snippet_name, app_name)
+    if skillet is not None and 'snippet_path' in skillet:
+        parent = Path(skillet['snippet_path'])
+        if parent.exists():
+            mdf = parent.joinpath('.meta-cnc.yaml')
+            if mdf.exists() and mdf.is_file():
                 try:
                     with open(mdf, 'r') as sc:
                         snippet_data = oyaml.safe_load(sc.read())
                         if 'name' in snippet_data and snippet_data['name'] == snippet_name:
-                            print(f'Found {snippet_name} at {snippet_path}')
+                            print(f'Found {snippet_name} at {parent.absolute()}')
                             sc.seek(0)
                             return sc.read()
                 except IOError as ioe:

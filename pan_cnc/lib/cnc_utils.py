@@ -329,6 +329,7 @@ def clear_long_term_cache(app_name: str) -> None:
 
     cache.set('ltc_dirty', apps_to_save)
     # save_long_term_cache(app_name, ltc)
+    print('Cleared')
     return None
 
 
