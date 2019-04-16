@@ -2072,6 +2072,8 @@ class DebugMetadataView(CNCView):
 
     def get_context_data(self, **kwargs):
         snippet_data = snippet_utils.get_snippet_metadata(self.snippet_name, self.app_dir)
+        snippet = snippet_utils.load_snippet_with_name(self.snippet_name, self.app_dir)
+        print(f"loaded snippet from {snippet['snippet_path']}")
         context = super().get_context_data()
         context['results'] = snippet_data
         context['header'] = 'Debug Metadata'

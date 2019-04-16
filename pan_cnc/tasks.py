@@ -184,61 +184,43 @@ def terraform_refresh(terraform_dir, tf_vars):
 @shared_task
 def python3_init_env(working_dir):
     print('Executing task Python3 init')
-    cmd_seq = ['pipenv', 'install']
+    cmd_seq = ['python3', '-m', 'virtualenv', '.venv']
     env = dict()
-    env['PIPENV_IGNORE_VIRTUALENVS'] = "1"
-    env['PIPENV_VENV_IN_PROJECT'] = "1"
-    # env['PIPENV_DEFAULT_PYTHON_VERSION'] = "3.6"
-    env['PIPENV_NOSPIN'] = "1"
-    env['PIPENV_YES'] = "1"
-    env['PIPENV_SKIP_LOCK'] = "1"
+    env['PYTHONUNBUFFERED'] = "1"
     return exec_local_task(cmd_seq, working_dir, env)
 
 
 @shared_task
 def python3_init_with_deps(working_dir):
     print('Executing task Python3 init with Dependencies')
-    cmd_seq = ['pipenv', 'install', '-r', 'requirements.txt']
-    # cmd_seq = ['python3', '-m', 'virtualenv', '.venv']
+    # cmd_seq = ['pipenv', 'install', '-r', 'requirements.txt']
+    cmd_seq = ['python3', '-m', 'virtualenv', '.venv', '&&',
+               './.venv/bin/python3', '-m', 'pip', 'install', '-r', 'requirements.txt']
     env = dict()
-    env['PIPENV_IGNORE_VIRTUALENVS'] = "1"
-    env['PIPENV_VENV_IN_PROJECT'] = "1"
-    # env['PIPENV_DEFAULT_PYTHON_VERSION'] = "3.6"
-    env['PIPENV_NOSPIN'] = "1"
-    env['PIPENV_YES'] = "1"
-    env['PIPENV_SKIP_LOCK'] = "1"
+    env['PYTHONUNBUFFERED'] = "1"
     return exec_local_task(cmd_seq, working_dir, env)
 
 
 @shared_task
 def python3_init_existing(working_dir):
     print('Executing task Python3 init with Dependencies')
-    cmd_seq = ['pipenv', 'update', '--bare']
+    # cmd_seq = ['pipenv', 'update', '--bare']
+    cmd_seq = ['./.venv/bin/python3', '-m', 'pip', 'install', '--upgrade', '-r', 'requirements.txt']
     env = dict()
-    env['PIPENV_IGNORE_VIRTUALENVS'] = "1"
-    env['PIPENV_VENV_IN_PROJECT'] = "1"
-    # env['PIPENV_DEFAULT_PYTHON_VERSION'] = "3.6"
-    env['PIPENV_NOSPIN'] = "1"
-    env['PIPENV_YES'] = "1"
-    env['PIPENV_SKIP_LOCK'] = "1"
+    env['PYTHONUNBUFFERED'] = "1"
     return exec_local_task(cmd_seq, working_dir, env)
 
 
 @shared_task
 def python3_execute_script(working_dir, script, args):
     print(f'Executing task Python3 {script}')
-    cmd_seq = ['pipenv', 'run', 'python3', '-u', script]
+    cmd_seq = ['./.venv/bin/python3', '-u', script]
 
     for k, v in args.items():
         cmd_seq.append(f'--{k}="{v}"')
 
     env = dict()
-    env['PIPENV_IGNORE_VIRTUALENVS'] = "1"
-    env['PIPENV_VENV_IN_PROJECT'] = "1"
-    # env['PIPENV_DEFAULT_PYTHON_VERSION'] = "3.6"
-    env['PIPENV_NOSPIN'] = "1"
-    env['PIPENV_YES'] = "1"
-    env['PIPENV_SKIP_LOCK'] = "1"
+    env['PYTHONUNBUFFERED'] = "1"
     return exec_local_task(cmd_seq, working_dir, env)
 
 
@@ -253,3 +235,4 @@ def python3_execute_bare_script(working_dir, script, args):
     env = dict()
     env['PYTHONUNBUFFERED'] = "1"
     return exec_local_task(cmd_seq, working_dir, env)
+
