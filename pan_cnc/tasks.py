@@ -199,6 +199,7 @@ def python3_init_env(working_dir):
 def python3_init_with_deps(working_dir):
     print('Executing task Python3 init with Dependencies')
     cmd_seq = ['pipenv', 'install', '-r', 'requirements.txt']
+    # cmd_seq = ['python3', '-m', 'virtualenv', '.venv']
     env = dict()
     env['PIPENV_IGNORE_VIRTUALENVS'] = "1"
     env['PIPENV_VENV_IN_PROJECT'] = "1"
@@ -229,7 +230,7 @@ def python3_execute_script(working_dir, script, args):
     cmd_seq = ['pipenv', 'run', 'python3', '-u', script]
 
     for k, v in args.items():
-        cmd_seq.append(f'--{k}={v}')
+        cmd_seq.append(f'--{k}="{v}"')
 
     env = dict()
     env['PIPENV_IGNORE_VIRTUALENVS'] = "1"
@@ -247,7 +248,7 @@ def python3_execute_bare_script(working_dir, script, args):
     cmd_seq = ['python3', '-u', script]
 
     for k, v in args.items():
-        cmd_seq.append(f'--{k}={v}')
+        cmd_seq.append(f'--{k}="{v}"')
 
     env = dict()
     env['PYTHONUNBUFFERED'] = "1"
