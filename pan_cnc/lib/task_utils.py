@@ -96,17 +96,16 @@ def python3_init(resource_def) -> AsyncResult:
     req_file = os.path.join(resource_dir, 'requirements.txt')
     print(f"req_file is {req_file}")
 
-    init_done_file = os.path.join(resource_dir, '.pipenv_init_done')
+    init_done_file = os.path.join(resource_dir, '.python3_init_done')
 
     with open(init_done_file, 'w+') as init_done:
         init_done.write('y')
 
-    pip_lock_file = os.path.join(resource_dir, 'Pipfile.lock')
-    if os.path.exists(pip_lock_file):
-        print('pipenv already exists')
+    venv_path = os.path.join(resource_dir, '.venv')
+    if os.path.exists(req_file) and os.path.exists(venv_path):
         return python3_init_existing.delay(resource_dir)
 
-    if os.path.exists(req_file):
+    elif os.path.exists(req_file):
         print('requirements.txt exists')
         return python3_init_with_deps.delay(resource_dir)
     else:
@@ -122,9 +121,9 @@ def python3_execute(resource_def, args) -> AsyncResult:
 def python3_init_complete(resource_def) -> bool:
     print(f"Performing python3 check")
     (resource_dir, script_name) = _normalize_python_script_path(resource_def)
-    init_done_file = os.path.join(resource_dir, '.pipenv_init_done')
+    init_done_file = os.path.join(resource_dir, '.python3_init_done')
     if os.path.exists(init_done_file):
-        print('pipenv already init')
+        print('python3 init complete')
         return True
     else:
         return False

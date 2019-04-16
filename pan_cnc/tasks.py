@@ -193,7 +193,6 @@ def python3_init_env(working_dir):
 @shared_task
 def python3_init_with_deps(working_dir):
     print('Executing task Python3 init with Dependencies')
-    # cmd_seq = ['pipenv', 'install', '-r', 'requirements.txt']
     cmd_seq = ['python3', '-m', 'virtualenv', '.venv', '&&',
                './.venv/bin/python3', '-m', 'pip', 'install', '-r', 'requirements.txt']
     env = dict()
@@ -204,7 +203,6 @@ def python3_init_with_deps(working_dir):
 @shared_task
 def python3_init_existing(working_dir):
     print('Executing task Python3 init with Dependencies')
-    # cmd_seq = ['pipenv', 'update', '--bare']
     cmd_seq = ['./.venv/bin/python3', '-m', 'pip', 'install', '--upgrade', '-r', 'requirements.txt']
     env = dict()
     env['PYTHONUNBUFFERED'] = "1"
