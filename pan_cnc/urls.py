@@ -56,12 +56,13 @@ urlpatterns = [
     path('unlock_envs', pan_cnc_views.UnlockEnvironmentsView.as_view()),
     path('debug/<app_dir>/<snippet_name>', pan_cnc_views.DebugMetadataView.as_view()),
     path('next_task', pan_cnc_views.NextTaskView.as_view()),
+    path('cancel_task', pan_cnc_views.CancelTaskView.as_view()),
     path('workflow/<step>', pan_cnc_views.WorkflowView.as_view()),
     path('editTarget', pan_cnc_views.EditTargetView.as_view()),
     path('editRestTarget', pan_cnc_views.EditRestTargetView.as_view()),
     path('provision', pan_cnc_views.ProvisionSnippetView.as_view()),
     path('terraform', pan_cnc_views.EditTerraformView.as_view()),
-    path('clearCache', pan_cnc_views.ClearCacheView.as_view())
+    path('clear_cache', pan_cnc_views.ClearCacheView.as_view())
 ]
 
 print('Configuring URLs for installed apps')

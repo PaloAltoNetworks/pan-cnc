@@ -1303,6 +1303,26 @@ class EditTerraformView(CNCBaseAuth, FormView):
         return render(self.request, 'pan_cnc/results_async.html', context)
 
 
+class CancelTaskView(CNCView):
+    template_name = 'pan_cnc/results.html'
+    page_title = 'Red Alert - Cancel Task'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+
+        # set last_page to something other than this one for the continue button
+        self.request.session['last_page'] = '/'
+
+        if 'task_id' in self.request.session:
+            task_id = self.request.session['task_id']
+            task = AsyncResult(task_id)
+            task.revoke(terminate=True)
+            context['results'] = f'cancelling task_id {task_id}'
+        else:
+            context['results'] = 'No task found to cancel'
+        return context
+
+
 class NextTaskView(CNCView):
     template_name = 'pan_cnc/results_async.html'
 
