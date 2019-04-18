@@ -20,14 +20,14 @@ from pathlib import Path
 
 import oyaml
 from django.conf import settings
-from django.core.cache import cache
 from jinja2 import Environment
 from jinja2.loaders import BaseLoader
+from yaml.constructor import ConstructorError
 from yaml.parser import ParserError
 
+from . import cnc_utils
 from . import jinja_filters
 from .exceptions import CCFParserError, SnippetNotFoundException
-from . import cnc_utils
 
 
 def load_service_snippets() -> list:
@@ -188,6 +188,10 @@ def _check_dir(directory: Path, snippet_type: str, snippet_list: list) -> list:
         except ParserError as pe:
             print('Could not parse metadata file in dir %s' % d.parent)
             print(pe)
+            raise CCFParserError
+        except ConstructorError as ce:
+            print('Could not parse metadata file in dir %s' % d.parent)
+            print(ce)
             raise CCFParserError
 
     # Do not descend into sub dirs after a .meta-cnc file has already been found

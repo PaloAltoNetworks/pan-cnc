@@ -848,7 +848,41 @@ class ProvisionSnippetView(CNCBaseFormView):
             return render(self.request, 'pan_cnc/results.html', context)
         elif self.service['type'] == 'rest':
             # Found a skillet type of 'rest'
-            return HttpResponseRedirect('/editRestTarget')
+            # return HttpResponseRedirect('/editRestTarget')
+            results = rest_utils.execute_all(self.service, self.app_dir, self.get_workflow())
+
+            context = dict()
+            context['base_html'] = self.base_html
+            context['results'] = results
+            context['view'] = self
+
+            # Most REST actions will only have a single action/path taken. If so, we can simplify the results
+            # shown to the user by default
+            if len(results['snippets']) == 1:
+                first_key = list(results['snippets'].keys())[0]
+                if type(results['snippets'][first_key]) is dict and 'results' in results['snippets'][first_key]:
+                    context['results'] = results['snippets'][first_key]['results']
+
+            # results is a dict containing 'snippets' 'status' 'message'
+            if 'snippets' not in results or 'status' not in results or 'message' not in results:
+                print('Results from rest_utils is malformed')
+            else:
+                # Save all results into the workflow
+                for result in results['snippets']:
+                    result_snippet = results['snippets'][result]
+                    if 'outputs' in result_snippet:
+                        for output in result_snippet['outputs']:
+                            print(f"Saving value for key {output} to session")
+                            v = result_snippet['outputs'][output]
+                            print(v)
+                            self.save_value_to_workflow(output, v)
+
+                        self.save_workflow_to_session()
+                    else:
+                        print('no outputs for this one')
+
+            return render(self.request, 'pan_cnc/results.html', context)
+
         elif self.service['type'] == 'python3':
             print('Launching python3 init')
             context = super().get_context_data()
@@ -2006,7 +2040,10 @@ class LoadEnvironmentView(EnvironmentBase, RedirectView):
             print('Desired env was not found')
             messages.add_message(self.request, messages.ERROR, 'Could not load environment!')
 
-        return '/list_envs'
+        if 'last_page' in self.request.session:
+            return self.request.session['last_page']
+        else:
+            return '/list_envs'
 
 
 class DeleteEnvironmentView(EnvironmentBase, RedirectView):

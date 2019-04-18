@@ -15,11 +15,10 @@
 # Author: Nathan Embery nembery@paloaltonetworks.com
 
 
+import json
 import os
-from pathlib import Path
 
 import requests
-from django.conf import settings
 from jinja2 import BaseLoader
 from jinja2 import Environment
 from urllib3.exceptions import HTTPError
@@ -66,14 +65,18 @@ def execute_all(meta_cnc, app_dir, context):
             rest_path = snippet.get('path', '/api')
             rest_op = snippet.get('operation', 'get')
             payload_name = snippet.get('payload', '')
+            header_dict = snippet.get('headers', dict())
 
             # FIXME - implement this to give some control over what will be sent to rest server
             content_type = snippet.get('content_type', '')
             accepts_type = snippet.get('accepts_type', '')
 
             headers = dict()
-            headers["Content-Type"] = content_type
-            headers['Accetps-Type'] = accepts_type
+            if content_type:
+                headers["Content-Type"] = content_type
+
+            if accepts_type:
+                headers['Accepts-Type'] = accepts_type
 
             environment = Environment(loader=BaseLoader())
 
@@ -82,12 +85,13 @@ def execute_all(meta_cnc, app_dir, context):
                     environment.filters[f] = getattr(jinja_filters, f)
 
             path_template = environment.from_string(rest_path)
-            rest_host = context.get('TARGET_IP', '')
-            path_string = path_template.render(context)
-            if not str(rest_host).endswith('/') and not str(path_string).startswith('/'):
-                rest_host += '/'
+            url = path_template.render(context)
 
-            full_rest_url = rest_host + path_string
+            for k, v in header_dict.items():
+                v_template = environment.from_string(v)
+                v_interpolated = v_template.render(context)
+                print(f'adding {k} as {v_interpolated} to headers')
+                headers[k] = v_interpolated
 
             # keep track of response text or json object
             r = ''
@@ -96,10 +100,22 @@ def execute_all(meta_cnc, app_dir, context):
                 with open(payload_path, 'r') as payload_file:
                     payload_string = payload_file.read()
                     payload_template = environment.from_string(payload_string)
-                    payload = payload_template.render(context)
+                    payload_interpolated = payload_template.render(context)
+                    if 'Content-Type' in headers and 'form' in headers['Content-Type']:
+                        print('Loading json data from payload')
+                        try:
+                            payload = json.loads(payload_interpolated)
+                        except ValueError as ve:
+                            print('Could not load payload as json data!')
+                            payload = payload_interpolated
+                    else:
+                        payload = payload_interpolated
+
+                    print('Using payload of')
+                    print(payload)
                     # FIXME - assumes JSON content_type and accepts, should take into account the values
                     # FIXME - of content-type and accepts_type from above if they were supplied
-                    res = requests.post(full_rest_url, data=payload, verify=False, headers=headers)
+                    res = requests.post(url, data=payload, verify=False, headers=headers)
                     if res.status_code != 200:
                         print('Found a non-200 response status_code!')
                         print(res.status_code)
@@ -110,8 +126,8 @@ def execute_all(meta_cnc, app_dir, context):
 
             elif rest_op == 'get':
                 print('Performing REST GET')
-                print(full_rest_url)
-                res = requests.get(full_rest_url, verify=False)
+                print(url)
+                res = requests.get(url, verify=False)
                 r = res.text
                 if res.status_code != 200:
                     response['status'] = 'error'
@@ -138,4 +154,3 @@ def execute_all(meta_cnc, app_dir, context):
         response['status'] = 'error'
         response['message'] = str(ce)
         return response
-
