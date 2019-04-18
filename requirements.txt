@@ -14,6 +14,7 @@ chardet==3.0.4
 constantly==15.1.0
 cryptography==2.4.2
 daphne==2.2.4
+decorator==4.4.0
 Django==2.1.5
 django-widget-tweaks==1.4.3
 docker==3.6.0
@@ -24,11 +25,13 @@ hyperlink==18.0.0
 idna==2.8
 incremental==17.5.0
 Jinja2==2.10
+jsonpath-ng==1.4.3
 kombu==4.2.2.post1
 MarkupSafe==1.1.0
 oyaml==0.7
 pan-python==0.14.0
 passlib==1.7.1
+ply==3.11
 pyAesCrypt==0.4.2
 pycparser==2.19
 PyHamcrest==1.9.0

@@ -2,13 +2,9 @@
 {% load static %}
 
 {% block content %}
-<div class="card border-primary mb-6 shadow-lg">
+<div class="card border-primary mb-5 shadow-lg">
     <div class="card-header">
-        {% if header %}
-        {{ header }}
-        {% else %}
-        Results
-        {% endif %}
+        {{ view.get_header }}
     </div>
     <div class="card-body">
         <h4 class="card-title">
@@ -19,7 +15,20 @@
             {% endif %}
         </h4>
         <p class="card-text">
-            <pre>{{ results }}</pre>
+            <pre class="pb-4">{{ results|linebreaksbr }}</pre>
+        </p>
+    </div>
+    <div class="card-footer text-right">
+        <p class="card-text">
+            {%  if request.session.next_step %}
+                {%  if request.session.last_step %}
+                    <a href="/workflow/{{ request.session.next_step }}" class="btn btn-primary">Complete</a>
+                    {% else %}
+                    <a href="/workflow/{{ request.session.next_step }}" class="btn btn-primary">Continue</a>
+                {% endif %}
+                {%  else %}
+                <a href="{{ request.session.last_page|urlencode }}" class="btn btn-primary">Continue</a>
+            {% endif %}
         </p>
     </div>
 </div>

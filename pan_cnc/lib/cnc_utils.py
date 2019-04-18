@@ -15,15 +15,19 @@
 # Author: Nathan Embery nembery@paloaltonetworks.com
 
 import io
+import json
 import os
 import pickle
 import re
 from pathlib import Path
 
 import pyAesCrypt
-from django.core.cache import cache
 from django.conf import settings
+from django.core.cache import cache
+
 from pan_cnc.lib import git_utils
+from time import time
+from pan_cnc.lib import snippet_utils
 
 
 def check_user_secret(user_id):
@@ -152,7 +156,6 @@ def get_config_value(config_key, default=None):
 
 
 def load_panrc():
-
     config = dict()
     try:
         path = os.path.expanduser('~')
@@ -180,14 +183,180 @@ def load_panrc():
 
 
 def get_cached_value(key):
-    return cache.get(key)
+    return cache.get(key, None)
 
 
 def set_cached_value(key, val):
     cache.set(key, val)
 
 
+def _load_long_term_cache(app_name):
+    path = os.path.expanduser('~')
+
+    cache_dir = os.path.join(path, '.pan_cnc', app_name)
+
+    if not os.path.exists(cache_dir):
+        os.makedirs(cache_dir, mode=600)
+
+    cache_file = os.path.join(cache_dir, 'cache')
+
+    if not os.path.exists(cache_file):
+        with open(cache_file, 'w') as cf:
+            cf.write(json.dumps(dict()))
+
+        cache.set(f'{app_name}_cache', dict())
+        os.chmod(cache_file, mode=0o600)
+        return None
+
+    with open(cache_file, 'r+') as cf:
+        cache_contents = cf.read()
+        try:
+            lt_cache = json.loads(cache_contents)
+            cache.set(f'{app_name}_cache', lt_cache)
+        except ValueError as ve:
+            print('Could not load long term cache')
+            print(ve)
+            return None
+
+    return None
+
+
+def save_long_term_cache(app_name, contents):
+    json_string = json.dumps(contents)
+
+    path = os.path.expanduser('~')
+    cache_dir = os.path.join(path, '.pan_cnc', app_name)
+
+    if not os.path.exists(cache_dir):
+        os.makedirs(cache_dir, mode=600)
+
+    cache_file = os.path.join(cache_dir, 'cache')
+
+    with open(cache_file, 'w+') as cf:
+        cf.write(json_string)
+
+
+def get_long_term_cached_value(app_name: str, key: str) -> any:
+
+    cache_key = f'{app_name}_cache'
+
+    if cache_key not in cache:
+        _load_long_term_cache(app_name)
+
+    ltc = cache.get(cache_key, dict())
+
+    if 'meta' not in ltc:
+        return None
+
+    if key not in ltc['meta']:
+        return None
+
+    now = time()
+
+    if 'time' not in ltc['meta'][key]:
+        return None
+    if 'life' not in ltc['meta'][key]:
+        return None
+
+    time_added = ltc['meta'][key]['time']
+    life = ltc['meta'][key]['life']
+
+    # Allow -1 to indicate cached items that should stay cached forever
+    if life == -1:
+        return ltc.get(key, None)
+
+    if (now - time_added) > life:
+        print(f'Aging out cache item for {key}')
+        return None
+
+    print(f'Cache hit for {key}')
+    return ltc.get(key, None)
+
+
+def set_long_term_cached_value(app_name: str, key: str, value: any, life=3600, cache_type='snippet') -> None:
+
+    cache_key = f'{app_name}_cache'
+
+    if cache_key not in cache:
+        _load_long_term_cache(app_name)
+
+    ltc = cache.get(cache_key, dict())
+
+    if key in ltc and value is None:
+        ltc.pop(key)
+        if 'meta' in ltc and key in ltc['meta']:
+            ltc['meta'].pop(key)
+
+    else:
+        ltc[key] = value
+
+        # Ensure all meta values are kept around so we can evict items from the cache
+        if 'meta' not in ltc:
+            ltc['meta'] = dict()
+
+        ltc['meta'][key] = dict()
+        ltc['meta'][key]['time'] = time()
+        ltc['meta'][key]['life'] = life
+        ltc['meta'][key]['cache_type'] = cache_type
+
+    cache.set(cache_key, ltc)
+
+    apps_to_save = cache.get('ltc_dirty', list())
+
+    if type(apps_to_save) is not list:
+        apps_to_save = list()
+
+    if app_name not in apps_to_save:
+        apps_to_save.append(app_name)
+
+    cache.set('ltc_dirty', apps_to_save)
+    # save_long_term_cache(app_name, ltc)
+    return None
+
+
+def clear_long_term_cache(app_name: str) -> None:
+    ltc = dict()
+    cache_key = f'{app_name}_cache'
+    cache.set(cache_key, ltc)
+
+    apps_to_save = cache.get('ltc_dirty', list())
+
+    if type(apps_to_save) is not list:
+        apps_to_save = list()
+
+    if app_name not in apps_to_save:
+        apps_to_save.append(app_name)
+
+    cache.set('ltc_dirty', apps_to_save)
+    # save_long_term_cache(app_name, ltc)
+    print('Cleared')
+    return None
+
+
+def evict_cache_items_of_type(app_name, cache_type):
+    cache_key = f'{app_name}_cache'
+
+    if cache_key not in cache:
+        _load_long_term_cache(app_name)
+
+    ltc = cache.get(cache_key, dict())
+    if 'meta' in ltc:
+        for key in ltc['meta']:
+            if 'cache_type' in ltc['meta'][key]:
+                if ltc['meta'][key]['cache_type'] == cache_type:
+                    if key in ltc:
+                        print(f'Evicting item {key}')
+                        set_long_term_cached_value(app_name, key, None, 0, cache_type)
+
+
 def init_app(app_cnc_config):
+
+    if 'name' not in app_cnc_config:
+        print('No name found in app_cnc_config!')
+        return None
+
+    app_name = app_cnc_config['name']
+
     if 'repositories' not in app_cnc_config:
         return None
 
@@ -200,10 +369,14 @@ def init_app(app_cnc_config):
             print('Invalid repository app_cnc_configuration')
             continue
 
-        repo_dir = os.path.join(app_cnc_config['app_dir'], 'snippets', r['destination_directory'])
+        user_dir = os.path.expanduser('~')
+        repo_base_dir = os.path.join(user_dir, '.pan_cnc', app_name, 'repositories')
+        repo_dir = os.path.join(repo_base_dir, r['destination_directory'])
+
         repo_path = Path(repo_dir)
-        app_dir_path = Path(app_cnc_config['app_dir'])
-        if app_dir_path not in repo_path.parents:
+        repo_base_path = Path(repo_base_dir)
+
+        if repo_base_path not in repo_path.parents:
             print('Will not allow destination directory to be outside of our application dir')
             continue
 
@@ -217,8 +390,16 @@ def init_app(app_cnc_config):
         repo_url = r['url']
         repo_name = r['name']
         repo_branch = r['branch']
-        print(f'Pulling / Refreshing repository: {repo_url}')
-        git_utils.clone_or_update_repo(repo_dir, repo_name, repo_url, repo_branch)
+        cache_key = f"{repo_dir}_life"
+        cached = get_long_term_cached_value(app_name, cache_key)
+        if not cached:
+            print(f'Pulling / Refreshing repository: {repo_url}')
+            if git_utils.clone_or_update_repo(repo_dir, repo_name, repo_url, repo_branch):
+                # if we have updated something, then we need to clear the caches
+                snippet_utils.invalidate_snippet_caches(app_name)
+
+            # only check for updates every 2 hours at most on app reload
+            set_long_term_cached_value(app_name, cache_key, True, 7200, 'imported_repos')
 
     return None
 
@@ -234,3 +415,14 @@ def get_app_config(app_name):
 
     print('Could not load app_config')
     return None
+
+
+def is_testing() -> bool:
+    """
+    Check for an environment variable that determines if we are in test mode
+    :return: bool
+    """
+    if os.environ.get('CNC_TEST', '') == 'TRUE':
+        return True
+    else:
+        return False

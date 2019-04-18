@@ -41,11 +41,14 @@ def clone_or_update_repo(repo_dir, repo_name, repo_url, branch='master'):
         if len(f) > 0:
             flags = f[0].flags
             if flags == 4:
-                return "Already up to date"
+                print("Already up to date")
+                return False
             elif flags == 64:
-                return "Updated to Latest"
+                print("Updated to Latest")
+                return True
             else:
-                return "Unknown flag returned"
+                print("Unknown flag returned")
+                return False
 
         repo.close()
         return True
@@ -80,17 +83,28 @@ def clone_repo(repo_dir, repo_name, repo_url, branch='master'):
     return True
 
 
-def get_repo_details(repo_name, repo_dir):
+def get_repo_details(repo_name, repo_dir, app_name='cnc'):
     """
     Fetch the details for a given repo name and directory
     :param repo_name:
     :param repo_dir:
+    :param app_name: name of the CNC application
     :return:
     """
+
+    repo_detail = cnc_utils.get_long_term_cached_value(app_name, f'{repo_name}_detail')
+    if repo_detail:
+        return repo_detail
+
     repo = Repo(repo_dir)
 
-    url = repo.remotes.origin.url
+    url = str(repo.remotes.origin.url)
     url_details = parse_repo_origin_url(url)
+
+    if 'github' in url:
+        link = f"https://github.com/{url_details['owner']}/{url_details['repo']}"
+    else:
+        link = url
 
     if 'repo' not in url_details or url_details['repo'] is None or url_details['repo'] == '':
         url_details['repo'] = repo_name
@@ -110,13 +124,14 @@ def get_repo_details(repo_name, repo_dir):
     repo_detail = dict()
     repo_detail['name'] = repo_name
     repo_detail['label'] = url_details['repo']
+    repo_detail['link'] = link
     repo_detail['dir'] = repo_name
     repo_detail['url'] = url
     repo_detail['branch'] = branch
     repo_detail['commits'] = commit_log
     repo_detail['commits_url'] = get_repo_commits_url(url)
 
-    upstream_details = get_repo_upstream_details(repo_name, url)
+    upstream_details = get_repo_upstream_details(repo_name, url, app_name)
     if 'description' in upstream_details:
         if upstream_details['description'] is None or upstream_details['description'] == 'None':
             repo_detail['description'] = f"{url} {branch}"
@@ -125,6 +140,7 @@ def get_repo_details(repo_name, repo_dir):
     else:
         repo_detail['description'] = branch
 
+    cnc_utils.set_long_term_cached_value(app_name, f'{repo_name}_detail', repo_detail, 604800, 'git_repo_details')
     return repo_detail
 
 
@@ -156,21 +172,27 @@ def update_repo(repo_dir):
     return "Unknown Error"
 
 
-def get_repo_upstream_details(repo_name: str, repo_url: str) -> dict:
+def get_repo_upstream_details(repo_name: str, repo_url: str, app_name: str) -> dict:
     """
     Attempt to get the details from a git repository. Details are found via specific APIs for each type of git repo.
     Currently only Github is supported.
     :param repo_name:
     :param repo_url:
+    :param app_name: cnc application name
     :return:
     """
-    cache_repo_name = repo_name.replace(' ', '_')
-    details = cnc_utils.get_cached_value(f'git_utils_upstream_{cache_repo_name}')
-    if details is not None:
-        return details
 
     details = dict()
 
+    if cnc_utils.is_testing():
+        return details
+
+    cache_repo_name = repo_name.replace(' ', '_')
+    details = cnc_utils.get_long_term_cached_value(app_name, f'git_utils_upstream_{cache_repo_name}')
+    if details is not None:
+        return details
+
+    print('Not found in cache, loading from upstream')
     url_details = parse_repo_origin_url(repo_url)
     owner = url_details.get('owner', '')
     repo = url_details.get('repo', '')
@@ -179,7 +201,8 @@ def get_repo_upstream_details(repo_name: str, repo_url: str) -> dict:
         api_url = f'https://api.github.com/repos/{owner}/{repo}'
         detail_string = requests.get(api_url, verify=False)
         details = detail_string.json()
-        cnc_utils.set_cached_value(f'git_utils_upstream_{cache_repo_name}', details)
+        cnc_utils.set_long_term_cached_value(app_name, f'git_utils_upstream_{cache_repo_name}', details, 86400,
+                                             'git_repo_details')
     except ConnectionResetError as cre:
         print('Could not get github details due to ConnectionResetError')
         print(cre)
@@ -207,7 +230,12 @@ def parse_repo_origin_url(repo_url):
     url_details = dict()
 
     try:
-        if repo_url.endswith('.git'):
+        if repo_url.endswith('.git') and repo_url.startswith('git@'):
+            # git@github.com:nembery/Skillets.git
+            url_parts = repo_url.split(':')[1].split('/')
+            owner = url_parts[0]
+            repo = url_parts[1].split('.git')[0]
+        elif repo_url.endswith('.git'):
             # https://github.com/owner/repo.git
             url_parts = repo_url.split('/')[-2:]
             owner = url_parts[0]
