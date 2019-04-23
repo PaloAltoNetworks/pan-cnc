@@ -164,6 +164,11 @@ def load_panrc():
         if not os.path.exists(rc_filepath):
             return config
 
+        if os.path.isdir(rc_filepath):
+            print('Refusing to load .panrc directory')
+            # FIXME - we should properly handle this
+            return config
+
         with open(rc_filepath, 'r') as rcf:
             rcs = rcf.read()
             for line in rcs.split('\n'):
