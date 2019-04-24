@@ -25,13 +25,12 @@ This software is provided without support, warranty, or guarantee.
 Use at your own risk.
 """
 
+import datetime
 import logging
 import os
-from pathlib import Path
 from xml.etree import ElementTree as et
 
 import pan.xapi
-from django.conf import settings
 from django.core.cache import cache
 from jinja2 import Environment, BaseLoader
 
@@ -98,7 +97,7 @@ def test_panorama() -> None:
     print(xapi.xml_result())
 
 
-def get_panos_credentials(pan_device_ip, pan_device_username, pan_device_password) ->dict:
+def get_panos_credentials(pan_device_ip, pan_device_username, pan_device_password) -> dict:
     """
     Returns a dict containing the panorama or PAN-OS credentials. If supplied args are None, attempt to load them
     via the Environment.
@@ -128,12 +127,13 @@ def get_panos_credentials(pan_device_ip, pan_device_username, pan_device_passwor
     return credentials
 
 
-def push_service(service, context, force_sync=False) -> bool:
+def push_service(meta, context, force_sync=False, perform_commit=True) -> bool:
     """
     Push a skillet to a PanXapi connected device
-    :param service: dict containing parsed and loaded skillet
+    :param meta: dict containing parsed and loaded skillet
     :param context: all compiled variables from the user interaction
     :param force_sync: should we wait on a successful commit operation or return after queue
+    :param perform_commit: should we actually commit or not
     :return: boolean on success / failure
     """
     xapi = panos_login()
@@ -142,22 +142,14 @@ def push_service(service, context, force_sync=False) -> bool:
         print('Could not login in to Palo Alto Networks Device')
         return False
 
-    if 'snippet_path' in service:
-        snippets_dir = service['snippet_path']
+    _perform_backup()
+    if 'snippet_path' in meta:
+        snippets_dir = meta['snippet_path']
     else:
-        # snippets_dir = Path(os.path.join(settings.BASE_DIR, 'mssp', 'snippets', service['name']))
         raise CCFParserError('Could not locate .meta-cnc file')
 
-    if 'type' not in service:
-        commit_type = 'commit'
-    else:
-        if 'panorama' in service['type']:
-            commit_type = 'commit-all'
-        else:
-            commit_type = 'commit'
-
     try:
-        for snippet in service['snippets']:
+        for snippet in meta['snippets']:
             if 'xpath' not in snippet or 'file' not in snippet:
                 print('Malformed meta-cnc error')
                 raise CCFParserError
@@ -186,32 +178,43 @@ def push_service(service, context, force_sync=False) -> bool:
                     print('xpath was NOT found')
                     return False
 
-        if commit_type == 'commit-all':
-            print('Performing commit-all in panorama')
-            xapi.commit(cmd='<commit-all></commit-all>', sync=True)
-        else:
-            if force_sync:
-                xapi.commit('<commit></commit>', sync=True)
+        if perform_commit:
+
+            if 'type' not in meta:
+                commit_type = 'commit'
             else:
-                xapi.commit('<commit></commit>')
+                if 'panorama' in meta['type']:
+                    commit_type = 'commit-all'
+                else:
+                    commit_type = 'commit'
 
-        print(xapi.xml_result())
+            if commit_type == 'commit-all':
+                print('Performing commit-all in panorama')
+                xapi.commit(cmd='<commit-all></commit-all>', sync=True)
+            else:
+                if force_sync:
+                    xapi.commit('<commit></commit>', sync=True)
+                else:
+                    xapi.commit('<commit></commit>')
 
-        # for gpcs baseline and svc connection network configuration do a scope push to gpcs
-        if service['name'] == 'gpcs_baseline':
-            print('push baseline and svc connection scope to gpcs')
-            xapi.commit(action='all',
-                        cmd='<commit-all><template-stack>'
-                            '<name>Service_Conn_Template_Stack</name></template-stack></commit-all>')
             print(xapi.xml_result())
 
-        # for gpcs remote network configuration do a scope push to gpcs
-        if service['name'] == 'gpcs_remote' or service['name'] == 'gpcs_baseline':
-            print('push remote network scope to gpcs')
-            xapi.commit(action='all',
-                        cmd='<commit-all><shared-policy><device-group>'
-                            '<entry name="Remote_Network_Device_Group"/></device-group></shared-policy></commit-all>')
-            print(xapi.xml_result())
+            # for gpcs baseline and svc connection network configuration do a scope push to gpcs
+            # FIXME - check for 'gpcs' in meta['type'] instead of hardcoded name
+            if meta['name'] == 'gpcs_baseline':
+                print('push baseline and svc connection scope to gpcs')
+                xapi.commit(action='all',
+                            cmd='<commit-all><template-stack>'
+                                '<name>Service_Conn_Template_Stack</name></template-stack></commit-all>')
+                print(xapi.xml_result())
+
+            # for gpcs remote network configuration do a scope push to gpcs
+            if meta['name'] == 'gpcs_remote' or meta['name'] == 'gpcs_baseline':
+                print('push remote network scope to gpcs')
+                xapi.commit(action='all',
+                            cmd='<commit-all><shared-policy><device-group>'
+                                '<entry name="Remote_Network_Device_Group"/></device-group></shared-policy></commit-all>')
+                print(xapi.xml_result())
 
         return True
 
@@ -222,7 +225,7 @@ def push_service(service, context, force_sync=False) -> bool:
         return False
 
     except pan.xapi.PanXapiError as pxe:
-        print('Could not push service snippet!')
+        print('Could not push meta snippet!')
         print(pxe)
         return False
 
@@ -321,3 +324,19 @@ def get_vm_auth_key_from_panorama() -> str:
         print('Could not get vm-auth-key!')
         print(pxe)
         raise TargetConnectionException
+
+
+def _perform_backup() -> str:
+    """
+    Saves a named backup on the PAN-OS device. The format for the backup is 'panhandler-20190424000000.xml'
+    :return:  xml results from the op command sequence
+    """
+    xapi = panos_login()
+    d = datetime.datetime.today()
+    tstamp = d.strftime('%Y%m%d%H%M%S')
+    cmd = f'<save><config><to>panhandler-{tstamp}.xml</to></config></save>'
+    try:
+        xapi.op(cmd=cmd)
+        return xapi.xml_result()
+    except pan.xapi.PanXapiError:
+        raise TargetConnectionException('Could not perform backup')

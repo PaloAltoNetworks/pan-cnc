@@ -970,27 +970,31 @@ class EditTargetView(CNCBaseAuth, FormView):
         header = 'Edit Target'
         title = 'Configure Target information'
 
-        if snippet_name != '':
-            meta = snippet_utils.load_snippet_with_name(snippet_name, self.app_dir)
-            if 'label' in meta:
-                header = f"Set Target for {meta['label']}"
+        if snippet_name == '':
+            messages.add_message(self.request, messages.ERROR, 'Process Error - Meta not found')
+            return context
 
-            if 'type' in meta:
-                if meta['type'] == 'panos':
-                    target_ip_label = 'PAN-OS IP'
-                    target_username_label = 'PAN-OS Username'
-                    target_password_label = 'PAN-OS Password'
-                elif meta['type'] == 'panorama':
-                    target_ip_label = 'Panorama IP'
-                    target_username_label = 'Panorama Username'
-                    target_password_label = 'Panorama Password'
-                elif meta['type'] == 'panorama-gpcs':
-                    target_ip_label = 'Panorama IP'
-                    target_username_label = 'Panorama Username'
-                    target_password_label = 'Panorama Password'
+        meta = snippet_utils.load_snippet_with_name(snippet_name, self.app_dir)
+        if meta is None:
+            messages.add_message(self.request, messages.ERROR, 'Process Error - Could not load meta')
+            return context
 
-        workflow = self.get_workflow()
-        # print(workflow)
+        if 'label' in meta:
+            header = f"Set Target for {meta['label']}"
+
+        if 'type' in meta:
+            if meta['type'] == 'panos':
+                target_ip_label = 'PAN-OS IP'
+                target_username_label = 'PAN-OS Username'
+                target_password_label = 'PAN-OS Password'
+            elif meta['type'] == 'panorama':
+                target_ip_label = 'Panorama IP'
+                target_username_label = 'Panorama Username'
+                target_password_label = 'Panorama Password'
+            elif meta['type'] == 'panorama-gpcs':
+                target_ip_label = 'Panorama IP'
+                target_username_label = 'Panorama Username'
+                target_password_label = 'Panorama Password'
 
         target_ip = self.get_value_from_workflow('TARGET_IP', '')
         target_username = self.get_value_from_workflow('TARGET_USERNAME', '')
@@ -1005,6 +1009,11 @@ class EditTargetView(CNCBaseAuth, FormView):
         form.fields['TARGET_IP'] = target_ip_field
         form.fields['TARGET_USERNAME'] = target_username_field
         form.fields['TARGET_PASSWORD'] = target_password_field
+
+        if 'type' in meta and 'panos' in meta['type']:
+            # add option to perform commit operation or not
+            perform_commit = forms.BooleanField(label='Perform Commit', initial=True)
+            form.fields['perform_commit'] = perform_commit
 
         context['form'] = form
         context['base_html'] = self.base_html
@@ -1022,21 +1031,32 @@ class EditTargetView(CNCBaseAuth, FormView):
         :return: render of a success template after service is provisioned
         """
         snippet_name = self.get_value_from_workflow('snippet_name', '')
-        if snippet_name != '':
-            meta = snippet_utils.load_snippet_with_name(snippet_name, self.app_dir)
-        else:
+
+        if snippet_name == '':
             print('Could not find a valid meta-cnc def')
             raise SnippetRequiredException
 
-        workflow = self.get_workflow()
-        print(workflow)
-
+        meta = snippet_utils.load_snippet_with_name(snippet_name, self.app_dir)
         tip = self.get_value_from_workflow('TARGET_IP', None)
         print(f'found current target_ip in workflow of {tip}')
         # Grab the values from the form, this is always hard-coded in this class
         target_ip = self.request.POST.get('TARGET_IP', None)
         target_username = self.request.POST.get('TARGET_USERNAME', None)
         target_password = self.request.POST.get('TARGET_PASSWORD', None)
+
+        # check if type is 'panos' and if the user wants to perform a commit or not
+        if 'type' in meta and meta['type'] == 'panos':
+            # check if perform commit is set
+            perform_commit_str = self.request.POST.get('perform_commit', 'off')
+            perform_commit = False
+
+            if perform_commit_str == 'on':
+                perform_commit = True
+        else:
+            # ensure commit happens for everything other than panos
+            perform_commit = True
+
+        print(f'Got a perform_commit of {perform_commit}')
 
         print(f'saving target_ip {target_ip} to workflow')
 
@@ -1090,12 +1110,12 @@ class EditTargetView(CNCBaseAuth, FormView):
                     # no prego (it's not in there)
                     print('Pushing configuration dependency: %s' % baseline_service['name'])
                     # make it prego
-                    if not pan_utils.push_service(baseline_service, jinja_context):
+                    if not pan_utils.push_service(baseline_service, jinja_context, False, perform_commit):
                         messages.add_message(self.request, messages.ERROR, 'Could not push baseline Configuration')
                         return HttpResponseRedirect(f"{self.app_dir}/")
 
         # BUG-FIX to always just push the toplevel meta
-        if not pan_utils.push_service(meta, jinja_context):
+        if not pan_utils.push_service(meta, jinja_context, False, perform_commit):
             messages.add_message(self.request, messages.ERROR, 'Could not push Configuration')
             return HttpResponseRedirect(f"{self.app_dir}/")
 
