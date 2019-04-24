@@ -54,6 +54,7 @@ def execute_all(meta_cnc, app_dir, context):
     response['status'] = 'success'
     response['message'] = 'A-OK'
     response['snippets'] = dict()
+
     try:
         # execute our rest call for each item in the 'snippets' stanza of the meta-cnc file
         for snippet in meta_cnc['snippets']:
@@ -63,7 +64,7 @@ def execute_all(meta_cnc, app_dir, context):
 
             name = snippet.get('name', '')
             rest_path = snippet.get('path', '/api')
-            rest_op = snippet.get('operation', 'get')
+            rest_op = str(snippet.get('operation', 'get')).lower()
             payload_name = snippet.get('payload', '')
             header_dict = snippet.get('headers', dict())
 
@@ -125,14 +126,19 @@ def execute_all(meta_cnc, app_dir, context):
                 r = res.text
 
             elif rest_op == 'get':
-                print('Performing REST GET')
-                print(url)
+                print('Performing REST get')
                 res = requests.get(url, verify=False)
                 r = res.text
                 if res.status_code != 200:
                     response['status'] = 'error'
                     response['snippets'][name] = r
                     break
+
+            else:
+                print('Unknown REST operation found')
+                response['status'] = 'Error'
+                response['message'] = 'Unkonwn REST operation found'
+                return response
 
             # collect the response text or json and continue
             response['snippets'][name] = dict()

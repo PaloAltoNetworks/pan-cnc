@@ -601,6 +601,8 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
                 dynamic_form.fields[field_name] = forms.ChoiceField(widget=forms.CheckboxSelectMultiple,
                                                                     choices=choices_list,
                                                                     label=description, initial=default)
+            elif type_hint == 'disabled':
+                dynamic_form.fields[field_name] = forms.CharField(label=description, initial=default, disabled=True)
             else:
                 dynamic_form.fields[field_name] = forms.CharField(label=description, initial=default)
 
