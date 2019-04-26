@@ -24,6 +24,7 @@ from jinja2 import Environment
 from jinja2.loaders import BaseLoader
 from yaml.constructor import ConstructorError
 from yaml.parser import ParserError
+from yaml.scanner import ScannerError
 
 from . import cnc_utils
 from . import jinja_filters
@@ -192,13 +193,15 @@ def _check_dir(directory: Path, snippet_type: str, snippet_list: list) -> list:
             print(pe)
             err_condition = True
             continue
-            # raise CCFParserError
+        except ScannerError as se:
+            print('Could not parse meta-cnc file in dir %s' % d.parent)
+            print(se)
+            continue
         except ConstructorError as ce:
             print('Could not parse metadata file in dir %s' % d.parent)
             print(ce)
             err_condition = True
             continue
-            # raise CCFParserError
 
     # Do not descend into sub dirs after a .meta-cnc file has already been found
     if snippet_list:
