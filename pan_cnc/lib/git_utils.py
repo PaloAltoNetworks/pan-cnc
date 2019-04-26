@@ -19,7 +19,7 @@ import urllib3
 from git import InvalidGitRepositoryError, NoSuchPathError, GitCommandError
 from git import Repo
 from requests import ConnectionError
-
+from pathlib import Path
 from pan_cnc.lib import cnc_utils
 
 urllib3.disable_warnings()
@@ -150,6 +150,11 @@ def update_repo(repo_dir):
     :param repo_dir:
     :return:
     """
+    repo_path = Path(repo_dir)
+
+    if not repo_path.exists():
+        return 'Error: Path does not exist'
+
     repo = Repo(repo_dir)
     try:
         changes = repo.index.diff(None)
