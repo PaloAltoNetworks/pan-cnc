@@ -33,6 +33,7 @@ from xml.etree import ElementTree as et
 import pan.xapi
 from django.core.cache import cache
 from jinja2 import Environment, BaseLoader
+from jinja2.exceptions import UndefinedError
 
 from pan_cnc.lib import jinja_filters
 from pan_cnc.lib.exceptions import TargetConnectionException, CCFParserError
@@ -217,6 +218,11 @@ def push_service(meta, context, force_sync=False, perform_commit=True) -> bool:
                 print(xapi.xml_result())
 
         return True
+
+    except UndefinedError as ue:
+        print('Undefined variable in skillet')
+        print(ue)
+        return False
 
     except IOError as ioe:
         print('Could not open xml snippet file for reading!!!')
