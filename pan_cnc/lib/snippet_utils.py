@@ -166,7 +166,8 @@ def _check_dir(directory: Path, snippet_type: str, snippet_list: list) -> list:
     :return: list of dicts containing loaded skillets
     """
 
-    for d in directory.glob('.meta-cnc.yaml'):
+    err_condition = False
+    for d in directory.glob('.meta-cnc.y*'):
         snippet_path = str(d.parent.absolute())
         print(f'snippet_path is {snippet_path}')
         try:
@@ -184,18 +185,26 @@ def _check_dir(directory: Path, snippet_type: str, snippet_list: list) -> list:
         except IOError as ioe:
             print('Could not open metadata file in dir %s' % d.parent)
             print(ioe)
-            raise CCFParserError
+            err_condition = True
+            continue
         except ParserError as pe:
             print('Could not parse metadata file in dir %s' % d.parent)
             print(pe)
-            raise CCFParserError
+            err_condition = True
+            continue
+            # raise CCFParserError
         except ConstructorError as ce:
             print('Could not parse metadata file in dir %s' % d.parent)
             print(ce)
-            raise CCFParserError
+            err_condition = True
+            continue
+            # raise CCFParserError
 
     # Do not descend into sub dirs after a .meta-cnc file has already been found
     if snippet_list:
+        return snippet_list
+
+    if err_condition:
         return snippet_list
 
     for d in directory.iterdir():
@@ -240,15 +249,23 @@ def get_snippet_metadata(snippet_name, app_name) -> (str, None):
     if skillet is not None and 'snippet_path' in skillet:
         parent = Path(skillet['snippet_path'])
         if parent.exists():
-            mdf = parent.joinpath('.meta-cnc.yaml')
+            # handle .yaml and .yml if possible
+            mdfs = list(parent.glob('.meta-cnc.y*'))
+            if len(mdfs) == 1:
+                mdf = mdfs[0]
+            else:
+                print('Could not find meta-cnc.yaml')
+                return None
             if mdf.exists() and mdf.is_file():
                 try:
-                    with open(mdf, 'r') as sc:
-                        snippet_data = oyaml.safe_load(sc.read())
+                    with mdf.open('r') as sc:
+                        data = sc.read()
+                        snippet_data = oyaml.safe_load(data)
                         if 'name' in snippet_data and snippet_data['name'] == snippet_name:
                             print(f'Found {snippet_name} at {parent.absolute()}')
-                            sc.seek(0)
-                            return sc.read()
+                            return data
+                        else:
+                            print('name mismatch loading .meta-cnc file')
                 except IOError as ioe:
                     print('Could not open metadata file in dir %s' % mdf)
                     print(ioe)
@@ -257,6 +274,10 @@ def get_snippet_metadata(snippet_name, app_name) -> (str, None):
                     print(pe)
                     print('Could not parse metadata file')
                     return None
+            else:
+                print('.meta-cnc cannot be found in this dir')
+    else:
+        print('Returned .meta-cnc contents was None')
 
     return None
 
