@@ -558,8 +558,13 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
             description = variable.get('description', '')
             variable_default = variable.get('default', '')
 
-            # if the user has entered this before, let's grab it from the session
-            default = self.get_value_from_workflow(field_name, variable_default)
+            force_default = variable.get('force_default', False)
+            if force_default:
+                default = variable_default
+            else:
+                # if the user has entered this before, let's grab it from the session
+                default = self.get_value_from_workflow(field_name, variable_default)
+
             # Figure out which type of widget should be rendered
             # Valid widgets are dropdown, text_area, password and defaults to a char field
             if type_hint == 'dropdown' and 'dd_list' in variable:
@@ -578,7 +583,7 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
             elif type_hint == "email":
                 dynamic_form.fields[field_name] = forms.CharField(widget=forms.EmailInput, label=description,
                                                                   initial=default)
-            elif type_hint == "number":
+            elif type_hint == "ip_address":
                 dynamic_form.fields[field_name] = forms.GenericIPAddressField(label=description,
                                                                               initial=default)
             elif type_hint == "password":
