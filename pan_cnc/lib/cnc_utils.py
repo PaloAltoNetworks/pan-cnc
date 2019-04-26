@@ -195,50 +195,69 @@ def set_cached_value(key, val):
     cache.set(key, val)
 
 
-def _load_long_term_cache(app_name):
+def _load_long_term_cache(app_name: str) -> None:
+    """
+    Loads the cache file from the current users $HOME dir/.pan_cnc/app_name/cache
+    :param app_name: name of the current CNC application
+    :return: None
+    """
     path = os.path.expanduser('~')
 
     cache_dir = os.path.join(path, '.pan_cnc', app_name)
 
-    if not os.path.exists(cache_dir):
-        os.makedirs(cache_dir, mode=600)
-
-    cache_file = os.path.join(cache_dir, 'cache')
-
-    if not os.path.exists(cache_file):
-        with open(cache_file, 'w') as cf:
-            cf.write(json.dumps(dict()))
-
-        cache.set(f'{app_name}_cache', dict())
-        os.chmod(cache_file, mode=0o600)
+    try:
+        if not os.path.exists(cache_dir):
+            os.makedirs(cache_dir, mode=600)
+    except OSError as ose:
+        print('Could not create application cache dir!')
+        print(ose)
         return None
 
-    with open(cache_file, 'r+') as cf:
-        cache_contents = cf.read()
-        try:
-            lt_cache = json.loads(cache_contents)
-            cache.set(f'{app_name}_cache', lt_cache)
-        except ValueError as ve:
-            print('Could not load long term cache')
-            print(ve)
+    cache_file = os.path.join(cache_dir, 'cache')
+    cache_contents = dict()
+    try:
+        if not os.path.exists(cache_file):
+            with open(cache_file, 'w') as cf:
+                cf.write(json.dumps(dict()))
+
+            os.chmod(cache_file, mode=0o600)
             return None
 
+        with open(cache_file, 'r+') as cf:
+            cache_contents_str = cf.read()
+            cache_contents = json.loads(cache_contents_str)
+
+    except OSError as ose:
+        print('Could not open cache file')
+        print(ose)
+
+    except ValueError as ve:
+        print('Could not load long term cache')
+        print(ve)
+
+    # always set something in the in-memory cache, even if it's only a blank dict
+    cache.set(f'{app_name}_cache', cache_contents)
     return None
 
 
-def save_long_term_cache(app_name, contents):
+def save_long_term_cache(app_name: str, contents: dict) -> None:
     json_string = json.dumps(contents)
 
     path = os.path.expanduser('~')
     cache_dir = os.path.join(path, '.pan_cnc', app_name)
 
-    if not os.path.exists(cache_dir):
-        os.makedirs(cache_dir, mode=600)
+    try:
+        if not os.path.exists(cache_dir):
+            os.makedirs(cache_dir, mode=600)
 
-    cache_file = os.path.join(cache_dir, 'cache')
+        cache_file = os.path.join(cache_dir, 'cache')
 
-    with open(cache_file, 'w+') as cf:
-        cf.write(json_string)
+        with open(cache_file, 'w+') as cf:
+            cf.write(json_string)
+    except OSError as ose:
+        print('Could not save long term cache')
+
+    return None
 
 
 def get_long_term_cached_value(app_name: str, key: str) -> any:
