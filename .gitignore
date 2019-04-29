@@ -2,7 +2,7 @@
 .idea
 app/db.sqlite3
 db.sqlite3
-
+venv*
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

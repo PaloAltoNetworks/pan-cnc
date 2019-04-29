@@ -14,12 +14,14 @@
 
 # Author: Nathan Embery nembery@paloaltonetworks.com
 
-import xml.etree.ElementTree as elementTree
-from xml.etree.ElementTree import ParseError
-from pan_cnc.lib.exceptions import CCFParserError
-from base64 import urlsafe_b64encode
-from jsonpath_ng import jsonpath, parse
 import json
+import xml.etree.ElementTree as elementTree
+from base64 import urlsafe_b64encode
+from xml.etree.ElementTree import ParseError
+
+from jsonpath_ng import parse
+
+from pan_cnc.lib.exceptions import CCFParserError
 
 
 def parse_outputs(meta: dict, snippet: dict, results: str) -> dict:
@@ -167,5 +169,3 @@ def _handle_json_outputs(snippet: dict, results: str) -> dict:
         outputs['system'] = str(e)
 
     return outputs
-
-

@@ -28,7 +28,7 @@ Use at your own risk.
 import datetime
 import logging
 import os
-from xml.etree import ElementTree as et
+from xml.etree import ElementTree as elementTree
 
 import pan.xapi
 from django.core.cache import cache
@@ -47,7 +47,7 @@ handler = logging.StreamHandler()
 logger.addHandler(handler)
 
 
-def panos_login(pan_device_ip=None, pan_device_username=None, pan_device_password=None) -> pan.xapi.PanXapi:
+def panos_login(pan_device_ip=None, pan_device_username=None, pan_device_password=None) -> (pan.xapi.PanXapi, None):
     """
     Using the pan-xapi to log in to a PAN-OS or Panorama instance. If supplied ip, username, and password are None
     this will attempt to find them via environment variables 'PANORAMA_IP', 'PANORAMA_USERNAME', and 'PANORAMA_PASSWORD'
@@ -214,7 +214,8 @@ def push_service(meta, context, force_sync=False, perform_commit=True) -> bool:
                 print('push remote network scope to gpcs')
                 xapi.commit(action='all',
                             cmd='<commit-all><shared-policy><device-group>'
-                                '<entry name="Remote_Network_Device_Group"/></device-group></shared-policy></commit-all>')
+                                '<entry name="Remote_Network_Device_Group"/>'
+                                '</device-group></shared-policy></commit-all>')
                 print(xapi.xml_result())
 
         return True
@@ -293,7 +294,7 @@ def get_device_groups_from_panorama() -> list:
         print(pxe)
         return services
 
-    doc = et.fromstring(xml)
+    doc = elementTree.fromstring(xml)
     for dg in doc:
         if 'name' in dg.attrib:
             service = dict()

@@ -75,7 +75,8 @@ def clone_repo(repo_dir, repo_name, repo_url, branch='master'):
     :return:
     """
     try:
-        repo = Repo.clone_from(repo_url, repo_dir, depth=3, branch=branch, config='http.sslVerify=false')
+        print(f'Cloning {repo_name}')
+        Repo.clone_from(repo_url, repo_dir, depth=3, branch=branch, config='http.sslVerify=false')
     except GitCommandError as gce:
         print(gce)
         return False

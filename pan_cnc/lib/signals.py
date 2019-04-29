@@ -1,9 +1,9 @@
+from django.conf import settings
 from django.contrib.auth.signals import user_logged_in
+from django.core.cache import cache
 from django.core.signals import request_finished
 from django.dispatch import receiver
-from django.conf import settings
-from django.core.handlers.wsgi import WSGIHandler
-from django.core.cache import cache
+
 from . import cnc_utils
 
 
