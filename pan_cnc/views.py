@@ -650,13 +650,13 @@ class ChooseSnippetByLabelView(CNCBaseFormView):
         """
         return ''
 
-    def generate_dynamic_form(self):
+    def generate_dynamic_form(self, data=None):
         """
         Generates a form with only 1 option - snippet_name
         :return: Form Object
         """
 
-        form = forms.Form()
+        form = forms.Form(data=data)
         if self.label_name == '' or self.label_value == '':
             print('No Labels to use to filter!')
             return form
@@ -730,8 +730,8 @@ class ChooseSnippetView(CNCBaseFormView):
     def get_snippet(self):
         return self.snippet
 
-    def generate_dynamic_form(self):
-        form = super().generate_dynamic_form()
+    def generate_dynamic_form(self, data=None):
+        form = super().generate_dynamic_form(data=data)
         if self.service is None:
             return form
 
@@ -1051,7 +1051,7 @@ class EditTargetView(CNCBaseAuth, FormView):
             raise SnippetRequiredException
 
         meta = snippet_utils.load_snippet_with_name(snippet_name, self.app_dir)
-        tip = self.get_value_from_workflow('TARGET_IP', None)
+        tip = self.get_value_from_workflow('TARGET_IP', '')
         print(f'found current target_ip in workflow of {tip}')
         # Grab the values from the form, this is always hard-coded in this class
         target_ip = self.request.POST.get('TARGET_IP', None)
@@ -1223,7 +1223,7 @@ class EditRestTargetView(CNCBaseAuth, FormView):
         target_ip = self.request.POST.get('TARGET_IP', None)
         if target_ip is None:
             messages.add_message(self.request, messages.ERROR, 'Endpoint cannot be blank')
-            return self.form_invalid(self.form)
+            return self.form_invalid(form)
 
         if not str(target_ip).startswith('http'):
             print('Adding https to endpoint')

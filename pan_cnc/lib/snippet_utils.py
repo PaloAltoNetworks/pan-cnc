@@ -361,7 +361,6 @@ def invalidate_snippet_caches(app_name: str) -> None:
     """
     Clears the long term cache file
     :param app_name: name of the CNC application
-    :param key: name of a specific key to clear, defaults to all
     :return: None
     """
     cnc_utils.set_long_term_cached_value(app_name, f'all_snippets', None, 0)

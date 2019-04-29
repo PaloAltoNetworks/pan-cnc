@@ -129,10 +129,10 @@ def save_user_secrets(user_id, secret_dict, passphrase):
 
         with open(file_path, 'wb+') as fps:
             fps.write(secret_output_stream.getvalue())
-    except OSError as ose:
+    except OSError:
         print('Caught Error saving user secrets!')
         return False
-    except BaseException as be:
+    except BaseException:
         print('Caught Error saving user secrets!')
         return False
 
@@ -254,7 +254,7 @@ def save_long_term_cache(app_name: str, contents: dict) -> None:
 
         with open(cache_file, 'w+') as cf:
             cf.write(json_string)
-    except OSError as ose:
+    except OSError:
         print('Could not save long term cache')
 
     return None
