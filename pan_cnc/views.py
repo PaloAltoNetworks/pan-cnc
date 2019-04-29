@@ -422,9 +422,15 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
         :param kwargs:
         :return:
         """
-        context = super().get_context_data(**kwargs)
-        # Generate the dynamic form based on the snippet name found and returned from get_snippet
-        form = self.generate_dynamic_form()
+
+        context = dict()
+        if 'form' in kwargs:
+            # this is being called from a validation error!
+            form = kwargs['form']
+        else:
+            # Generate the dynamic form based on the snippet name found and returned from get_snippet
+            form = self.generate_dynamic_form()
+
         context['form'] = form
         context['header'] = self.header
         context['title'] = self.title
@@ -462,16 +468,18 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
         POST variables and then check if it's valid. If valid, save variables to the session
         and call form_valid
         """
-        form = self.get_form()
+        self.service = snippet_utils.load_snippet_with_name(self.get_snippet(), self.app_dir)
+        form = self.generate_dynamic_form(self.request.POST)
+
         if form.is_valid():
             # load the snippet into the class attribute here so it's available to all other methods throughout the
             # call chain in the child classes
-            self.service = snippet_utils.load_snippet_with_name(self.get_snippet(), self.app_dir)
             # go ahead and save all our current POSTed variables to the session for use later
             self.save_workflow_to_session()
 
             return self.form_valid(form)
         else:
+            print('This form is not valid!')
             return self.form_invalid(form)
 
     def render_snippet_template(self) -> str:
@@ -487,7 +495,7 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
         template = snippet_utils.render_snippet_template(self.service, self.app_dir, self.get_workflow())
         return template
 
-    def generate_dynamic_form(self) -> forms.Form:
+    def generate_dynamic_form(self, data=None) -> forms.Form:
         """
         The heart of this class. This will generate a Form object based on the value of the self.snippet
         All variables defined in a snippet metadata.xml file will be converted into a form field depending on it's
@@ -496,8 +504,7 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
 
         :return: Form object
         """
-
-        dynamic_form = forms.Form()
+        dynamic_form = forms.Form(data=data)
 
         if self.service is None:
             # A GET call will find and load a snippet, then use the snippet_utils library to load that snippet
@@ -778,7 +785,7 @@ class ProvisionSnippetView(CNCBaseFormView):
         if self.service is not None:
 
             if 'type' not in self.service:
-                return super().get_context_data()
+                return super().get_context_data(**kwargs)
 
             if self.service['type'] == 'template':
                 self.header = 'Render Template'
@@ -799,7 +806,7 @@ class ProvisionSnippetView(CNCBaseFormView):
                 self.title = self.service['label']
                 print(f'Found unknown type {t} for form customization in ProvisionSnippetView:get_context_data')
 
-        return super().get_context_data()
+        return super().get_context_data(**kwargs)
 
     def get_snippet(self):
         print('Checking app_dir')
@@ -2175,4 +2182,3 @@ class ClearCacheView(CNCBaseAuth, RedirectView):
         cnc_utils.clear_long_term_cache(self.app_dir)
         messages.add_message(self.request, messages.INFO, 'Long term cache cleared')
         return '/'
-
