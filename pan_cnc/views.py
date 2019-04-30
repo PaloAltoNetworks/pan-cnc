@@ -803,7 +803,7 @@ class ProvisionSnippetView(CNCBaseFormView):
                 # May need to add additional types here
                 t = self.service['type']
                 self.header = 'Provision'
-                self.title = self.service['label']
+                self.title = self.service.get('label', '')
                 print(f'Found unknown type {t} for form customization in ProvisionSnippetView:get_context_data')
 
         return super().get_context_data(**kwargs)
