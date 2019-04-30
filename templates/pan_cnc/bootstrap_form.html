@@ -40,4 +40,6 @@
       <small class="form-text text-muted">{{ field.help_text }}</small>
     {% endif %}
   </div>
+{% empty %}
+    No user input required. Click Submit to launch this Skillet
 {% endfor %}
