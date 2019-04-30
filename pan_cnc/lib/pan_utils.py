@@ -143,7 +143,7 @@ def push_service(meta, context, force_sync=False, perform_commit=True) -> bool:
         print('Could not login in to Palo Alto Networks Device')
         return False
 
-    _perform_backup()
+    # _perform_backup()
     if 'snippet_path' in meta:
         snippets_dir = meta['snippet_path']
     else:
@@ -333,7 +333,7 @@ def get_vm_auth_key_from_panorama() -> str:
         raise TargetConnectionException
 
 
-def _perform_backup() -> str:
+def perform_backup() -> str:
     """
     Saves a named backup on the PAN-OS device. The format for the backup is 'panhandler-20190424000000.xml'
     :return:  xml results from the op command sequence

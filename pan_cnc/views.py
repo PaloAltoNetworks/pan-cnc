@@ -1026,8 +1026,10 @@ class EditTargetView(CNCBaseAuth, FormView):
 
         if 'type' in meta and 'panos' in meta['type']:
             # add option to perform commit operation or not
-            perform_commit = forms.BooleanField(label='Perform Commit', initial=True)
+            perform_commit = forms.BooleanField(label='Perform Commit', initial=True, label_suffix='')
             form.fields['perform_commit'] = perform_commit
+            perform_backup = forms.BooleanField(label='Perform Backup', initial=True, label_suffix='')
+            form.fields['perform_backup'] = perform_backup
 
         context['form'] = form
         context['base_html'] = self.base_html
@@ -1066,9 +1068,16 @@ class EditTargetView(CNCBaseAuth, FormView):
 
             if perform_commit_str == 'on':
                 perform_commit = True
+
+            perform_backup_str = self.request.POST.get('perform_backup', 'off')
+            perform_backup = False
+
+            if perform_backup_str == 'on':
+                perform_backup = True
         else:
             # ensure commit happens for everything other than panos
             perform_commit = True
+            perform_backup = True
 
         print(f'Got a perform_commit of {perform_commit}')
 
@@ -1104,6 +1113,11 @@ class EditTargetView(CNCBaseAuth, FormView):
 
         # let's grab the current workflow values (values saved from ALL forms in this app
         jinja_context.update(self.get_workflow())
+
+        if perform_backup:
+            print('Performing configuration backup before Configuration Push')
+            pan_utils.perform_backup()
+
         dependencies = snippet_utils.resolve_dependencies(meta, self.app_dir, [])
         for baseline in dependencies:
             # prego (it's in there)
