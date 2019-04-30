@@ -487,6 +487,15 @@ def _normalize_snippet_structure(skillet: dict) -> dict:
     :return: skillet/snippet that has been 'fixed'
     """
 
+    if 'name' not in skillet:
+        skillet['name'] = 'Unknown Skillet'
+
+    if 'label' not in skillet:
+        skillet['label'] = 'Unknown Skillet'
+
+    if 'type' not in skillet:
+        skillet['type'] = 'template'
+
     # first verify the variables stanza is present and is a list
     if 'variables' not in skillet:
         skillet['variables'] = list()
