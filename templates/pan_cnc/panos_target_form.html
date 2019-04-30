@@ -1,0 +1,16 @@
+{% extends 'pan_cnc/dynamic_form.html' %}
+{% block head %}
+    <script type="text/javascript">
+    function debug_and_submit() {
+        let debug_button = $('#id_debug');
+        debug_button.val('True');
+        let dynamic_form = $('#dynamic_form');
+        $('#submit_button').prop("disabled", true);
+        dynamic_form.submit();
+    }
+    </script>
+{% endblock %}
+
+{% block form_buttons %}
+    <button type="submit" class="btn btn-secondary" id="debug_button" onclick="debug_and_submit()">Debug</button>
+{% endblock %}

@@ -237,6 +237,43 @@ def push_service(meta, context, force_sync=False, perform_commit=True) -> bool:
         return False
 
 
+def debug_meta(meta: dict, context: dict) -> dict:
+    rendered_snippets = dict()
+
+    if 'snippet_path' in meta:
+        snippets_dir = meta['snippet_path']
+    else:
+        return rendered_snippets
+
+    for snippet in meta['snippets']:
+        if 'xpath' not in snippet or 'file' not in snippet:
+            print('Malformed meta-cnc error')
+            raise CCFParserError
+
+        xpath = snippet['xpath']
+        xml_file_name = snippet['file']
+        snippet_name = snippet['name']
+
+        xml_full_path = os.path.join(snippets_dir, xml_file_name)
+        with open(xml_full_path, 'r') as xml_file:
+            xml_string = xml_file.read()
+            environment = Environment(loader=BaseLoader())
+
+            for f in jinja_filters.defined_filters:
+                if hasattr(jinja_filters, f):
+                    environment.filters[f] = getattr(jinja_filters, f)
+
+            xml_template = environment.from_string(xml_string)
+            xpath_template = environment.from_string(xpath)
+            xml_snippet = xml_template.render(context)
+            xpath_string = xpath_template.render(context)
+            rendered_snippets[snippet_name] = dict()
+            rendered_snippets[snippet_name]['xpath'] = xpath_string
+            rendered_snippets[snippet_name]['xml'] = xml_snippet
+
+    return rendered_snippets
+
+
 def validate_snippet_present(service, context) -> bool:
     """
     Checks all xpaths in the service to validate if they are already present in panorama

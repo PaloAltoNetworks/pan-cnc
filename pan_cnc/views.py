@@ -939,7 +939,7 @@ class EditTargetView(CNCBaseAuth, FormView):
     # base form class, you should not need to override this
     form_class = forms.Form
     # form to render, override if you need a specific html fragment to render the form
-    template_name = 'pan_cnc/dynamic_form.html'
+    template_name = 'pan_cnc/panos_target_form.html'
     # Head to show on the rendered dynamic form - Main header
     header = 'PAN-OS Utils'
     # title to show on dynamic form
@@ -1020,9 +1020,12 @@ class EditTargetView(CNCBaseAuth, FormView):
                                                 label=target_password_label,
                                                 initial=target_password)
 
+        debug_field = forms.CharField(initial='False', widget=forms.HiddenInput())
+
         form.fields['TARGET_IP'] = target_ip_field
         form.fields['TARGET_USERNAME'] = target_username_field
         form.fields['TARGET_PASSWORD'] = target_password_field
+        form.fields['debug'] = debug_field
 
         if 'type' in meta and 'panos' in meta['type']:
             # add option to perform commit operation or not
@@ -1059,6 +1062,50 @@ class EditTargetView(CNCBaseAuth, FormView):
         target_ip = self.request.POST.get('TARGET_IP', None)
         target_username = self.request.POST.get('TARGET_USERNAME', None)
         target_password = self.request.POST.get('TARGET_PASSWORD', None)
+        debug = self.request.POST.get('debug', False)
+
+        print(f'Found a debug setting of {debug}')
+
+        print(f'saving target_ip {target_ip} to workflow')
+
+        self.save_value_to_workflow('TARGET_IP', target_ip)
+        self.save_value_to_workflow('TARGET_USERNAME', target_username)
+
+        workflow = self.get_workflow()
+        self.request.session[self.app_dir] = workflow
+
+        # self.save_value_to_workflow('TARGET_PASSWORD', target_password)
+        # Always grab all the default values, then update them based on user input in the workflow
+        jinja_context = dict()
+        if 'variables' in meta and type(meta['variables']) is list:
+            for snippet_var in meta['variables']:
+                jinja_context[snippet_var['name']] = snippet_var['default']
+
+        # let's grab the current workflow values (values saved from ALL forms in this app
+        jinja_context.update(self.get_workflow())
+
+        if debug == 'True' or debug is True:
+            context = dict()
+            context['base_html'] = self.base_html
+            changes = pan_utils.debug_meta(meta, jinja_context)
+            context['results'] = changes
+            context['meta'] = meta
+            context['target_ip'] = target_ip
+            self.request.session['last_page'] = '/editTarget'
+            return render(self.request, 'pan_cnc/debug_panos_skillet.html', context=context)
+
+        print(f'logging in to pan device with {target_ip}')
+        login = pan_utils.panos_login(
+            pan_device_ip=target_ip,
+            pan_device_username=target_username,
+            pan_device_password=target_password
+        )
+
+        if login is None:
+            context = dict()
+            context['base_html'] = self.base_html
+            context['results'] = 'Could not login to PAN-OS'
+            return render(self.request, 'pan_cnc/results.html', context=context)
 
         # check if type is 'panos' and if the user wants to perform a commit or not
         if 'type' in meta and meta['type'] == 'panos':
@@ -1080,40 +1127,6 @@ class EditTargetView(CNCBaseAuth, FormView):
             perform_backup = True
 
         print(f'Got a perform_commit of {perform_commit}')
-
-        print(f'saving target_ip {target_ip} to workflow')
-
-        self.save_value_to_workflow('TARGET_IP', target_ip)
-        self.save_value_to_workflow('TARGET_USERNAME', target_username)
-
-        workflow = self.get_workflow()
-        print(workflow)
-
-        self.request.session[self.app_dir] = workflow
-
-        # self.save_value_to_workflow('TARGET_PASSWORD', target_password)
-        print(f'logging in to pan device with {target_ip}')
-        login = pan_utils.panos_login(
-            pan_device_ip=target_ip,
-            pan_device_username=target_username,
-            pan_device_password=target_password
-        )
-
-        if login is None:
-            context = dict()
-            context['base_html'] = self.base_html
-            context['results'] = 'Could not login to PAN-OS'
-            return render(self.request, 'pan_cnc/results.html', context=context)
-
-        # Always grab all the default values, then update them based on user input in the workflow
-        jinja_context = dict()
-        if 'variables' in meta and type(meta['variables']) is list:
-            for snippet_var in meta['variables']:
-                jinja_context[snippet_var['name']] = snippet_var['default']
-
-        # let's grab the current workflow values (values saved from ALL forms in this app
-        jinja_context.update(self.get_workflow())
-
         if perform_backup:
             print('Performing configuration backup before Configuration Push')
             pan_utils.perform_backup()
