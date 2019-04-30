@@ -128,7 +128,7 @@ def get_panos_credentials(pan_device_ip, pan_device_username, pan_device_passwor
     return credentials
 
 
-def push_service(meta, context, force_sync=False, perform_commit=True) -> bool:
+def push_service(meta, context, force_sync=False, perform_commit=True) -> None:
     """
     Push a skillet to a PanXapi connected device
     :param meta: dict containing parsed and loaded skillet
@@ -140,8 +140,7 @@ def push_service(meta, context, force_sync=False, perform_commit=True) -> bool:
     xapi = panos_login()
 
     if xapi is None:
-        print('Could not login in to Palo Alto Networks Device')
-        return False
+        raise CCFParserError('Could not login in to Palo Alto Networks Device')
 
     # _perform_backup()
     if 'snippet_path' in meta:
@@ -153,7 +152,7 @@ def push_service(meta, context, force_sync=False, perform_commit=True) -> bool:
         for snippet in meta['snippets']:
             if 'xpath' not in snippet or 'file' not in snippet:
                 print('Malformed meta-cnc error')
-                raise CCFParserError
+                raise CCFParserError('Malformed meta-cnc file')
 
             xpath = snippet['xpath']
             xml_file_name = snippet['file']
@@ -176,8 +175,7 @@ def push_service(meta, context, force_sync=False, perform_commit=True) -> bool:
                 if xapi.status_code == '19' or xapi.status_code == '20':
                     print('xpath is already present')
                 elif xapi.status_code == '7':
-                    print('xpath was NOT found')
-                    return False
+                    raise CCFParserError(f'xpath {xpath_string} was NOT found')
 
         if perform_commit:
 
@@ -218,23 +216,16 @@ def push_service(meta, context, force_sync=False, perform_commit=True) -> bool:
                                 '</device-group></shared-policy></commit-all>')
                 print(xapi.xml_result())
 
-        return True
+        return
 
     except UndefinedError as ue:
-        print('Undefined variable in skillet')
-        print(ue)
-        return False
+        raise CCFParserError(f'Undefined variable in skillet: {ue}')
 
     except IOError as ioe:
-        print('Could not open xml snippet file for reading!!!')
-        print(ioe)
-        # FIXME - raise a decent error here
-        return False
+        raise CCFParserError(f'Could not open xml snippet file for reading! {ioe}')
 
     except pan.xapi.PanXapiError as pxe:
-        print('Could not push meta snippet!')
-        print(pxe)
-        return False
+        raise CCFParserError(f'Could not push meta-cnc! {pxe}')
 
 
 def debug_meta(meta: dict, context: dict) -> dict:
@@ -254,22 +245,31 @@ def debug_meta(meta: dict, context: dict) -> dict:
         xml_file_name = snippet['file']
         snippet_name = snippet['name']
 
-        xml_full_path = os.path.join(snippets_dir, xml_file_name)
-        with open(xml_full_path, 'r') as xml_file:
-            xml_string = xml_file.read()
-            environment = Environment(loader=BaseLoader())
+        try:
+            xml_full_path = os.path.abspath(os.path.join(snippets_dir, xml_file_name))
+            with open(xml_full_path, 'r') as xml_file:
+                xml_string = xml_file.read()
+                environment = Environment(loader=BaseLoader())
 
-            for f in jinja_filters.defined_filters:
-                if hasattr(jinja_filters, f):
-                    environment.filters[f] = getattr(jinja_filters, f)
+                for f in jinja_filters.defined_filters:
+                    if hasattr(jinja_filters, f):
+                        environment.filters[f] = getattr(jinja_filters, f)
 
-            xml_template = environment.from_string(xml_string)
-            xpath_template = environment.from_string(xpath)
-            xml_snippet = xml_template.render(context)
-            xpath_string = xpath_template.render(context)
-            rendered_snippets[snippet_name] = dict()
-            rendered_snippets[snippet_name]['xpath'] = xpath_string
-            rendered_snippets[snippet_name]['xml'] = xml_snippet
+                xml_template = environment.from_string(xml_string)
+                xpath_template = environment.from_string(xpath)
+                xml_snippet = xml_template.render(context)
+                xpath_string = xpath_template.render(context)
+                rendered_snippets[snippet_name] = dict()
+                rendered_snippets[snippet_name]['xpath'] = xpath_string
+                rendered_snippets[snippet_name]['xml'] = xml_snippet
+        except FileNotFoundError:
+            err = f'Could not find file from path: {xml_full_path} from snippet: {snippet_name}'
+            print(err)
+            raise CCFParserError(err)
+        except OSError:
+            err = f'Unknown Error loading snippet: {snippet_name} from file {xml_file_name}'
+            print(err)
+            raise CCFParserError(err)
 
     return rendered_snippets
 

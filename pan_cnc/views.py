@@ -1087,7 +1087,14 @@ class EditTargetView(CNCBaseAuth, FormView):
         if debug == 'True' or debug is True:
             context = dict()
             context['base_html'] = self.base_html
-            changes = pan_utils.debug_meta(meta, jinja_context)
+            try:
+                changes = pan_utils.debug_meta(meta, jinja_context)
+            except CCFParserError as cpe:
+                label = meta['label']
+                messages.add_message(self.request, messages.ERROR, f'Could not debug Skillet: {label}')
+                context['results'] = str(cpe)
+                return render(self.request, 'pan_cnc/results.html', context=context)
+
             context['results'] = changes
             context['meta'] = meta
             context['target_ip'] = target_ip
@@ -1151,13 +1158,18 @@ class EditTargetView(CNCBaseAuth, FormView):
                     # no prego (it's not in there)
                     print('Pushing configuration dependency: %s' % baseline_service['name'])
                     # make it prego
-                    if not pan_utils.push_service(baseline_service, jinja_context, False, perform_commit):
-                        messages.add_message(self.request, messages.ERROR, 'Could not push baseline Configuration')
+                    try:
+                        pan_utils.push_service(baseline_service, jinja_context, False, perform_commit)
+                    except CCFParserError as cpe:
+                        messages.add_message(self.request, messages.ERROR,
+                                             f'Could not push baseline Configuration: {cpe}')
                         return HttpResponseRedirect(f"{self.app_dir}/")
 
         # BUG-FIX to always just push the toplevel meta
-        if not pan_utils.push_service(meta, jinja_context, False, perform_commit):
-            messages.add_message(self.request, messages.ERROR, 'Could not push Configuration')
+        try:
+            pan_utils.push_service(meta, jinja_context, False, perform_commit)
+        except CCFParserError as cpe:
+            messages.add_message(self.request, messages.ERROR, f'Could not push Configuration: {cpe}')
             return HttpResponseRedirect(f"{self.app_dir}/")
 
         messages.add_message(self.request, messages.SUCCESS, 'Configuration Push Queued successfully')
