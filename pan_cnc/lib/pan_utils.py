@@ -28,6 +28,7 @@ Use at your own risk.
 import datetime
 import logging
 import os
+import re
 from xml.etree import ElementTree as elementTree
 
 import pan.xapi
@@ -128,31 +129,53 @@ def get_panos_credentials(pan_device_ip, pan_device_username, pan_device_passwor
     return credentials
 
 
-def push_service(meta, context, force_sync=False, perform_commit=True) -> None:
+def push_service(meta, context, force_sync=False, perform_commit=True) -> bool:
+    """
+    push_service is a wrapper around push_meta for API compatibility
+    :param meta: loaded skillet
+    :param context: user_inputs and secrets
+    :param force_sync: should we wait for the commit to complete
+    :param perform_commit: should we actually commit at all
+    :return: bool - True on success, False on failure
+    """
+    try:
+        push_meta(meta, context, force_sync, perform_commit)
+    except CCFParserError:
+        return False
+
+    return True
+
+
+def push_meta(meta, context, force_sync=False, perform_commit=True) -> (str, None):
     """
     Push a skillet to a PanXapi connected device
     :param meta: dict containing parsed and loaded skillet
     :param context: all compiled variables from the user interaction
     :param force_sync: should we wait on a successful commit operation or return after queue
     :param perform_commit: should we actually commit or not
-    :return: boolean on success / failure
+    :return: job_id as a str or None if no job_id could be found
     """
     xapi = panos_login()
 
     if xapi is None:
         raise CCFParserError('Could not login in to Palo Alto Networks Device')
 
+    name = meta['name'] if 'name' in meta else 'unknown'
+
+    # default to None as return value, set to job_id if possible later if a commit was requested
+    return_value = None
+
     # _perform_backup()
     if 'snippet_path' in meta:
         snippets_dir = meta['snippet_path']
     else:
-        raise CCFParserError('Could not locate .meta-cnc file')
+        raise CCFParserError(f'Could not locate .meta-cnc file on filesystem for Skillet: {name}')
 
     try:
         for snippet in meta['snippets']:
             if 'xpath' not in snippet or 'file' not in snippet:
                 print('Malformed meta-cnc error')
-                raise CCFParserError('Malformed meta-cnc file')
+                raise CCFParserError(f'Malformed snippet section in meta-cnc file for {name}')
 
             xpath = snippet['xpath']
             xml_file_name = snippet['file']
@@ -171,12 +194,16 @@ def push_service(meta, context, force_sync=False, perform_commit=True) -> None:
                 xml_snippet = xml_template.render(context).replace('\n', '')
                 xpath_string = xpath_template.render(context)
                 print('Pushing xpath: %s' % xpath_string)
-                xapi.set(xpath=xpath_string, element=xml_snippet)
-                if xapi.status_code == '19' or xapi.status_code == '20':
-                    print('xpath is already present')
-                elif xapi.status_code == '7':
-                    raise CCFParserError(f'xpath {xpath_string} was NOT found')
-
+                try:
+                    xapi.set(xpath=xpath_string, element=xml_snippet)
+                    if xapi.status_code == '19' or xapi.status_code == '20':
+                        print('xpath is already present')
+                    elif xapi.status_code == '7':
+                        raise CCFParserError(f'xpath {xpath_string} was NOT found for skillet: {name}')
+                except pan.xapi.PanXapiError as pxe:
+                    raise CCFParserError(
+                        f'Could not push meta-cnc for skillet {name} / snippet {xml_file_name}! {pxe}'
+                    )
         if perform_commit:
 
             if 'type' not in meta:
@@ -196,7 +223,14 @@ def push_service(meta, context, force_sync=False, perform_commit=True) -> None:
                 else:
                     xapi.commit('<commit></commit>')
 
-            print(xapi.xml_result())
+            results = xapi.xml_result()
+            print(results)
+
+            # let's capture the job_id if possible
+            if 'with jobid' in results:
+                result = re.match(r'.* with jobid (\d+)', results)
+                if result is not None:
+                    return_value = result.group(1)
 
             # for gpcs baseline and svc connection network configuration do a scope push to gpcs
             # FIXME - check for 'gpcs' in meta['type'] instead of hardcoded name
@@ -216,7 +250,7 @@ def push_service(meta, context, force_sync=False, perform_commit=True) -> None:
                                 '</device-group></shared-policy></commit-all>')
                 print(xapi.xml_result())
 
-        return
+        return return_value
 
     except UndefinedError as ue:
         raise CCFParserError(f'Undefined variable in skillet: {ue}')
@@ -225,7 +259,7 @@ def push_service(meta, context, force_sync=False, perform_commit=True) -> None:
         raise CCFParserError(f'Could not open xml snippet file for reading! {ioe}')
 
     except pan.xapi.PanXapiError as pxe:
-        raise CCFParserError(f'Could not push meta-cnc! {pxe}')
+        raise CCFParserError(f'Could not push meta-cnc for skillet {name}! {pxe}')
 
 
 def debug_meta(meta: dict, context: dict) -> dict:

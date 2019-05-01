@@ -1159,20 +1159,24 @@ class EditTargetView(CNCBaseAuth, FormView):
                     print('Pushing configuration dependency: %s' % baseline_service['name'])
                     # make it prego
                     try:
-                        pan_utils.push_service(baseline_service, jinja_context, False, perform_commit)
+                        pan_utils.push_meta(baseline_service, jinja_context, False, perform_commit)
                     except CCFParserError as cpe:
                         messages.add_message(self.request, messages.ERROR,
                                              f'Could not push baseline Configuration: {cpe}')
                         return HttpResponseRedirect(f"{self.app_dir}/")
 
-        # BUG-FIX to always just push the toplevel meta
         try:
-            pan_utils.push_service(meta, jinja_context, False, perform_commit)
+            job_id = pan_utils.push_meta(meta, jinja_context, False, perform_commit)
         except CCFParserError as cpe:
             messages.add_message(self.request, messages.ERROR, f'Could not push Configuration: {cpe}')
             return HttpResponseRedirect(f"{self.app_dir}/")
 
-        messages.add_message(self.request, messages.SUCCESS, 'Configuration Push Queued successfully')
+        if job_id is not None:
+            messages.add_message(self.request, messages.SUCCESS,
+                                 f'Configuration Push Queued successfully with job)_id: {job_id}')
+        else:
+            messages.add_message(self.request, messages.SUCCESS, 'Configuration Push Queued successfully')
+
         return HttpResponseRedirect(f"{self.app_dir}/")
 
 
