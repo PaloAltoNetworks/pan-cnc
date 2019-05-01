@@ -1159,7 +1159,8 @@ class EditTargetView(CNCBaseAuth, FormView):
                     print('Pushing configuration dependency: %s' % baseline_service['name'])
                     # make it prego
                     try:
-                        pan_utils.push_meta(baseline_service, jinja_context, False, perform_commit)
+                        # never commit on extended baseline skillets
+                        pan_utils.push_meta(baseline_service, jinja_context, False, False)
                     except CCFParserError as cpe:
                         messages.add_message(self.request, messages.ERROR,
                                              f'Could not push baseline Configuration: {cpe}')
