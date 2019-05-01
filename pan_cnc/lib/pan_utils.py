@@ -61,10 +61,16 @@ def panos_login(pan_device_ip=None, pan_device_username=None, pan_device_passwor
     # if pan_device_ip is not None:
     if xapi_obj is not None:
         if pan_device_ip is not None:
-            if xapi_obj.hostname == pan_device_ip:
+            if xapi_obj.hostname == pan_device_ip and xapi_obj.api_username == pan_device_username \
+                    and xapi_obj.api_password == pan_device_password:
                 # an IP was specified and we have already connected to it
                 # oterhwise, fall through to get credentials and do another connection attempt
+                print('Returning cached xapi object')
                 return xapi_obj
+            else:
+                print('Clearing old PanXapi credentials')
+                xapi_obj = None
+                cache.set('panorama_api_key', None)
 
         else:
             # no new credentials passed, but we have already connected, return the current connection
@@ -120,7 +126,7 @@ def get_panos_credentials(pan_device_ip, pan_device_username, pan_device_passwor
     credentials["api_username"] = pan_device_username
     credentials["api_password"] = pan_device_password
 
-    api_key = cache.get('panorama_api_key')
+    api_key = cache.get('panorama_api_key', None)
     if api_key is not None:
         print('Using API KEY')
         credentials['api_key'] = api_key
@@ -416,5 +422,5 @@ def perform_backup() -> str:
     try:
         xapi.op(cmd=cmd)
         return xapi.xml_result()
-    except pan.xapi.PanXapiError:
-        raise TargetConnectionException('Could not perform backup')
+    except pan.xapi.PanXapiError as pxe:
+        raise TargetConnectionException(f'Could not perform backup: {pxe}')

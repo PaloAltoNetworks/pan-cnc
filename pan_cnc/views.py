@@ -47,7 +47,7 @@ from pan_cnc.lib import pan_utils
 from pan_cnc.lib import rest_utils
 from pan_cnc.lib import snippet_utils
 from pan_cnc.lib import task_utils
-from pan_cnc.lib.exceptions import SnippetRequiredException, CCFParserError
+from pan_cnc.lib.exceptions import SnippetRequiredException, CCFParserError, TargetConnectionException
 
 
 class CNCBaseAuth(LoginRequiredMixin, View):
@@ -89,7 +89,7 @@ class CNCBaseAuth(LoginRequiredMixin, View):
             print('saving new workflow')
             current_workflow = dict()
 
-        if hasattr(self, 'service'):
+        if hasattr(self, 'service') and self.service is not None:
             if 'variables' in self.service and self.service['variables'] is not None and \
                     type(self.service['variables']) is list:
 
@@ -840,6 +840,11 @@ class ProvisionSnippetView(CNCBaseFormView):
             print('No Service ID found!')
             return super().form_valid(form)
 
+        if self.service is None:
+            print('Unknonw Error, Skillet was None')
+            messages.add_message(self.request, messages.ERROR, 'Process Error - No Skillet was loaded')
+            return self.form_invalid(form)
+
         if self.service['type'] == 'template':
             template = snippet_utils.render_snippet_template(self.service, self.app_dir, self.get_workflow())
             if len(self.service['snippets']) == 0:
@@ -956,6 +961,8 @@ class EditTargetView(CNCBaseAuth, FormView):
                 'This us usually a PAN-OS or other network device depending on the type of template to ' \
                 'be provisioned'
 
+    meta = None
+
     def get(self, request, *args, **kwargs) -> Any:
         """
             Handle GET requests
@@ -965,37 +972,53 @@ class EditTargetView(CNCBaseAuth, FormView):
         # load the snippet into the class attribute here so it's available to all other methods throughout the
         # call chain in the child classes
         snippet_name = self.get_value_from_workflow('snippet_name', '')
-        if snippet_name != '':
-            return self.render_to_response(self.get_context_data())
-        else:
-            messages.add_message(self.request, messages.ERROR, 'Process Error - Meta not found')
-            return HttpResponseRedirect('/')
-
-    def get_context_data(self, **kwargs) -> dict:
-        context = super().get_context_data(**kwargs)
-        env_name = self.kwargs.get('env_name')
-        form = forms.Form()
-        snippet_name = self.get_value_from_workflow('snippet_name', '')
-
-        target_ip_label = 'Target IP'
-        target_username_label = 'Target Username'
-        target_password_label = 'Target Password'
-
-        header = 'Edit Target'
-        title = 'Configure Target information'
-
         if snippet_name == '':
             messages.add_message(self.request, messages.ERROR, 'Process Error - Meta not found')
-            return context
+            return HttpResponseRedirect('/')
 
         meta = snippet_utils.load_snippet_with_name(snippet_name, self.app_dir)
         if meta is None:
             messages.add_message(self.request, messages.ERROR, 'Process Error - Could not load meta')
-            return context
 
-        if 'label' in meta:
-            header = f"Set Target for {meta['label']}"
+        self.meta = meta
+        return self.render_to_response(self.get_context_data())
 
+    def post(self, request, *args, **kwargs):
+        snippet_name = self.get_value_from_workflow('snippet_name', '')
+        if snippet_name == '':
+            messages.add_message(self.request, messages.ERROR, 'Process Error - Meta not found')
+            return HttpResponseRedirect('/')
+
+        meta = snippet_utils.load_snippet_with_name(snippet_name, self.app_dir)
+        if meta is None:
+            messages.add_message(self.request, messages.ERROR, 'Process Error - Could not load meta')
+
+        self.meta = meta
+
+        form = self.generate_dynamic_form(self.request.POST)
+
+        if form.is_valid():
+            # load the snippet into the class attribute here so it's available to all other methods throughout the
+            # call chain in the child classes
+            # go ahead and save all our current POSTed variables to the session for use later
+            self.save_workflow_to_session()
+
+            return self.form_valid(form)
+        else:
+            print('This form is not valid!')
+            return self.form_invalid(form)
+
+    def generate_dynamic_form(self, data=None) -> forms.Form:
+
+        form = forms.Form(data=data)
+
+        meta = self.meta
+        if meta is None:
+            print('Why?')
+
+        target_ip_label = 'Target IP'
+        target_username_label = 'Target Username'
+        target_password_label = 'Target Password'
         if 'type' in meta:
             if meta['type'] == 'panos':
                 target_ip_label = 'PAN-OS IP'
@@ -1014,9 +1037,9 @@ class EditTargetView(CNCBaseAuth, FormView):
         target_username = self.get_value_from_workflow('TARGET_USERNAME', '')
         target_password = self.get_value_from_workflow('TARGET_PASSWORD', '')
 
-        target_ip_field = forms.CharField(label=target_ip_label, initial=target_ip)
-        target_username_field = forms.CharField(label=target_username_label, initial=target_username)
-        target_password_field = forms.CharField(widget=forms.PasswordInput(render_value=True),
+        target_ip_field = forms.CharField(label=target_ip_label, initial=target_ip, required=False)
+        target_username_field = forms.CharField(label=target_username_label, initial=target_username, required=False)
+        target_password_field = forms.CharField(widget=forms.PasswordInput(render_value=True), required=False,
                                                 label=target_password_label,
                                                 initial=target_password)
 
@@ -1029,10 +1052,29 @@ class EditTargetView(CNCBaseAuth, FormView):
 
         if 'type' in meta and 'panos' in meta['type']:
             # add option to perform commit operation or not
-            perform_commit = forms.BooleanField(label='Perform Commit', initial=True, label_suffix='')
+            perform_commit = forms.BooleanField(label='Perform Commit', initial=True, label_suffix='', required=False)
             form.fields['perform_commit'] = perform_commit
-            perform_backup = forms.BooleanField(label='Perform Backup', initial=True, label_suffix='')
+            perform_backup = forms.BooleanField(label='Perform Backup', initial=True, label_suffix='', required=False)
             form.fields['perform_backup'] = perform_backup
+
+        return form
+
+    def get_context_data(self, **kwargs) -> dict:
+        context = super().get_context_data(**kwargs)
+        env_name = self.kwargs.get('env_name')
+
+        if 'form' in kwargs:
+            form = kwargs.get('form')
+        else:
+            form = self.generate_dynamic_form()
+
+        header = 'Edit Target'
+        title = 'Configure Target information'
+
+        meta = self.meta
+
+        if 'label' in meta:
+            header = f"Set Target for {meta['label']}"
 
         context['form'] = form
         context['base_html'] = self.base_html
@@ -1049,6 +1091,7 @@ class EditTargetView(CNCBaseAuth, FormView):
         :param form: blank form data from request
         :return: render of a success template after service is provisioned
         """
+
         snippet_name = self.get_value_from_workflow('snippet_name', '')
 
         if snippet_name == '':
@@ -1066,15 +1109,6 @@ class EditTargetView(CNCBaseAuth, FormView):
 
         print(f'Found a debug setting of {debug}')
 
-        print(f'saving target_ip {target_ip} to workflow')
-
-        self.save_value_to_workflow('TARGET_IP', target_ip)
-        self.save_value_to_workflow('TARGET_USERNAME', target_username)
-
-        workflow = self.get_workflow()
-        self.request.session[self.app_dir] = workflow
-
-        # self.save_value_to_workflow('TARGET_PASSWORD', target_password)
         # Always grab all the default values, then update them based on user input in the workflow
         jinja_context = dict()
         if 'variables' in meta and type(meta['variables']) is list:
@@ -1101,6 +1135,31 @@ class EditTargetView(CNCBaseAuth, FormView):
             self.request.session['last_page'] = '/editTarget'
             return render(self.request, 'pan_cnc/debug_panos_skillet.html', context=context)
 
+        print(f'saving target_ip {target_ip} to workflow')
+
+        self.save_value_to_workflow('TARGET_IP', target_ip)
+        self.save_value_to_workflow('TARGET_USERNAME', target_username)
+
+        workflow = self.get_workflow()
+        self.request.session[self.app_dir] = workflow
+
+        err_condition = False
+        print(f'TARGET_IP is now :{target_ip}:')
+        if target_ip is None or target_ip == '':
+            form.add_error('TARGET_IP', 'Host entry cannot be blank')
+            err_condition = True
+
+        if target_username is None or target_username == '':
+            form.add_error('TARGET_USERNAME', 'Username cannot be blank')
+            err_condition = True
+
+        if target_password is None or target_password == '':
+            form.add_error('TARGET_PASSWORD', 'Password cannot be blank')
+            err_condition = True
+
+        if err_condition:
+            return self.form_invalid(form)
+
         print(f'logging in to pan device with {target_ip}')
         login = pan_utils.panos_login(
             pan_device_ip=target_ip,
@@ -1109,10 +1168,10 @@ class EditTargetView(CNCBaseAuth, FormView):
         )
 
         if login is None:
-            context = dict()
-            context['base_html'] = self.base_html
-            context['results'] = 'Could not login to PAN-OS'
-            return render(self.request, 'pan_cnc/results.html', context=context)
+            form.add_error('TARGET_IP', 'Cannot login to device')
+            form.add_error('TARGET_USERNAME', 'Cannot login to device')
+            form.add_error('TARGET_PASSWORD', 'Cannot login to device')
+            return self.form_invalid(form)
 
         # check if type is 'panos' and if the user wants to perform a commit or not
         if 'type' in meta and meta['type'] == 'panos':
@@ -1136,7 +1195,11 @@ class EditTargetView(CNCBaseAuth, FormView):
         print(f'Got a perform_commit of {perform_commit}')
         if perform_backup:
             print('Performing configuration backup before Configuration Push')
-            pan_utils.perform_backup()
+            try:
+                pan_utils.perform_backup()
+            except TargetConnectionException as tce:
+                messages.add_message(self.request, messages.ERROR, str(tce))
+                return self.form_invalid(form)
 
         dependencies = snippet_utils.resolve_dependencies(meta, self.app_dir, [])
         for baseline in dependencies:
@@ -1174,7 +1237,7 @@ class EditTargetView(CNCBaseAuth, FormView):
 
         if job_id is not None:
             messages.add_message(self.request, messages.SUCCESS,
-                                 f'Configuration Push Queued successfully with job)_id: {job_id}')
+                                 f'Configuration Push Queued successfully with Job ID: {job_id}')
         else:
             messages.add_message(self.request, messages.SUCCESS, 'Configuration Push Queued successfully')
 
@@ -1235,7 +1298,6 @@ class EditRestTargetView(CNCBaseAuth, FormView):
         target_ip_label = 'Endpoint Host'
 
         workflow = self.get_workflow()
-        print(workflow)
 
         target_ip = self.get_value_from_workflow('TARGET_IP', '')
 
@@ -1265,6 +1327,7 @@ class EditRestTargetView(CNCBaseAuth, FormView):
             raise SnippetRequiredException
 
         target_ip = self.request.POST.get('TARGET_IP', None)
+
         if target_ip is None:
             messages.add_message(self.request, messages.ERROR, 'Endpoint cannot be blank')
             return self.form_invalid(form)
