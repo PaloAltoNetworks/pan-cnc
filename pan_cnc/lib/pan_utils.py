@@ -37,7 +37,8 @@ from jinja2 import Environment, BaseLoader
 from jinja2.exceptions import UndefinedError
 
 from pan_cnc.lib import jinja_filters
-from pan_cnc.lib.exceptions import TargetConnectionException, CCFParserError
+from pan_cnc.lib.exceptions import TargetConnectionException, TargetLoginException, CCFParserError, \
+    TargetGenericException
 
 xapi_obj = None
 
@@ -49,6 +50,25 @@ logger.addHandler(handler)
 
 
 def panos_login(pan_device_ip=None, pan_device_username=None, pan_device_password=None) -> (pan.xapi.PanXapi, None):
+    """
+    Similar to panos_login_verbose but hide exceptions and returns None on errors
+    :param pan_device_ip:
+    :param pan_device_username:
+    :param pan_device_password:
+    :return: pan.xapi object or None on error
+    """
+
+    try:
+        return panos_login_verbose(pan_device_ip, pan_device_username, pan_device_password)
+    except TargetConnectionException:
+        return None
+    except TargetLoginException:
+        return None
+    except pan.xapi.PanXapiError:
+        return None
+
+
+def panos_login_verbose(pan_device_ip=None, pan_device_username=None, pan_device_password=None) -> pan.xapi.PanXapi:
     """
     Using the pan-xapi to log in to a PAN-OS or Panorama instance. If supplied ip, username, and password are None
     this will attempt to find them via environment variables 'PANORAMA_IP', 'PANORAMA_USERNAME', and 'PANORAMA_PASSWORD'
@@ -89,10 +109,19 @@ def panos_login(pan_device_ip=None, pan_device_username=None, pan_device_passwor
     except pan.xapi.PanXapiError as pxe:
         print('Error logging in to Palo Alto Networks device')
         print(pxe)
-        # reset to None here to force re-auth next time
+        err_msg = str(pxe)
+
         xapi_obj = None
         cache.set('panorama_api_key', None)
-        return None
+
+        if '403' in err_msg:
+            raise TargetLoginException('Invalid credentials logging into device')
+        elif 'Errno 111' in err_msg:
+            raise TargetConnectionException('Error contacting the device at the given IP / hostname')
+        elif 'Errno 60' in err_msg:
+            raise TargetConnectionException('Error contacting the device at the given IP / hostname')
+        else:
+            raise TargetGenericException(pxe)
 
 
 def test_panorama() -> None:

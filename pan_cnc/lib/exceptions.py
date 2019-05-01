@@ -29,6 +29,14 @@ class TargetConnectionException(Exception):
     pass
 
 
+class TargetLoginException(Exception):
+    pass
+
+
+class TargetGenericException(Exception):
+    pass
+
+
 class CCFParserError(Exception):
     pass
 

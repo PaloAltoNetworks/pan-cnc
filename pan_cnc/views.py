@@ -47,7 +47,8 @@ from pan_cnc.lib import pan_utils
 from pan_cnc.lib import rest_utils
 from pan_cnc.lib import snippet_utils
 from pan_cnc.lib import task_utils
-from pan_cnc.lib.exceptions import SnippetRequiredException, CCFParserError, TargetConnectionException
+from pan_cnc.lib.exceptions import SnippetRequiredException, CCFParserError, TargetConnectionException, \
+    TargetLoginException, TargetGenericException
 
 
 class CNCBaseAuth(LoginRequiredMixin, View):
@@ -1161,16 +1162,21 @@ class EditTargetView(CNCBaseAuth, FormView):
             return self.form_invalid(form)
 
         print(f'logging in to pan device with {target_ip}')
-        login = pan_utils.panos_login(
-            pan_device_ip=target_ip,
-            pan_device_username=target_username,
-            pan_device_password=target_password
-        )
-
-        if login is None:
-            form.add_error('TARGET_IP', 'Cannot login to device')
-            form.add_error('TARGET_USERNAME', 'Cannot login to device')
-            form.add_error('TARGET_PASSWORD', 'Cannot login to device')
+        try:
+            login = pan_utils.panos_login_verbose(
+                pan_device_ip=target_ip,
+                pan_device_username=target_username,
+                pan_device_password=target_password
+            )
+        except TargetConnectionException:
+            form.add_error('TARGET_IP', 'Connection Refused Error, check the IP and try again')
+            return self.form_invalid(form)
+        except TargetLoginException:
+            form.add_error('TARGET_USERNAME', 'Invalid Credentials, ensure your username and password are correct')
+            form.add_error('TARGET_PASSWORD', 'Invalid Credentials, ensure your username and password are correct')
+            return self.form_invalid(form)
+        except TargetGenericException as tge:
+            form.add_error('TARGET_IP', f'Unknonw Connection Error: {tge}')
             return self.form_invalid(form)
 
         # check if type is 'panos' and if the user wants to perform a commit or not
