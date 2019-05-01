@@ -208,7 +208,7 @@ def push_meta(meta, context, force_sync=False, perform_commit=True) -> (str, Non
                         raise CCFParserError(f'xpath {xpath_string} was NOT found for skillet: {name}')
                 except pan.xapi.PanXapiError as pxe:
                     raise CCFParserError(
-                        f'Could not push meta-cnc for skillet {name} / snippet {xml_file_name}! {pxe}'
+                        f'Could not push skillet {name} / snippet {xml_file_name}! {pxe}'
                     )
         if perform_commit:
 
