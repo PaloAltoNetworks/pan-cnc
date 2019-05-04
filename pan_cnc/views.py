@@ -34,6 +34,7 @@ from celery.result import AsyncResult
 from django import forms
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.core.validators import MaxValueValidator, MinValueValidator, RegexValidator
 from django.http import JsonResponse
 from django.shortcuts import render, HttpResponseRedirect, HttpResponse
 from django.views.generic import RedirectView
@@ -47,6 +48,8 @@ from pan_cnc.lib import pan_utils
 from pan_cnc.lib import rest_utils
 from pan_cnc.lib import snippet_utils
 from pan_cnc.lib import task_utils
+from pan_cnc.lib.validators import HostTypeValidator
+
 from pan_cnc.lib.exceptions import SnippetRequiredException, CCFParserError, TargetConnectionException, \
     TargetLoginException, TargetGenericException
 
@@ -499,7 +502,7 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
     def generate_dynamic_form(self, data=None) -> forms.Form:
         """
         The heart of this class. This will generate a Form object based on the value of the self.snippet
-        All variables defined in a snippet metadata.xml file will be converted into a form field depending on it's
+        All variables defined in a snippet .meta-cnc.yaml file will be converted into a form field depending on it's
         type_hint. The initial value of the variable will be the value of the 'default' key defined in the metadata file
         or the value of a secret from the currently loaded environment if it contains the same name.
 
@@ -581,6 +584,10 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
                 for item in dd_list:
                     if 'key' in item and 'value' in item:
                         print(item)
+                        if default == item['key'] and default != item['value']:
+                            # user set the key as the default and not the value, just fix it for them here
+                            default = item['value']
+
                         choice = (item['value'], item['key'])
                         choices_list.append(choice)
                 dynamic_form.fields[field_name] = forms.ChoiceField(choices=tuple(choices_list), label=description,
@@ -594,9 +601,42 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
             elif type_hint == "ip_address":
                 dynamic_form.fields[field_name] = forms.GenericIPAddressField(label=description,
                                                                               initial=default)
+            elif type_hint == "number":
+                attrs = dict()
+                if 'attributes' in variable:
+                    if 'min' in variable['attributes'] and 'max' in variable['attributes']:
+                        attrs['min'] = variable['attributes']['min']
+                        attrs['max'] = variable['attributes']['max']
+                        dynamic_form.fields[field_name] = forms.IntegerField(widget=forms.NumberInput(attrs=attrs),
+                                                                             label=description,
+                                                                             initial=default,
+                                                                             validators=[
+                                                                                 MaxValueValidator(attrs['max']),
+                                                                                 MinValueValidator(attrs['min'])])
+                else:
+                    dynamic_form.fields[field_name] = forms.IntegerField(widget=forms.NumberInput(),
+                                                                         label=description,
+                                                                         initial=default)
+
+            elif type_hint == "hostname_or_ip":
+                ul = '\u00a1-\uffff'  # unicode letters range (must not be a raw string)
+                # IP patterns
+                ipv4_re = r'(?:25[0-5]|2[0-4]\d|[0-1]?\d?\d)(?:\.(?:25[0-5]|2[0-4]\d|[0-1]?\d?\d)){3}'
+                ipv6_re = r'\[[0-9a-f:\.]+\]'  # (simple regex, validated later)
+                # Host patterns
+                hostname_re = r'[a-z' + ul + r'0-9](?:[a-z' + ul + r'0-9-]{0,61}[a-z' + ul + r'0-9])?'
+                regex = ipv4_re + '|' + ipv6_re + '|' + hostname_re
+                dynamic_form.fields[field_name] = forms.CharField(label=description,
+                                                                  initial=default,
+                                                                  validators=[RegexValidator(regex=regex,
+                                                                                             message='Not a valid '
+                                                                                                     ' hostname or IP '
+                                                                                                     'Address',
+                                                                                             code='Invalid Format')])
             elif type_hint == "password":
                 dynamic_form.fields[field_name] = forms.CharField(widget=forms.PasswordInput(render_value=True),
-                                                                  initial=default)
+                                                                  initial=default,
+                                                                  label=description)
             elif type_hint == "radio" and "rad_list":
                 rad_list = variable['rad_list']
                 choices_list = list()
@@ -611,9 +651,9 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
                 for item in cbx_list:
                     choice = (item['value'], item['key'])
                     choices_list.append(choice)
-                dynamic_form.fields[field_name] = forms.ChoiceField(widget=forms.CheckboxSelectMultiple,
-                                                                    choices=choices_list,
-                                                                    label=description, initial=default)
+                dynamic_form.fields[field_name] = forms.MultipleChoiceField(widget=forms.CheckboxSelectMultiple,
+                                                                            choices=choices_list,
+                                                                            label=description, initial=default)
             elif type_hint == 'disabled':
                 dynamic_form.fields[field_name] = forms.CharField(label=description, initial=default, disabled=True)
             else:
