@@ -48,8 +48,6 @@ from pan_cnc.lib import pan_utils
 from pan_cnc.lib import rest_utils
 from pan_cnc.lib import snippet_utils
 from pan_cnc.lib import task_utils
-from pan_cnc.lib.validators import HostTypeValidator
-
 from pan_cnc.lib.exceptions import SnippetRequiredException, CCFParserError, TargetConnectionException, \
     TargetLoginException, TargetGenericException
 
@@ -619,18 +617,16 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
                                                                          initial=default)
 
             elif type_hint == "hostname_or_ip":
-                ul = '\u00a1-\uffff'  # unicode letters range (must not be a raw string)
                 # IP patterns
-                ipv4_re = r'(?:25[0-5]|2[0-4]\d|[0-1]?\d?\d)(?:\.(?:25[0-5]|2[0-4]\d|[0-1]?\d?\d)){3}'
-                ipv6_re = r'\[[0-9a-f:\.]+\]'  # (simple regex, validated later)
-                # Host patterns
-                hostname_re = r'[a-z' + ul + r'0-9](?:[a-z' + ul + r'0-9-]{0,61}[a-z' + ul + r'0-9])?'
+                ipv4_re = r'^(?:25[0-5]|2[0-4]\d|[0-1]?\d?\d)(?:\.(?:25[0-5]|2[0-4]\d|[0-1]?\d?\d)){3}$'
+                ipv6_re = r'\[[0-9a-f:\.]+\]'
+                hostname_re = r'[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])$'
                 regex = ipv4_re + '|' + ipv6_re + '|' + hostname_re
                 dynamic_form.fields[field_name] = forms.CharField(label=description,
                                                                   initial=default,
                                                                   validators=[RegexValidator(regex=regex,
                                                                                              message='Not a valid '
-                                                                                                     ' hostname or IP '
+                                                                                                     'hostname or IP '
                                                                                                      'Address',
                                                                                              code='Invalid Format')])
             elif type_hint == "password":
