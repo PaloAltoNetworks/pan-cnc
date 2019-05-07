@@ -616,18 +616,32 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
                                                                          label=description,
                                                                          initial=default)
 
-            elif type_hint == "hostname_or_ip":
+            elif type_hint == "fqdn_or_ip":
                 # IP patterns
-                ipv4_re = r'^(?:25[0-5]|2[0-4]\d|[0-1]?\d?\d)(?:\.(?:25[0-5]|2[0-4]\d|[0-1]?\d?\d)){3}$'
-                ipv6_re = r'\[[0-9a-f:\.]+\]'
+                ipv4_re = r'^(?:25[0-5]|2[0-4]\d|[0-1]?\d?\d)(?:\.(?:25[0-5]|2[0-4]\d|[0-1]?\d?\d)){3}' \
+                          r'(?:/(?:\d|[1-3][0-2])){0,1}$'
+                ipv6_re = r'[(?:0-9a-fA-F){1,4}:\.]+(?:/(?:\d|\d\d|1[0-2][0-8])){0,1}$'
                 hostname_re = r'[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])$'
                 regex = ipv4_re + '|' + ipv6_re + '|' + hostname_re
                 dynamic_form.fields[field_name] = forms.CharField(label=description,
                                                                   initial=default,
                                                                   validators=[RegexValidator(regex=regex,
                                                                                              message='Not a valid '
-                                                                                                     'hostname or IP '
+                                                                                                     'FQDN or IP '
                                                                                                      'Address',
+                                                                                             code='Invalid Format')])
+
+            elif type_hint == "cidr":
+                # IP patterns
+                ipv4_re = r'^(?:25[0-5]|2[0-4]\d|[0-1]?\d?\d)(?:\.(?:25[0-5]|2[0-4]\d|[0-1]?\d?\d)){3}' \
+                          r'/(?:\d|[1-3][0-2])$'
+                ipv6_re = r'[(?:0-9a-fA-F){1,4}:\.]+/(?:\d|\d\d|1[0-2][0-8])$'
+                regex = ipv4_re + '|' + ipv6_re
+                dynamic_form.fields[field_name] = forms.CharField(label=description,
+                                                                  initial=default,
+                                                                  validators=[RegexValidator(regex=regex,
+                                                                                             message='Not a valid '
+                                                                                                     'CIDR ',
                                                                                              code='Invalid Format')])
             elif type_hint == "password":
                 dynamic_form.fields[field_name] = forms.CharField(widget=forms.PasswordInput(render_value=True),
