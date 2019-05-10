@@ -10,3 +10,4 @@ celery
 django
 GitPython
 jsonpath-ng
+netaddr

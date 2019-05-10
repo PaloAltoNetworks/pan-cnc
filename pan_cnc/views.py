@@ -34,7 +34,7 @@ from celery.result import AsyncResult
 from django import forms
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.core.validators import MaxValueValidator, MinValueValidator, RegexValidator
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.http import JsonResponse
 from django.shortcuts import render, HttpResponseRedirect, HttpResponse
 from django.views.generic import RedirectView
@@ -50,6 +50,7 @@ from pan_cnc.lib import snippet_utils
 from pan_cnc.lib import task_utils
 from pan_cnc.lib.exceptions import SnippetRequiredException, CCFParserError, TargetConnectionException, \
     TargetLoginException, TargetGenericException
+from pan_cnc.lib.validators import FqdnOrIp, Cidr
 
 
 class CNCBaseAuth(LoginRequiredMixin, View):
@@ -439,6 +440,7 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
         context['base_html'] = self.base_html
         context['app_dir'] = self.app_dir
         context['snippet_name'] = self.get_snippet()
+        context['view'] = self
 
         return context
 
@@ -569,6 +571,7 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
 
             force_default = variable.get('force_default', False)
             if force_default:
+                print('Using variable as default')
                 default = variable_default
             else:
                 # if the user has entered this before, let's grab it from the session
@@ -617,32 +620,14 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
                                                                          initial=default)
 
             elif type_hint == "fqdn_or_ip":
-                # IP patterns
-                ipv4_re = r'^(?:25[0-5]|2[0-4]\d|[0-1]?\d?\d)(?:\.(?:25[0-5]|2[0-4]\d|[0-1]?\d?\d)){3}' \
-                          r'(?:/(?:\d|[1-3][0-2])){0,1}$'
-                ipv6_re = r'[(?:0-9a-fA-F){1,4}:\.]+(?:/(?:\d|\d\d|1[0-2][0-8])){0,1}$'
-                hostname_re = r'[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])$'
-                regex = ipv4_re + '|' + ipv6_re + '|' + hostname_re
                 dynamic_form.fields[field_name] = forms.CharField(label=description,
                                                                   initial=default,
-                                                                  validators=[RegexValidator(regex=regex,
-                                                                                             message='Not a valid '
-                                                                                                     'FQDN or IP '
-                                                                                                     'Address',
-                                                                                             code='Invalid Format')])
+                                                                  validators=[FqdnOrIp])
 
             elif type_hint == "cidr":
-                # IP patterns
-                ipv4_re = r'^(?:25[0-5]|2[0-4]\d|[0-1]?\d?\d)(?:\.(?:25[0-5]|2[0-4]\d|[0-1]?\d?\d)){3}' \
-                          r'/(?:\d|[1-3][0-2])$'
-                ipv6_re = r'[(?:0-9a-fA-F){1,4}:\.]+/(?:\d|\d\d|1[0-2][0-8])$'
-                regex = ipv4_re + '|' + ipv6_re
                 dynamic_form.fields[field_name] = forms.CharField(label=description,
                                                                   initial=default,
-                                                                  validators=[RegexValidator(regex=regex,
-                                                                                             message='Not a valid '
-                                                                                                     'CIDR ',
-                                                                                             code='Invalid Format')])
+                                                                  validators=[Cidr])
             elif type_hint == "password":
                 dynamic_form.fields[field_name] = forms.CharField(widget=forms.PasswordInput(render_value=True),
                                                                   initial=default,

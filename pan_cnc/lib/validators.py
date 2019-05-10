@@ -1,14 +1,57 @@
-from django.core.validators import RegexValidator
 import re
 
+import netaddr
+from django.core.validators import ValidationError
+from django.utils.deconstruct import deconstructible
+from netaddr import AddrFormatError
 
-class HostTypeValidator(RegexValidator):
 
-    ul = '\u00a1-\uffff'  # unicode letters range (must not be a raw string)
-    # IP patterns
-    ipv4_re = r'(?:25[0-5]|2[0-4]\d|[0-1]?\d?\d)(?:\.(?:25[0-5]|2[0-4]\d|[0-1]?\d?\d)){3}'
-    ipv6_re = r'\[[0-9a-f:\.]+\]'  # (simple regex, validated later)
-    # Host patterns
-    hostname_re = r'[a-z' + ul + r'0-9](?:[a-z' + ul + r'0-9-]{0,61}[a-z' + ul + r'0-9])?'
-    regex = re.compile('(?:' + ipv4_re + '|' + ipv6_re + '|' + hostname_re + ')', re.IGNORECASE)
-    message = 'Enter a valid Hostname or IP Address.'
+@deconstructible
+class FqdnOrIp:
+    """
+    Checks for valid IPv4, IPv6, or hostname notation from value. Uses netaddr to do the heavy lifting
+    """
+    regex = ''
+
+    def __init__(self, value):
+        hostname_re = r'[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])$'
+        self.regex = re.compile(hostname_re, re.IGNORECASE)
+        self.__call__(value)
+
+    def __call__(self, value):
+
+        try:
+            netaddr.IPNetwork(value)
+        except AddrFormatError:
+            if not self.regex.match(value):
+                raise ValidationError('Not a valid IPv4, IPv6, or Hostname', code='Invalid Format')
+
+    def __eq__(self, other):
+        return (
+            isinstance(other, FqdnOrIp)
+        )
+
+
+@deconstructible
+class Cidr:
+    """
+    Checks for valid CIDR notation from value. Uses netaddr to do the heavy lifting
+    """
+
+    def __init__(self, value):
+        self.__call__(value)
+
+    def __call__(self, value):
+
+        if '/' not in value:
+            raise ValidationError('Not a valid CIDR', code='Invalid Format')
+
+        try:
+            netaddr.IPNetwork(value)
+        except AddrFormatError:
+            raise ValidationError('Not a valid CIDR', code='Invalid Format')
+
+    def __eq__(self, other):
+        return (
+            isinstance(other, Cidr)
+        )
