@@ -55,6 +55,8 @@ def execute_all(meta_cnc, app_dir, context):
     response['message'] = 'A-OK'
     response['snippets'] = dict()
 
+    session = requests.Session()
+
     try:
         # execute our rest call for each item in the 'snippets' stanza of the meta-cnc file
         for snippet in meta_cnc['snippets']:
@@ -67,6 +69,10 @@ def execute_all(meta_cnc, app_dir, context):
             rest_op = str(snippet.get('operation', 'get')).lower()
             payload_name = snippet.get('payload', '')
             header_dict = snippet.get('headers', dict())
+
+            # fix for issue #42
+            if type(header_dict) is not dict:
+                header_dict = dict()
 
             # FIXME - implement this to give some control over what will be sent to rest server
             content_type = snippet.get('content_type', '')
@@ -114,9 +120,11 @@ def execute_all(meta_cnc, app_dir, context):
 
                     print('Using payload of')
                     print(payload)
+                    print(url)
+                    print(headers)
                     # FIXME - assumes JSON content_type and accepts, should take into account the values
                     # FIXME - of content-type and accepts_type from above if they were supplied
-                    res = requests.post(url, data=payload, verify=False, headers=headers)
+                    res = session.post(url, data=payload, verify=False, headers=headers)
                     if res.status_code != 200:
                         print('Found a non-200 response status_code!')
                         print(res.status_code)
@@ -127,7 +135,7 @@ def execute_all(meta_cnc, app_dir, context):
 
             elif rest_op == 'get':
                 print('Performing REST get')
-                res = requests.get(url, verify=False)
+                res = session.get(url, verify=False)
                 r = res.text
                 if res.status_code != 200:
                     response['status'] = 'error'
