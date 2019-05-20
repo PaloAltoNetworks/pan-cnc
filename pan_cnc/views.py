@@ -1086,7 +1086,7 @@ class EditTargetView(CNCBaseAuth, FormView):
         form.fields['TARGET_PASSWORD'] = target_password_field
         form.fields['debug'] = debug_field
 
-        if 'type' in meta and 'panos' in meta['type']:
+        if 'type' in meta and 'pan' in meta['type']:
             # add option to perform commit operation or not
             perform_commit = forms.BooleanField(label='Perform Commit', initial=True, label_suffix='', required=False)
             form.fields['perform_commit'] = perform_commit
