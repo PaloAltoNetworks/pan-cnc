@@ -283,7 +283,11 @@ def get_long_term_cached_value(app_name: str, key: str) -> any:
         return None
 
     time_added = ltc['meta'][key]['time']
-    life = ltc['meta'][key]['life']
+    try:
+        life = int(ltc['meta'][key]['life'])
+    except ValueError:
+        print('could not parse life value from cache entry')
+        return None
 
     # Allow -1 to indicate cached items that should stay cached forever
     if life == -1:
