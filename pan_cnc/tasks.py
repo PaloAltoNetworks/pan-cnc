@@ -125,9 +125,9 @@ def terraform_validate(terraform_dir, tf_vars):
 def terraform_init(terraform_dir, tf_vars):
     print('Executing task terraform init')
     cmd_seq = ['terraform', 'init', '-no-color']
-    for k, v in tf_vars.items():
-        cmd_seq.append('-var')
-        cmd_seq.append(f'{k}={v}')
+    # for k, v in tf_vars.items():
+    #     cmd_seq.append('-var')
+    #     cmd_seq.append(f'{k}={v}')
 
     return exec_local_task(cmd_seq, terraform_dir)
 
