@@ -45,4 +45,5 @@ class SnippetNotFoundException(Exception):
     pass
 
 
-
+class ImportRepositoryException(Exception):
+    pass

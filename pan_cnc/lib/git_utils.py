@@ -14,13 +14,20 @@
 
 # Author: Nathan Embery nembery@paloaltonetworks.com
 
+import subprocess
+from pathlib import Path
+
 import requests
 import urllib3
-from git import InvalidGitRepositoryError, NoSuchPathError, GitCommandError
+from git import GitCommandError
+from git import InvalidGitRepositoryError
+from git import NoSuchPathError
 from git import Repo
-from requests import ConnectionError, Timeout
-from pathlib import Path
+from requests import ConnectionError
+from requests import Timeout
+
 from pan_cnc.lib import cnc_utils
+from pan_cnc.lib.exceptions import ImportRepositoryException
 
 urllib3.disable_warnings()
 
@@ -67,6 +74,24 @@ def clone_or_update_repo(repo_dir, repo_name, repo_url, branch='master'):
 
 def clone_repo(repo_dir, repo_name, repo_url, branch='master'):
     """
+    Wrapper for clone_repository for old clone_repo func which only returned bool
+    :param repo_dir: dir to clone the repo into
+    :param repo_name: name of the repo to use for reporting
+    :param repo_url: url of the upstream repo
+    :param branch: branch to clone from
+    :return: bool
+    """
+    try:
+        message = clone_repository(repo_dir, repo_name, repo_url, branch)
+        print(message)
+        return True
+    except ImportRepositoryException as ire:
+        print(ire)
+        return False
+
+
+def clone_repository(repo_dir, repo_name, repo_url, branch='master'):
+    """
     Clone the given repository into the given directory name
     :param repo_dir:
     :param repo_name:
@@ -76,12 +101,17 @@ def clone_repo(repo_dir, repo_name, repo_url, branch='master'):
     """
     try:
         print(f'Cloning {repo_name}')
-        Repo.clone_from(repo_url, repo_dir, depth=3, branch=branch, config='http.sslVerify=false')
-    except GitCommandError as gce:
-        print(gce)
-        return False
+        # bugfix/workaround for issue #23
+        env = dict()
+        if 'http' in repo_url:
+            true_binary = subprocess.check_output("which true", shell=True)
+            env['GIT_ASKPASS'] = true_binary
 
-    return True
+        Repo.clone_from(repo_url, repo_dir, depth=3, branch=branch, env=env, config='http.sslVerify=false')
+    except GitCommandError as gce:
+        raise ImportRepositoryException(gce)
+
+    return "Imported repository successfully"
 
 
 def get_repo_details(repo_name, repo_dir, app_name='cnc'):
@@ -235,7 +265,6 @@ def get_repo_commits_url(repo_url):
 
 
 def parse_repo_origin_url(repo_url):
-
     url_details = dict()
 
     try:
