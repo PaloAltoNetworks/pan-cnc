@@ -25,6 +25,10 @@ class LoginRequired(Exception):
     pass
 
 
+class TargetCommitException(Exception):
+    pass
+
+
 class TargetConnectionException(Exception):
     pass
 

@@ -34,9 +34,14 @@ from celery.result import AsyncResult
 from django import forms
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.core.validators import MaxValueValidator, MinValueValidator, RegexValidator, URLValidator
+from django.core.validators import MaxValueValidator
+from django.core.validators import MinValueValidator
+from django.core.validators import RegexValidator
+from django.core.validators import URLValidator
 from django.http import JsonResponse
-from django.shortcuts import render, HttpResponseRedirect, HttpResponse
+from django.shortcuts import HttpResponse
+from django.shortcuts import HttpResponseRedirect
+from django.shortcuts import render
 from django.views.generic import RedirectView
 from django.views.generic import TemplateView
 from django.views.generic import View
@@ -48,9 +53,14 @@ from pan_cnc.lib import pan_utils
 from pan_cnc.lib import rest_utils
 from pan_cnc.lib import snippet_utils
 from pan_cnc.lib import task_utils
-from pan_cnc.lib.exceptions import SnippetRequiredException, CCFParserError, TargetConnectionException, \
-    TargetLoginException, TargetGenericException
-from pan_cnc.lib.validators import FqdnOrIp, Cidr
+from pan_cnc.lib.exceptions import CCFParserError
+from pan_cnc.lib.exceptions import SnippetRequiredException
+from pan_cnc.lib.exceptions import TargetCommitException
+from pan_cnc.lib.exceptions import TargetConnectionException
+from pan_cnc.lib.exceptions import TargetGenericException
+from pan_cnc.lib.exceptions import TargetLoginException
+from pan_cnc.lib.validators import Cidr
+from pan_cnc.lib.validators import FqdnOrIp
 
 
 class CNCBaseAuth(LoginRequiredMixin, View):
@@ -998,7 +1008,7 @@ class EditTargetView(CNCBaseAuth, FormView):
     # form to render, override if you need a specific html fragment to render the form
     template_name = 'pan_cnc/panos_target_form.html'
     # Head to show on the rendered dynamic form - Main header
-    header = 'PAN-OS Utils'
+    header = 'PAN-OS Skillet'
     # title to show on dynamic form
     title = 'Title'
     # where to go after this? once the form has been submitted, redirect to where?
@@ -1009,9 +1019,16 @@ class EditTargetView(CNCBaseAuth, FormView):
     # link to external documentation
     documentation_link = ''
     # help text - inline documentation text
-    help_text = 'The Target is the endpoint or device where the configured template will be applied. ' \
-                'This us usually a PAN-OS or other network device depending on the type of template to ' \
-                'be provisioned'
+    help_text = 'The Target is the PAN-OS device where the configured template will be applied. ' \
+                'The supplied username needs to have API access rights. \n\n Commit options allows you ' \
+                'to control how the commit operation happens. A fast commit will queue the commit and return ' \
+                'immediately with a job id. No commit will push configuration changes to the device but will not' \
+                'perform a commit. Commit and wait to finish will only return after the commit operation has fully' \
+                'completed. This may take some time depending on the platform, however you will immediately see any' \
+                'commit or validation errors. \n\n Perform Backup will record a on-device backup prior to any changes' \
+                'being pushed to the device. To view the backups, you may use the `load config from` CLI command.'
+    help_link_title = 'More information'
+    help_link = 'https://panhandler.readthedocs.io/en/master/using.html'
 
     meta = None
 
@@ -1089,9 +1106,10 @@ class EditTargetView(CNCBaseAuth, FormView):
         target_username = self.get_value_from_workflow('TARGET_USERNAME', '')
         target_password = self.get_value_from_workflow('TARGET_PASSWORD', '')
 
-        target_ip_field = forms.CharField(label=target_ip_label, initial=target_ip, required=False)
-        target_username_field = forms.CharField(label=target_username_label, initial=target_username, required=False)
-        target_password_field = forms.CharField(widget=forms.PasswordInput(render_value=True), required=False,
+        target_ip_field = forms.CharField(label=target_ip_label, initial=target_ip, required=True,
+                                          validators=[FqdnOrIp])
+        target_username_field = forms.CharField(label=target_username_label, initial=target_username, required=True)
+        target_password_field = forms.CharField(widget=forms.PasswordInput(render_value=True), required=True,
                                                 label=target_password_label,
                                                 initial=target_password)
 
@@ -1104,7 +1122,14 @@ class EditTargetView(CNCBaseAuth, FormView):
 
         if 'type' in meta and 'pan' in meta['type']:
             # add option to perform commit operation or not
-            perform_commit = forms.BooleanField(label='Perform Commit', initial=True, label_suffix='', required=False)
+            # perform_commit = forms.BooleanField(label='Perform Commit', initial=True, label_suffix='', required=False)
+            choices_list = list()
+            choices_list.append(('commit', 'Fast Commit. Do not wait on commit to finish'))
+            choices_list.append(('no_commit', 'Do not Commit. Push changes only'))
+            choices_list.append(('sync_commit', 'Commit and wait to finish'))
+
+            choices_set = tuple(choices_list)
+            perform_commit = forms.ChoiceField(choices=choices_set, label='Commit Options', initial='commit')
             form.fields['perform_commit'] = perform_commit
             perform_backup = forms.BooleanField(label='Perform Backup', initial=True, label_suffix='', required=False)
             form.fields['perform_backup'] = perform_backup
@@ -1231,22 +1256,24 @@ class EditTargetView(CNCBaseAuth, FormView):
             return self.form_invalid(form)
 
         # check if type is 'panos' and if the user wants to perform a commit or not
-        if 'type' in meta and meta['type'] == 'panos':
-            # check if perform commit is set
-            perform_commit_str = self.request.POST.get('perform_commit', 'off')
-            perform_commit = False
+        # check if perform commit is set
+        perform_commit_str = self.request.POST.get('perform_commit', 'commit')
 
-            if perform_commit_str == 'on':
-                perform_commit = True
+        perform_commit = False
+        force_sync = False
 
-            perform_backup_str = self.request.POST.get('perform_backup', 'off')
-            perform_backup = False
-
-            if perform_backup_str == 'on':
-                perform_backup = True
-        else:
-            # ensure commit happens for everything other than panos
+        if perform_commit_str == 'commit':
             perform_commit = True
+        elif perform_commit_str == 'no_commit':
+            perform_commit = False
+        elif perform_commit_str == 'sync_commit':
+            perform_commit = True
+            force_sync = True
+
+        perform_backup_str = self.request.POST.get('perform_backup', 'off')
+        perform_backup = False
+
+        if perform_backup_str == 'on':
             perform_backup = True
 
         print(f'Got a perform_commit of {perform_commit}')
@@ -1285,18 +1312,29 @@ class EditTargetView(CNCBaseAuth, FormView):
                         messages.add_message(self.request, messages.ERROR,
                                              f'Could not push baseline Configuration: {cpe}')
                         return HttpResponseRedirect(f"{self.app_dir}/")
+                    except TargetCommitException as tce:
+                        messages.add_message(self.request, messages.ERROR,
+                                             f'Could not push baseline Configuration: {tce}')
+                        return HttpResponseRedirect(f"{self.app_dir}/")
 
         try:
-            job_id = pan_utils.push_meta(meta, jinja_context, False, perform_commit)
+            job_id = pan_utils.push_meta(meta, jinja_context, force_sync, perform_commit)
         except CCFParserError as cpe:
             messages.add_message(self.request, messages.ERROR, f'Could not push Configuration: {cpe}')
+            return HttpResponseRedirect(f"{self.app_dir}/")
+        except TargetCommitException as tce:
+            messages.add_message(self.request, messages.ERROR,
+                                 f'Could not push Configuration: {tce}')
             return HttpResponseRedirect(f"{self.app_dir}/")
 
         if job_id is not None:
             messages.add_message(self.request, messages.SUCCESS,
                                  f'Configuration Push Queued successfully with Job ID: {job_id}')
         else:
-            messages.add_message(self.request, messages.SUCCESS, 'Configuration Push Queued successfully')
+            if force_sync:
+                messages.add_message(self.request, messages.SUCCESS, 'Configuration Pushed successfully')
+            else:
+                messages.add_message(self.request, messages.SUCCESS, 'Configuration Push Queued successfully')
 
         return HttpResponseRedirect(f"{self.app_dir}/")
 

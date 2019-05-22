@@ -105,7 +105,9 @@ def clone_repository(repo_dir, repo_name, repo_url, branch='master'):
         env = dict()
         if 'http' in repo_url:
             true_binary = subprocess.check_output("which true", shell=True)
-            env['GIT_ASKPASS'] = true_binary
+            true_binary_path = true_binary.decode('utf-8').strip()
+            print(f'USING fake ASKPASS of {true_binary_path}')
+            env['GIT_ASKPASS'] = true_binary_path
 
         Repo.clone_from(repo_url, repo_dir, depth=3, branch=branch, env=env, config='http.sslVerify=false')
     except GitCommandError as gce:

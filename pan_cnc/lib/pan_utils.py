@@ -33,12 +33,16 @@ from xml.etree import ElementTree as elementTree
 
 import pan.xapi
 from django.core.cache import cache
-from jinja2 import Environment, BaseLoader
+from jinja2 import BaseLoader
+from jinja2 import Environment
 from jinja2.exceptions import UndefinedError
 
 from pan_cnc.lib import jinja_filters
-from pan_cnc.lib.exceptions import TargetConnectionException, TargetLoginException, CCFParserError, \
-    TargetGenericException
+from pan_cnc.lib.exceptions import CCFParserError
+from pan_cnc.lib.exceptions import TargetCommitException
+from pan_cnc.lib.exceptions import TargetConnectionException
+from pan_cnc.lib.exceptions import TargetGenericException
+from pan_cnc.lib.exceptions import TargetLoginException
 
 xapi_obj = None
 
@@ -259,13 +263,20 @@ def push_meta(meta, context, force_sync=False, perform_commit=True) -> (str, Non
                     xapi.commit('<commit></commit>')
 
             results = xapi.xml_result()
-            print(results)
-
-            # let's capture the job_id if possible
-            if 'with jobid' in results:
-                result = re.match(r'.* with jobid (\d+)', results)
-                if result is not None:
-                    return_value = result.group(1)
+            if force_sync:
+                # we have the results of a job id query, the commit results are embedded therein
+                doc = elementTree.XML(results)
+                embedded_result = doc.find('result')
+                if embedded_result is not None:
+                    commit_result = embedded_result.text
+                    print(f'Commit result is {commit_result}')
+                    if commit_result == 'FAIL':
+                        raise TargetCommitException(xapi.status_detail)
+            else:
+                if 'with jobid' in results:
+                    result = re.match(r'.* with jobid (\d+)', results)
+                    if result is not None:
+                        return_value = result.group(1)
 
             # for gpcs baseline and svc connection network configuration do a scope push to gpcs
             # FIXME - check for 'gpcs' in meta['type'] instead of hardcoded name
