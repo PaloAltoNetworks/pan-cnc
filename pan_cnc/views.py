@@ -34,7 +34,7 @@ from celery.result import AsyncResult
 from django import forms
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.core.validators import MaxValueValidator, MinValueValidator
+from django.core.validators import MaxValueValidator, MinValueValidator, RegexValidator, URLValidator
 from django.http import JsonResponse
 from django.shortcuts import render, HttpResponseRedirect, HttpResponse
 from django.views.generic import RedirectView
@@ -651,8 +651,24 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
                                                                             label=description, initial=default)
             elif type_hint == 'disabled':
                 dynamic_form.fields[field_name] = forms.CharField(label=description, initial=default, disabled=True)
+
+            elif type_hint == 'url':
+                dynamic_form.fields[field_name] = forms.CharField(label=description, initial=default,
+                                                                  validators=[URLValidator])
             else:
-                dynamic_form.fields[field_name] = forms.CharField(label=description, initial=default)
+                if 'allow_special_characters' in variable and variable['allow_special_characters'] is False:
+                    dynamic_form.fields[field_name] = forms.CharField(label=description, initial=default,
+                                                                      validators=[
+                                                                          RegexValidator(
+                                                                              regex='^[a-zA-Z0-9-_ ]*$',
+                                                                              message='Only Letters, number, hypers'
+                                                                                      'underscores and spaces are '
+                                                                                      'allowed',
+                                                                              code='invalid_format'
+                                                                          ),
+                                                                      ])
+                else:
+                    dynamic_form.fields[field_name] = forms.CharField(label=description, initial=default)
 
         return dynamic_form
 
