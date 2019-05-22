@@ -664,13 +664,15 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
 
             elif type_hint == 'url':
                 dynamic_form.fields[field_name] = forms.CharField(label=description, initial=default,
-                                                                  validators=[URLValidator])
+                                                                  validators=[URLValidator(message='Entry must be '
+                                                                                                   'a valid URL',
+                                                                                           code='invalid_format')])
             else:
                 if 'allow_special_characters' in variable and variable['allow_special_characters'] is False:
                     dynamic_form.fields[field_name] = forms.CharField(label=description, initial=default,
                                                                       validators=[
                                                                           RegexValidator(
-                                                                              regex='^[a-zA-Z0-9-_ ]*$',
+                                                                              regex='^[a-zA-Z0-9-_ \.]*$',
                                                                               message='Only Letters, number, hypers'
                                                                                       'underscores and spaces are '
                                                                                       'allowed',
