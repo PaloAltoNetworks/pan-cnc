@@ -142,17 +142,22 @@ def get_repo_details(repo_name, repo_dir, app_name='cnc'):
     if 'repo' not in url_details or url_details['repo'] is None or url_details['repo'] == '':
         url_details['repo'] = repo_name
 
-    branch = repo.active_branch.name
-    commits = repo.iter_commits(branch, max_count=5)
+    try:
+        branch = repo.active_branch.name
+        commits = repo.iter_commits(branch, max_count=5)
 
-    commit_log = list()
-    for c in commits:
-        commit_detail = dict()
-        commit_detail['time'] = str(c.committed_datetime)
-        commit_detail['author'] = c.author.name
-        commit_detail['message'] = c.message
-        commit_detail['id'] = str(c)
-        commit_log.append(commit_detail)
+        commit_log = list()
+        for c in commits:
+            commit_detail = dict()
+            commit_detail['time'] = str(c.committed_datetime)
+            commit_detail['author'] = c.author.name
+            commit_detail['message'] = c.message
+            commit_detail['id'] = str(c)
+            commit_log.append(commit_detail)
+
+    except GitCommandError as gce:
+        print('Could not get commits from repo')
+        print(gce)
 
     repo_detail = dict()
     repo_detail['name'] = repo_name
