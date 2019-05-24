@@ -905,7 +905,7 @@ class ProvisionSnippetView(CNCBaseFormView):
             return super().form_valid(form)
 
         if self.service is None:
-            print('Unknonw Error, Skillet was None')
+            print('Unknown Error, Skillet was None')
             messages.add_message(self.request, messages.ERROR, 'Process Error - No Skillet was loaded')
             return self.form_invalid(form)
 
@@ -913,6 +913,7 @@ class ProvisionSnippetView(CNCBaseFormView):
             template = snippet_utils.render_snippet_template(self.service, self.app_dir, self.get_workflow())
             if len(self.service['snippets']) == 0:
                 template = 'Could not find a valid template to load!'
+                snippet = dict()
             else:
                 snippet = self.service['snippets'][0]
                 # check for and handle outputs
@@ -925,7 +926,11 @@ class ProvisionSnippetView(CNCBaseFormView):
             context['base_html'] = self.base_html
             # context['header'] = f"Results for {self.service['label']}"
             self.header = f"Results for {self.service['label']}"
-            context['title'] = "Rendered Output"
+            if 'template_title' in snippet:
+                context['title'] = snippet['template_title']
+            else:
+                context['title'] = "Rendered Output"
+
             context['results'] = template
             context['view'] = self
             return render(self.request, 'pan_cnc/results.html', context)
