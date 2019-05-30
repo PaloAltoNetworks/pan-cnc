@@ -669,11 +669,12 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
                                                                                            code='invalid_format')])
             else:
                 if 'allow_special_characters' in variable and variable['allow_special_characters'] is False:
+                    print('Using allow_special_characters')
                     dynamic_form.fields[field_name] = forms.CharField(label=description, initial=default,
                                                                       validators=[
                                                                           RegexValidator(
                                                                               regex='^[a-zA-Z0-9-_ \.]*$',
-                                                                              message='Only Letters, number, hypers'
+                                                                              message='Only Letters, number, hyphens, '
                                                                                       'underscores and spaces are '
                                                                                       'allowed',
                                                                               code='invalid_format'

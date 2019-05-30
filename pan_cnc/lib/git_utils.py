@@ -20,6 +20,7 @@ from pathlib import Path
 import requests
 import urllib3
 from git import GitCommandError
+from git import GitError
 from git import InvalidGitRepositoryError
 from git import NoSuchPathError
 from git import Repo
@@ -70,6 +71,9 @@ def clone_or_update_repo(repo_dir, repo_name, repo_url, branch='master'):
     except GitCommandError as gce:
         print(gce)
         return False
+    except GitError as ge:
+        print(ge)
+        return False
 
 
 def clone_repo(repo_dir, repo_name, repo_url, branch='master'):
@@ -110,7 +114,7 @@ def clone_repository(repo_dir, repo_name, repo_url, branch='master'):
             env['GIT_ASKPASS'] = true_binary_path
 
         Repo.clone_from(repo_url, repo_dir, depth=3, branch=branch, env=env, config='http.sslVerify=false')
-    except GitCommandError as gce:
+    except (GitCommandError, GitError) as gce:
         raise ImportRepositoryException(gce)
 
     return "Imported repository successfully"
@@ -129,7 +133,21 @@ def get_repo_details(repo_name, repo_dir, app_name='cnc'):
     if repo_detail:
         return repo_detail
 
-    repo = Repo(repo_dir)
+    try:
+
+        repo = Repo(repo_dir)
+
+    except NoSuchPathError as nspe:
+        print(f'Repository directory {repo_dir} does not actually exist!')
+        print(nspe)
+        repo_detail = dict()
+        repo_detail['name'] = 'Repository directory could not be found!'
+        return repo_detail
+    except GitError as ge:
+        print(ge)
+        repo_detail = dict()
+        repo_detail['name'] = 'Git Repository Error!'
+        return repo_detail
 
     url = str(repo.remotes.origin.url)
     url_details = parse_repo_origin_url(url)
@@ -158,6 +176,9 @@ def get_repo_details(repo_name, repo_dir, app_name='cnc'):
     except GitCommandError as gce:
         print('Could not get commits from repo')
         print(gce)
+    except GitError as ge:
+        print('Unknown GitError')
+        print(ge)
 
     repo_detail = dict()
     repo_detail['name'] = repo_name
@@ -193,8 +214,8 @@ def update_repo(repo_dir):
     if not repo_path.exists():
         return 'Error: Path does not exist'
 
-    repo = Repo(repo_dir)
     try:
+        repo = Repo(repo_dir)
         changes = repo.index.diff(None)
         if len(changes) > 0:
             print('There are local changes that may get lost if we update!')
@@ -203,6 +224,16 @@ def update_repo(repo_dir):
     except GitCommandError as gce:
         print(gce)
         return 'Could not update! Ensure there are no local changes before updating'
+    except InvalidGitRepositoryError as igre:
+        print(igre)
+        return 'Could not update! Invalid git repository directory'
+    except NoSuchPathError as nspe:
+        print(nspe)
+        return 'Could not update, repository directory could not be found'
+    except GitError as ge:
+        print(ge)
+        return 'Could not update, Unknown error with git repository'
+
     if len(f) > 0:
         flags = f[0].flags
         if flags == 4:
