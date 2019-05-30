@@ -25,6 +25,8 @@ from jinja2.loaders import BaseLoader
 from yaml.constructor import ConstructorError
 from yaml.parser import ParserError
 from yaml.scanner import ScannerError
+from yaml.reader import ReaderError
+from yaml.error import YAMLError
 
 from . import cnc_utils
 from . import jinja_filters
@@ -202,6 +204,21 @@ def _check_dir(directory: Path, snippet_type: str, snippet_list: list) -> list:
             print(ce)
             err_condition = True
             continue
+        except ReaderError as re:
+            print('Could not parse metadata file in dir %s' % d.parent)
+            print(re)
+            err_condition = True
+            continue
+        except YAMLError as ye:
+            print('YAMLError: Could not parse metadata file in dir %s' % d.parent)
+            print(ye)
+            err_condition = True
+            continue
+        except Exception as ex:
+            print('Caught unknown exception!')
+            print(ex)
+            err_condition = True
+            continue
 
     # Do not descend into sub dirs after a .meta-cnc file has already been found
     if snippet_list:
@@ -278,6 +295,14 @@ def debug_snippets_in_repo(directory: Path, err_list: list) -> list:
             err_condition = True
             err_detail['severity'] = 'error'
             err_detail['err_list'] = [err, str(ce)]
+            continue
+        # catch everything else that should be generated from oyaml libraries
+        except YAMLError as ye:
+            err = 'YAMLError: Could not parse metadata file in dir %s' % d.parent
+            print(ye)
+            err_condition = True
+            err_detail['severity'] = 'error'
+            err_detail['err_list'] = [err, str(ye)]
             continue
 
     # Do not descend into sub dirs after a .meta-cnc file has already been found
@@ -562,6 +587,12 @@ def _normalize_snippet_structure(skillet: dict) -> dict:
     :return: skillet/snippet that has been 'fixed'
     """
 
+    if skillet is None:
+        skillet = dict()
+
+    if type(skillet) is not dict:
+        skillet = dict()
+
     if 'name' not in skillet:
         skillet['name'] = 'Unknown Skillet'
 
@@ -612,6 +643,14 @@ def _debug_skillet_structure(skillet: dict) -> list:
     """
 
     errs = list()
+
+    if skillet is None:
+        errs.append('Skillet is blank or could not be loaded')
+        return errs
+
+    if type(skillet) is not dict:
+        errs.append('Skillet is malformed')
+        return errs
 
     # verify labels stanza is present and is a OrderedDict
     if 'labels' not in skillet:
