@@ -116,6 +116,15 @@ def load_snippets_of_type_from_dir(app_name: str, directory: str, snippet_type=N
 
     snippets_dir = Path(directory)
 
+    try:
+        snippets_dir.stat()
+    except PermissionError:
+        print(f'Permission Denied access {snippets_dir}')
+        return snippet_list
+    except OSError:
+        print(f'Could not access {snippets_dir}')
+        return snippet_list
+
     if not snippets_dir.exists():
         print(f'Could not find meta-cnc files in dir {directory}')
         return snippet_list
