@@ -420,20 +420,16 @@ def init_app(app_cnc_config):
             continue
 
         try:
-            repo_path.stat()
-        except PermissionError:
-            print('Permission denied')
-            continue
-        except OSError:
-            print('Could not access repositories directory')
-            continue
-
-        if not repo_path.exists():
-            try:
+            if not repo_path.exists():
                 os.makedirs(repo_dir, mode=0o700)
-            except IOError:
-                print('Could not create repo_dir!')
-                continue
+        except PermissionError:
+            print('***********************************************************')
+            print('Permission denied, Could not create repositories directory!')
+            print('***********************************************************')
+            continue
+        except IOError:
+            print('Could not create repo_dir!')
+            continue
 
         repo_url = r['url']
         repo_name = r['name']
