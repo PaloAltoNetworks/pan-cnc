@@ -579,7 +579,9 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
             description = variable.get('description', '')
             variable_default = variable.get('default', '')
 
+            required = variable.get('required', False)
             force_default = variable.get('force_default', False)
+
             if force_default:
                 print('Using variable as default')
                 default = variable_default
@@ -602,16 +604,16 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
                         choice = (item['value'], item['key'])
                         choices_list.append(choice)
                 dynamic_form.fields[field_name] = forms.ChoiceField(choices=tuple(choices_list), label=description,
-                                                                    initial=default)
+                                                                    initial=default, required=required)
             elif type_hint == "text_area":
                 dynamic_form.fields[field_name] = forms.CharField(widget=forms.Textarea, label=description,
-                                                                  initial=default)
+                                                                  initial=default, required=required)
             elif type_hint == "email":
                 dynamic_form.fields[field_name] = forms.CharField(widget=forms.EmailInput, label=description,
-                                                                  initial=default)
+                                                                  initial=default, required=required)
             elif type_hint == "ip_address":
                 dynamic_form.fields[field_name] = forms.GenericIPAddressField(label=description,
-                                                                              initial=default)
+                                                                              initial=default, required=required)
             elif type_hint == "number":
                 attrs = dict()
                 if 'attributes' in variable:
@@ -620,28 +622,28 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
                         attrs['max'] = variable['attributes']['max']
                         dynamic_form.fields[field_name] = forms.IntegerField(widget=forms.NumberInput(attrs=attrs),
                                                                              label=description,
-                                                                             initial=default,
+                                                                             initial=default, required=required,
                                                                              validators=[
                                                                                  MaxValueValidator(attrs['max']),
                                                                                  MinValueValidator(attrs['min'])])
                 else:
                     dynamic_form.fields[field_name] = forms.IntegerField(widget=forms.NumberInput(),
                                                                          label=description,
-                                                                         initial=default)
+                                                                         initial=default, required=required)
 
             elif type_hint == "fqdn_or_ip":
                 dynamic_form.fields[field_name] = forms.CharField(label=description,
                                                                   initial=default,
-                                                                  validators=[FqdnOrIp])
+                                                                  validators=[FqdnOrIp], required=required)
 
             elif type_hint == "cidr":
                 dynamic_form.fields[field_name] = forms.CharField(label=description,
                                                                   initial=default,
-                                                                  validators=[Cidr])
+                                                                  validators=[Cidr], required=required)
             elif type_hint == "password":
                 dynamic_form.fields[field_name] = forms.CharField(widget=forms.PasswordInput(render_value=True),
                                                                   initial=default,
-                                                                  label=description)
+                                                                  label=description, required=required)
             elif type_hint == "radio" and "rad_list":
                 rad_list = variable['rad_list']
                 choices_list = list()
@@ -649,7 +651,8 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
                     choice = (item['value'], item['key'])
                     choices_list.append(choice)
                 dynamic_form.fields[field_name] = forms.ChoiceField(widget=forms.RadioSelect, choices=choices_list,
-                                                                    label=description, initial=default)
+                                                                    label=description, initial=default,
+                                                                    required=required)
             elif type_hint == "checkbox" and "cbx_list":
                 cbx_list = variable['cbx_list']
                 choices_list = list()
@@ -658,19 +661,27 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
                     choices_list.append(choice)
                 dynamic_form.fields[field_name] = forms.MultipleChoiceField(widget=forms.CheckboxSelectMultiple,
                                                                             choices=choices_list,
-                                                                            label=description, initial=default)
+                                                                            label=description, initial=default,
+                                                                            required=required)
             elif type_hint == 'disabled':
-                dynamic_form.fields[field_name] = forms.CharField(label=description, initial=default, disabled=True)
+                dynamic_form.fields[field_name] = forms.CharField(label=description, initial=default,
+                                                                  disabled=True, required=required)
 
             elif type_hint == 'url':
-                dynamic_form.fields[field_name] = forms.CharField(label=description, initial=default,
-                                                                  validators=[URLValidator(message='Entry must be '
-                                                                                                   'a valid URL',
-                                                                                           code='invalid_format')])
+                dynamic_form.fields[field_name] = forms.CharField(label=description,
+                                                                  initial=default,
+                                                                  required=required,
+                                                                  validators=[
+                                                                      URLValidator(message='Entry must be '
+                                                                                           'a valid URL',
+                                                                                   code='invalid_format')
+                                                                  ])
             else:
                 if 'allow_special_characters' in variable and variable['allow_special_characters'] is False:
                     print('Using allow_special_characters')
-                    dynamic_form.fields[field_name] = forms.CharField(label=description, initial=default,
+                    dynamic_form.fields[field_name] = forms.CharField(label=description,
+                                                                      initial=default,
+                                                                      required=required,
                                                                       validators=[
                                                                           RegexValidator(
                                                                               regex='^[a-zA-Z0-9-_ \.]*$',
@@ -681,7 +692,10 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
                                                                           ),
                                                                       ])
                 else:
-                    dynamic_form.fields[field_name] = forms.CharField(label=description, initial=default)
+                    dynamic_form.fields[field_name] = forms.CharField(label=description,
+                                                                      initial=default,
+                                                                      required=required
+                                                                      )
 
         return dynamic_form
 
