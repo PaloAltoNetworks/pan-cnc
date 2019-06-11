@@ -674,7 +674,7 @@ def _debug_skillet_structure(skillet: dict) -> list:
     if 'type' not in skillet:
         errs.append('No type attribute in skillet')
     else:
-        valid_types = ['panos', 'panorama', 'panoram-gpcs', 'python3', 'rest', 'terraform', 'template', 'workflow']
+        valid_types = ['panos', 'panorama', 'panorama-gpcs', 'python3', 'rest', 'terraform', 'template', 'workflow']
         if skillet['type'] not in valid_types:
             errs.append(f'Unknown type {skillet["type"]} in skillet')
 
