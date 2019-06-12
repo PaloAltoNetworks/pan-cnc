@@ -52,13 +52,21 @@ async def cmd_runner(cmd_seq, cwd, env, o: OutputHolder):
                                               stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT,
                                               cwd=cwd, env=env)
 
+    print(f'Spawned process {p.pid}')
+    o.add_output(f'Spawned Process: {p.pid}\n')
+
     while True:
         line = await p.stdout.readline()
         if line == b'':
             break
 
-        o.add_output(line.decode())
-        current_task.update_state(state='PROGRESS', meta=o.get_output())
+        try:
+            o.add_output(line.decode())
+            current_task.update_state(state='PROGRESS', meta=o.get_output())
+        except UnicodeDecodeError as ude:
+            print(f'Could not read results from task')
+            print(ude)
+            return 255
 
     await p.wait()
     return p.returncode
