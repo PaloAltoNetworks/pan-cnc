@@ -27,6 +27,8 @@ Use at your own risk.
 
 import copy
 import json
+import os
+import re
 from collections import OrderedDict
 from typing import Any
 
@@ -1607,7 +1609,26 @@ class CancelTaskView(CNCBaseAuth, RedirectView):
         if 'task_id' in self.request.session:
             task_id = self.request.session['task_id']
             task = AsyncResult(task_id)
+
+            try:
+                if task.state == 'PROGRESS':
+                    output = task.info
+                    pid_matches = re.match(r'Spawned Process: (\d+)', output)
+                    if pid_matches is not None:
+                        pid_str = pid_matches[1]
+                        pid = int(pid_str)
+                        print(f'Terminating Child process: {pid}')
+                        os.kill(pid, 9)
+
+            except TypeError as te:
+                print(te)
+                pass
+            except ValueError as ve:
+                print(ve)
+                pass
+
             task.revoke(terminate=True)
+            task_utils.purge_all_tasks()
             messages.add_message(self.request, messages.INFO, f'Cancelled Task Successfully')
         else:
             messages.add_message(self.request, messages.ERROR, f'No Task found to cancel')
