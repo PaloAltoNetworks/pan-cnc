@@ -5,6 +5,8 @@ from pathlib import Path
 from celery.result import AsyncResult
 from celery.result import EagerResult
 
+from pan_cnc.celery import app as cnc_celery_app
+
 from pan_cnc.lib.exceptions import CCFParserError
 from pan_cnc.tasks import terraform_init, terraform_validate, terraform_plan, terraform_apply, terraform_refresh, \
     terraform_destroy, terraform_output, python3_init_env, python3_init_with_deps, python3_execute_script, \
@@ -177,3 +179,10 @@ def verify_clean_state(resource_def) -> bool:
                         return True
 
     return True
+
+
+def purge_all_tasks() -> None:
+    num_tasks = cnc_celery_app.control.purge()
+    print(f'Purged {num_tasks} tasks from queue')
+    return None
+
