@@ -631,6 +631,17 @@ def _normalize_snippet_structure(skillet: dict) -> dict:
     elif type(skillet['labels']) is not OrderedDict and type(skillet['labels']) is not dict:
         skillet['labels'] = OrderedDict()
 
+    # ensure we have a collection label
+    if 'collection' not in skillet['labels'] or type(skillet['labels']['collection']) is None:
+        skillet['labels']['collection'] = list()
+        skillet['labels']['collection'].append('Unknown')
+
+    elif type(skillet['labels']['collection']) is str:
+        new_collection = list()
+        old_value = skillet['labels']['collection']
+        new_collection.append(old_value)
+        skillet['labels']['collection'] = new_collection
+
     # verify snippets stanza is present and is a list
     if 'snippets' not in skillet:
         skillet['snippets'] = list()
