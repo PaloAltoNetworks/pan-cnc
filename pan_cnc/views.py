@@ -126,6 +126,8 @@ class CNCBaseAuth(LoginRequiredMixin, View):
 
         workflow = self.get_workflow()
         workflow[var_name] = var_value
+        self.request.session[self.app_dir] = workflow
+        self.request.session.modified = True
 
     def save_dict_to_workflow(self, dict_to_save: dict) -> None:
         """
@@ -182,7 +184,8 @@ class CNCBaseAuth(LoginRequiredMixin, View):
         """
         # context = self.get_workflow()
         # context.update(self.get_environment_secrets())
-        context = self.get_environment_secrets()
+        context = dict()
+        context.update(self.get_environment_secrets())
         context.update(self.get_workflow())
         return context
 
@@ -859,7 +862,7 @@ class ProvisionSnippetView(CNCBaseFormView):
     use form_valid as it will always be true in this case.
     """
     snippet = ''
-    header = 'Provision Configuration'
+    header = 'Execute Skillet'
     title = 'Customize Variables'
 
     def get_context_data(self, **kwargs):
@@ -1613,7 +1616,7 @@ class CancelTaskView(CNCBaseAuth, RedirectView):
             try:
                 if task.state == 'PROGRESS':
                     output = task.info
-                    pid_matches = re.match(r'Spawned Process: (\d+)', output)
+                    pid_matches = re.match(r'CNC: Spawned Process: (\d+)', output)
                     if pid_matches is not None:
                         pid_str = pid_matches[1]
                         pid = int(pid_str)
@@ -1629,6 +1632,7 @@ class CancelTaskView(CNCBaseAuth, RedirectView):
 
             task.revoke(terminate=True)
             task_utils.purge_all_tasks()
+            self.request.session.pop('task_id')
             messages.add_message(self.request, messages.INFO, f'Cancelled Task Successfully')
         else:
             messages.add_message(self.request, messages.ERROR, f'No Task found to cancel')
@@ -1883,13 +1887,16 @@ class TaskLogsView(CNCBaseAuth, View):
                     print(ve)
                     logs_output['output'] = task_result.result
 
+                # remove task_id from session as this one is completed!
+                self.request.session.pop('task_id')
                 logs_output['status'] = 'exited'
             elif task_result.failed():
                 logs_output['status'] = 'exited'
                 logs_output['output'] = 'Task Failed, check logs for details'
             elif task_result.status == 'PROGRESS':
                 logs_output['status'] = task_result.state
-                logs_output['output'] = task_result.info
+                task_output = str(task_result.info)
+                logs_output['output'] = task_utils.clean_task_output(task_output)
 
             else:
                 logs_output['output'] = 'Task is still Running'
@@ -1900,7 +1907,9 @@ class TaskLogsView(CNCBaseAuth, View):
 
             request.session['task_logs'][task_id] = logs_output
         else:
-            logs_output['status'] = 'no task found'
+            logs_output['status'] = 'exited'
+            logs_output['output'] = 'No task found'
+            logs_output['returncode'] = 255
 
         try:
             logs_out_str = json.dumps(logs_output)
@@ -1955,6 +1964,9 @@ class WorkflowView(CNCBaseAuth, RedirectView):
 
         print(f"found skillet name {skillet_name}")
         self.meta = snippet_utils.load_snippet_with_name(skillet_name, self.app_dir)
+        if self.meta is None:
+            messages.add_message(self.request, messages.ERROR, 'Process Error - No skillet could be loaded')
+            return '/'
 
         if 'snippets' not in self.meta or 'type' not in self.meta:
             messages.add_message(self.request, messages.ERROR, 'Malformed .meta-cnc')

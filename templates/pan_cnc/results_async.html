@@ -26,8 +26,8 @@
                     returncode = json_data['returncode'];
 
                     if ('captured_output' in json_data) {
-                        console.log('Found captured output to use here');
-                        msg = json_data['captured_output'];
+                        console.log(json_data['captured_output']);
+                        msg = "Completed Execution";
                     }
                 }
 
@@ -42,9 +42,12 @@
                     cancel_countdown = true;
 
                     let f = $('#footer');
+                    let t = $('#results_title');
 
                     let next_link = $('<a/>');
                     if (returncode === 0) {
+                        let old_title = t.html();
+                        t.html("Completed: " + old_title);
                         {% if request.session.task_next %}
                             next_link.attr('href', '/next_task');
                             next_link.html('Continue');
@@ -114,7 +117,7 @@
             </div>
         </div>
         <div class="card-body">
-            <h4 class="card-title">
+            <h4 class="card-title" id="results_title">
                 {% if title %}
                     {{ title }}
                 {% else %}

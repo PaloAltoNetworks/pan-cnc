@@ -35,10 +35,18 @@ from celery import shared_task, current_task
 
 
 class OutputHolder(object):
+    """
+    Simple class to hold output for our tasks
+    """
     full_output = ''
+    metadata = ''
 
     def __init__(self):
         self.full_output = ''
+        self.metadata = ''
+
+    def add_metadata(self, message):
+        self.metadata += message
 
     def add_output(self, message):
         self.full_output += message
@@ -46,14 +54,27 @@ class OutputHolder(object):
     def get_output(self):
         return self.full_output
 
+    def get_progress(self):
+        return self.metadata + self.full_output
 
-async def cmd_runner(cmd_seq, cwd, env, o: OutputHolder):
+
+async def cmd_runner(cmd_seq: list, cwd: str, env: dict, o: OutputHolder) -> int:
+    """
+    This function will get called within our tasks to execute subprocesses using asyncio
+    :param cmd_seq: command to execute
+    :param cwd: current working dir
+    :param env: dict containing the environment variables to pass along
+    :param o: reference to out OutputHolder class
+    :return: int return code once the command has completed
+    """
     p = await asyncio.create_subprocess_shell(' '.join(cmd_seq),
                                               stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT,
                                               cwd=cwd, env=env)
 
     print(f'Spawned process {p.pid}')
-    o.add_output(f'Spawned Process: {p.pid}\n')
+    o.add_metadata(f'CNC: Spawned Process: {p.pid}\n')
+    # ensure we always have at least some output while in progress
+    current_task.update_state(state='PROGRESS', meta=o.get_progress())
 
     while True:
         line = await p.stdout.readline()
@@ -62,7 +83,7 @@ async def cmd_runner(cmd_seq, cwd, env, o: OutputHolder):
 
         try:
             o.add_output(line.decode())
-            current_task.update_state(state='PROGRESS', meta=o.get_output())
+            current_task.update_state(state='PROGRESS', meta=o.get_progress())
         except UnicodeDecodeError as ude:
             print(f'Could not read results from task')
             print(ude)
@@ -73,6 +94,14 @@ async def cmd_runner(cmd_seq, cwd, env, o: OutputHolder):
 
 
 def exec_local_task(cmd_seq: list, cwd: str, env=None) -> str:
+    """
+    This function will kick off our local task calling cmd_runner in a celery worker thread. Uses an event loop
+    to track progress
+    :param cmd_seq: command sequence to execute
+    :param cwd: current working directory
+    :param env: dict containing env vars
+    :return: str containing the state of the job
+    """
     print('Kicking off new task - exe local task')
     process_env = os.environ.copy()
     if env is not None and type(env) is dict:
@@ -86,6 +115,13 @@ def exec_local_task(cmd_seq: list, cwd: str, env=None) -> str:
     print(f'Task {current_task.request.id} return code is {r}')
     state = dict()
     state['returncode'] = r
+
+    # clean out CNC related informational messages
+    # We need to communicate back some information such as spawned process id, but we don't
+    # need to show these to the user after task completion, so filter them out here
+    # FIXME - there should be a better way to do this?
+
+    print('returning output')
     state['out'] = o.get_output()
     state['err'] = ''
     return json.dumps(state)
@@ -218,27 +254,39 @@ def python3_init_existing(working_dir):
 
 
 @shared_task
-def python3_execute_script(working_dir, script, args):
+def python3_execute_script(working_dir, script, input_type, args):
+    """Build python3 cli and environment"""
     print(f'Executing task Python3 {script}')
     cmd_seq = ['./.venv/bin/python3', '-u', script]
 
-    for k, v in args.items():
-        cmd_seq.append(f'--{k}="{v}"')
-
     env = dict()
     env['PYTHONUNBUFFERED'] = "1"
+
+    for k, v in args.items():
+        if input_type == 'env':
+            env[k] = v
+        else:
+            cmd_seq.append(f'--{k}="{v}"')
+
     return exec_local_task(cmd_seq, working_dir, env)
 
 
 @shared_task
-def python3_execute_bare_script(working_dir, script, args):
+def python3_execute_bare_script(working_dir, script, input_type, args):
     print(f'Executing task Python3 {script}')
     cmd_seq = ['python3', '-u', script]
 
-    for k, v in args.items():
-        cmd_seq.append(f'--{k}="{v}"')
-
     env = dict()
     env['PYTHONUNBUFFERED'] = "1"
+
+    for k, v in args.items():
+        if input_type == 'env':
+            env[k] = v
+        else:
+            cmd_seq.append(f'--{k}="{v}"')
+
     return exec_local_task(cmd_seq, working_dir, env)
+
+
+
 
