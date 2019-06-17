@@ -31,7 +31,8 @@ import os
 import subprocess
 from subprocess import Popen
 
-from celery import shared_task, current_task
+from celery import current_task
+from celery import shared_task
 
 
 class OutputHolder(object):
@@ -67,9 +68,9 @@ async def cmd_runner(cmd_seq: list, cwd: str, env: dict, o: OutputHolder) -> int
     :param o: reference to out OutputHolder class
     :return: int return code once the command has completed
     """
-    p = await asyncio.create_subprocess_shell(' '.join(cmd_seq),
-                                              stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT,
-                                              cwd=cwd, env=env)
+    p = await asyncio.create_subprocess_exec(*cmd_seq,
+                                             stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT,
+                                             cwd=cwd, env=env)
 
     print(f'Spawned process {p.pid}')
     o.add_metadata(f'CNC: Spawned Process: {p.pid}\n')
@@ -143,7 +144,7 @@ def exec_sync_local_task(cmd_seq: list, cwd: str, env=None) -> str:
         process_env.update(env)
 
     p = Popen(cmd_seq, cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, bufsize=1, universal_newlines=True,
-              env=process_env)
+              env=process_env, shell=False)
     stdout, stderr = p.communicate()
     rc = p.returncode
     print(f'Task {current_task.request.id} return code is {rc}')
@@ -286,7 +287,3 @@ def python3_execute_bare_script(working_dir, script, input_type, args):
             cmd_seq.append(f'--{k}="{v}"')
 
     return exec_local_task(cmd_seq, working_dir, env)
-
-
-
-

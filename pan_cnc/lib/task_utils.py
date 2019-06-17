@@ -1,6 +1,7 @@
 import json
 import os
 from pathlib import Path
+import shlex
 
 from celery.result import AsyncResult
 from celery.result import EagerResult
@@ -18,16 +19,16 @@ def __build_cmd_seq_vars(resource_def, snippet_context):
         print('No resource def found or mis-configured')
         return None
 
-    tf_vars = dict()
+    sanity_checked_vars = dict()
     for v in list(resource_def['variables']):
         var_name = v['name']
         if var_name in snippet_context:
-            tf_vars[var_name] = snippet_context[var_name]
+            sanity_checked_vars[var_name] = shlex.quote(snippet_context[var_name])
         else:
             print('Not found in snippet_context')
 
-    print(tf_vars)
-    return tf_vars
+    print(sanity_checked_vars)
+    return sanity_checked_vars
 
 
 def perform_init(resource_def, snippet_context) -> AsyncResult:

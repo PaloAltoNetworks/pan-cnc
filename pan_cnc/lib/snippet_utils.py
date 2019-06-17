@@ -633,8 +633,10 @@ def _normalize_snippet_structure(skillet: dict) -> dict:
 
     # ensure we have a collection label
     if 'collection' not in skillet['labels'] or type(skillet['labels']['collection']) is None:
-        skillet['labels']['collection'] = list()
-        skillet['labels']['collection'].append('Unknown')
+        # do not force a collection for 'app' type skillets as these aren't meant to be shown to the end user
+        if skillet['type'] != 'app':
+            skillet['labels']['collection'] = list()
+            skillet['labels']['collection'].append('Unknown')
 
     elif type(skillet['labels']['collection']) is str:
         new_collection = list()
