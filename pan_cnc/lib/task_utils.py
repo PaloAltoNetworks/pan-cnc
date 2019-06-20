@@ -7,7 +7,7 @@ from celery.result import AsyncResult
 from celery.result import EagerResult
 
 from pan_cnc.celery import app as cnc_celery_app
-
+from django.conf import settings
 from pan_cnc.lib.exceptions import CCFParserError
 from pan_cnc.tasks import terraform_init, terraform_validate, terraform_plan, terraform_apply, terraform_refresh, \
     terraform_destroy, terraform_output, python3_init_env, python3_init_with_deps, python3_execute_script, \
@@ -108,7 +108,8 @@ def python3_init(resource_def) -> AsyncResult:
 
     elif os.path.exists(req_file):
         print('requirements.txt exists')
-        return python3_init_with_deps.delay(resource_dir)
+        tools_dir = os.path.join(settings.CNC_PATH, 'tools')
+        return python3_init_with_deps.delay(resource_dir, tools_dir)
     else:
         print('no requirements.txt exists')
         return python3_init_env.delay(resource_dir)
