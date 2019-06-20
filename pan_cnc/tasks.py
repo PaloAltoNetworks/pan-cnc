@@ -159,20 +159,18 @@ def exec_sync_local_task(cmd_seq: list, cwd: str, env=None) -> str:
 def terraform_validate(terraform_dir, tf_vars):
     print('Executing task terraform validate')
     cmd_seq = ['terraform', 'validate', '-no-color']
-    for k, v in tf_vars.items():
-        cmd_seq.append('-var')
-        cmd_seq.append(f'{k}={v}')
 
-    return exec_local_task(cmd_seq, terraform_dir)
+    env = dict()
+    for k, v in tf_vars.items():
+        env[f'TF_VAR_{k}'] = v
+
+    return exec_local_task(cmd_seq, terraform_dir, env)
 
 
 @shared_task
 def terraform_init(terraform_dir, tf_vars):
     print('Executing task terraform init')
     cmd_seq = ['terraform', 'init', '-no-color']
-    for k, v in tf_vars.items():
-        cmd_seq.append('-var')
-        cmd_seq.append(f'{k}={v}')
 
     return exec_local_task(cmd_seq, terraform_dir)
 
@@ -181,11 +179,11 @@ def terraform_init(terraform_dir, tf_vars):
 def terraform_plan(terraform_dir, tf_vars):
     print('Executing task terraform plan')
     cmd_seq = ['terraform', 'plan', '-no-color', '-out=.cnc_plan']
+    env = dict()
     for k, v in tf_vars.items():
-        cmd_seq.append('-var')
-        cmd_seq.append(f'{k}={v}')
+        env[f'TF_VAR_{k}'] = v
 
-    return exec_local_task(cmd_seq, terraform_dir)
+    return exec_local_task(cmd_seq, terraform_dir, env)
 
 
 @shared_task
@@ -199,7 +197,6 @@ def terraform_apply(terraform_dir, tf_vars):
 def terraform_output(terraform_dir, tf_vars):
     print('Executing task terraform output')
     cmd_seq = ['terraform', 'output', '-no-color', '-json']
-    print(cmd_seq)
     return exec_sync_local_task(cmd_seq, terraform_dir)
 
 
@@ -207,9 +204,6 @@ def terraform_output(terraform_dir, tf_vars):
 def terraform_destroy(terraform_dir, tf_vars):
     print('Executing task terraform destroy')
     cmd_seq = ['terraform', 'destroy', '-no-color', '-auto-approve']
-    for k, v in tf_vars.items():
-        cmd_seq.append('-var')
-        cmd_seq.append(f'{k}={v}')
 
     return exec_local_task(cmd_seq, terraform_dir)
 
@@ -218,12 +212,12 @@ def terraform_destroy(terraform_dir, tf_vars):
 def terraform_refresh(terraform_dir, tf_vars):
     print('Executing task terraform status')
     cmd_seq = ['terraform', 'refresh', '-no-color']
+    env = dict()
     for k, v in tf_vars.items():
-        cmd_seq.append('-var')
-        cmd_seq.append(f'{k}={v}')
+        env[f'TF_VAR_{k}'] = v
 
     print(cmd_seq)
-    return exec_local_task(cmd_seq, terraform_dir)
+    return exec_local_task(cmd_seq, terraform_dir, env)
 
 
 @shared_task
