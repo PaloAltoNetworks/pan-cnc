@@ -15,7 +15,7 @@ class FqdnOrIp:
     regex = ''
 
     def __init__(self, value):
-        hostname_re = r'[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])$'
+        hostname_re = r'[a-z0-9](?:[a-z0-9\-]{0,61}[a-z0-9])$'
         self.regex = re.compile(hostname_re, re.IGNORECASE)
         self.__call__(value)
 
