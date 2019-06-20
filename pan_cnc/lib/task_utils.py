@@ -1,17 +1,23 @@
 import json
 import os
 from pathlib import Path
-import shlex
 
 from celery.result import AsyncResult
 from celery.result import EagerResult
+from django.conf import settings
 
 from pan_cnc.celery import app as cnc_celery_app
-from django.conf import settings
 from pan_cnc.lib.exceptions import CCFParserError
-from pan_cnc.tasks import terraform_init, terraform_validate, terraform_plan, terraform_apply, terraform_refresh, \
-    terraform_destroy, terraform_output, python3_init_env, python3_init_with_deps, python3_execute_script, \
-    python3_init_existing, python3_execute_bare_script
+from pan_cnc.tasks import python3_execute_bare_script
+from pan_cnc.tasks import python3_execute_script
+from pan_cnc.tasks import python3_init_with_deps
+from pan_cnc.tasks import terraform_apply
+from pan_cnc.tasks import terraform_destroy
+from pan_cnc.tasks import terraform_init
+from pan_cnc.tasks import terraform_output
+from pan_cnc.tasks import terraform_plan
+from pan_cnc.tasks import terraform_refresh
+from pan_cnc.tasks import terraform_validate
 
 
 def __build_cmd_seq_vars(resource_def, snippet_context):
