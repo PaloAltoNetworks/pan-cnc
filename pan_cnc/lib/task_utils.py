@@ -23,7 +23,7 @@ def __build_cmd_seq_vars(resource_def, snippet_context):
     for v in list(resource_def['variables']):
         var_name = v['name']
         if var_name in snippet_context:
-            sanity_checked_vars[var_name] = shlex.quote(snippet_context[var_name])
+            sanity_checked_vars[var_name] = snippet_context[var_name]
         else:
             print('Not found in snippet_context')
 

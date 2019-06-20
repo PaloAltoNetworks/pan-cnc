@@ -4,6 +4,7 @@ import netaddr
 from django.core.validators import ValidationError
 from django.utils.deconstruct import deconstructible
 from netaddr import AddrFormatError
+import json
 
 
 @deconstructible
@@ -54,4 +55,26 @@ class Cidr:
     def __eq__(self, other):
         return (
             isinstance(other, Cidr)
+        )
+
+
+@deconstructible
+class JSONValidator:
+    """
+    Checks for valid json input
+    """
+
+    def __init__(self, value):
+        self.__call__(value)
+
+    def __call__(self, value):
+        try:
+            cleaned = value.replace('\r\n', '')
+            json.loads(cleaned)
+        except ValueError:
+            raise ValidationError('Not valid JSON')
+
+    def __eq__(self, other):
+        return (
+            isinstance(other, JSONValidator)
         )

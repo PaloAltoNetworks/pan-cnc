@@ -63,6 +63,7 @@ from pan_cnc.lib.exceptions import TargetGenericException
 from pan_cnc.lib.exceptions import TargetLoginException
 from pan_cnc.lib.validators import Cidr
 from pan_cnc.lib.validators import FqdnOrIp
+from pan_cnc.lib.validators import JSONValidator
 
 
 class CNCBaseAuth(LoginRequiredMixin, View):
@@ -613,6 +614,10 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
             elif type_hint == "text_area":
                 dynamic_form.fields[field_name] = forms.CharField(widget=forms.Textarea, label=description,
                                                                   initial=default, required=required)
+            elif type_hint == 'json':
+                dynamic_form.fields[field_name] = forms.CharField(widget=forms.Textarea, label=description,
+                                                                  initial=default, required=required,
+                                                                  validators=[JSONValidator])
             elif type_hint == "email":
                 dynamic_form.fields[field_name] = forms.CharField(widget=forms.EmailInput, label=description,
                                                                   initial=default, required=required)
