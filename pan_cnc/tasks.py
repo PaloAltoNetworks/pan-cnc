@@ -68,7 +68,7 @@ async def cmd_runner(cmd_seq: list, cwd: str, env: dict, o: OutputHolder) -> int
     :param o: reference to out OutputHolder class
     :return: int return code once the command has completed
     """
-    p = await asyncio.create_subprocess_exec(*cmd_seq,
+    p = await asyncio.create_subprocess_exec(cmd_seq[0], *cmd_seq[1:],
                                              stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT,
                                              cwd=cwd, env=env)
 
@@ -225,17 +225,16 @@ def terraform_refresh(terraform_dir, tf_vars):
 @shared_task
 def python3_init_env(working_dir):
     print('Executing task Python3 init')
-    cmd_seq = ['python3', '-m', 'virtualenv', '.venv']
+    cmd_seq = ['python3', '-m', 'virtualenv', f'{working_dir}/.venv']
     env = dict()
     env['PYTHONUNBUFFERED'] = "1"
     return exec_local_task(cmd_seq, working_dir, env)
 
 
 @shared_task
-def python3_init_with_deps(working_dir):
+def python3_init_with_deps(working_dir, tools_dir):
     print('Executing task Python3 init with Dependencies')
-    cmd_seq = ['python3', '-m', 'virtualenv', '.venv', '&&',
-               './.venv/bin/python3', '-m', 'pip', 'install', '-r', 'requirements.txt']
+    cmd_seq = [f'{tools_dir}/init_virtual_env.sh', working_dir]
     env = dict()
     env['PYTHONUNBUFFERED'] = "1"
     return exec_local_task(cmd_seq, working_dir, env)
@@ -254,7 +253,7 @@ def python3_init_existing(working_dir):
 def python3_execute_script(working_dir, script, input_type, args):
     """Build python3 cli and environment"""
     print(f'Executing task Python3 {script}')
-    cmd_seq = ['./.venv/bin/python3', '-u', script]
+    cmd_seq = [f'{working_dir}/.venv/bin/python3', '-u', script]
 
     env = dict()
     env['PYTHONUNBUFFERED'] = "1"
@@ -263,8 +262,9 @@ def python3_execute_script(working_dir, script, input_type, args):
         if input_type == 'env':
             env[k] = v
         else:
-            cmd_seq.append(f'--{k}="{v}"')
+            cmd_seq.append(f'--{k}={v}')
 
+    print(cmd_seq)
     return exec_local_task(cmd_seq, working_dir, env)
 
 
@@ -280,6 +280,6 @@ def python3_execute_bare_script(working_dir, script, input_type, args):
         if input_type == 'env':
             env[k] = v
         else:
-            cmd_seq.append(f'--{k}="{v}"')
+            cmd_seq.append(f'--{k}={v}')
 
     return exec_local_task(cmd_seq, working_dir, env)
