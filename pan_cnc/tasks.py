@@ -280,6 +280,6 @@ def python3_execute_bare_script(working_dir, script, input_type, args):
         if input_type == 'env':
             env[k] = v
         else:
-            cmd_seq.append(f'--{k}="{v}"')
+            cmd_seq.append(f'--{k}={v}')
 
     return exec_local_task(cmd_seq, working_dir, env)
