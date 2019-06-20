@@ -79,10 +79,21 @@ def load_user_secrets(user_id, passphrase):
     secret_dir = os.path.expanduser('~/.pan_cnc')
     file_path = os.path.join(secret_dir, user_id)
 
-    buffer_size = 64 * 1024
+    try:
+        if not os.path.exists(file_path):
+            print('Could not load user secrets file')
+            return None
 
-    with open(file_path, 'rb') as fps:
-        secret_input = io.BytesIO(fps.read())
+        buffer_size = 64 * 1024
+
+        with open(file_path, 'rb') as fps:
+            secret_input = io.BytesIO(fps.read())
+    except PermissionError:
+        print('Permission denied opening user secrets')
+        return None
+    except IOError:
+        print('Could not open user secrets')
+        return None
 
     # initialize decrypted binary stream
     secret_output = io.BytesIO()
@@ -109,10 +120,10 @@ def load_user_secrets(user_id, passphrase):
 
 def save_user_secrets(user_id, secret_dict, passphrase):
     secret_dir = os.path.expanduser('~/.pan_cnc')
-    if not os.path.isdir(secret_dir):
-        os.mkdir(secret_dir)
-
     try:
+        if not os.path.isdir(secret_dir):
+            os.mkdir(secret_dir, mode=0o700)
+
         file_path = os.path.join(secret_dir, user_id)
         pickled_data = pickle.dumps(secret_dict)
         buffer_size = 64 * 1024
@@ -207,7 +218,7 @@ def _load_long_term_cache(app_name: str) -> None:
 
     try:
         if not os.path.exists(cache_dir):
-            os.makedirs(cache_dir, mode=600)
+            os.makedirs(cache_dir, mode=0o700)
     except OSError as ose:
         print('Could not create application cache dir!')
         print(ose)
@@ -248,7 +259,7 @@ def save_long_term_cache(app_name: str, contents: dict) -> None:
 
     try:
         if not os.path.exists(cache_dir):
-            os.makedirs(cache_dir, mode=600)
+            os.makedirs(cache_dir, mode=0o700)
 
         cache_file = os.path.join(cache_dir, 'cache')
 
@@ -283,7 +294,11 @@ def get_long_term_cached_value(app_name: str, key: str) -> any:
         return None
 
     time_added = ltc['meta'][key]['time']
-    life = ltc['meta'][key]['life']
+    try:
+        life = int(ltc['meta'][key]['life'])
+    except ValueError:
+        print('could not parse life value from cache entry')
+        return None
 
     # Allow -1 to indicate cached items that should stay cached forever
     if life == -1:
@@ -404,12 +419,17 @@ def init_app(app_cnc_config):
             print('Will not allow destination directory to be outside of our application dir')
             continue
 
-        if not os.path.exists(repo_dir):
-            try:
-                os.makedirs(repo_dir)
-            except IOError:
-                print('Could not make repo_dir!')
-                continue
+        try:
+            if not repo_path.exists():
+                os.makedirs(repo_dir, mode=0o700)
+        except PermissionError:
+            print('***********************************************************')
+            print('Permission denied, Could not create repositories directory!')
+            print('***********************************************************')
+            continue
+        except IOError:
+            print('Could not create repo_dir!')
+            continue
 
         repo_url = r['url']
         repo_name = r['name']

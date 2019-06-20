@@ -4,59 +4,89 @@
 {% block content %}
     <script type="text/javascript">
         let time_left = 5;
+        let cancel_countdown = false;
 
         function updateOutput() {
             time_left = 5;
-            $.get({
-                'url': '/logs', 'success': function (json_data) {
-                    console.log(json_data);
+            $.get('/logs').done(function (json_data) {
+                console.log(json_data);
+
+                let msg = '';
+                let status = '';
+                let returncode = 255;
+
+                if (typeof (json_data) === "string") {
+                    msg = 'Error executing task';
+                    status = 'exited';
+                    returncode = 255;
+                } else {
                     // let json_data = JSON.parse(data);
-                    let msg = json_data['output'];
-                    let status = json_data['status'];
-                    let returncode = json_data['returncode'];
+                    msg = json_data['output'];
+                    status = json_data['status'];
+                    returncode = json_data['returncode'];
 
                     if ('captured_output' in json_data) {
-                        console.log('Found captured output to use here')
-                        msg = json_data['captured_output'];
+                        console.log(json_data['captured_output']);
+                        msg = "Completed Execution";
                     }
+                }
 
-                    $('#results').html(msg);
-                    if (status !== 'exited') {
-                        console.log('checking again');
-                        countdown();
-                        setTimeout(updateOutput, 5000);
-                    } else {
-                        let c = $('#countdown');
-                        c.empty();
-                        let f = $('#footer');
+                $('#results').html(msg);
+                if (status !== 'exited') {
+                    console.log('checking again');
+                    countdown();
+                    setTimeout(updateOutput, 5000);
+                } else {
+                    let c = $('#countdown');
+                    c.empty();
+                    cancel_countdown = true;
 
-                        let next_link = $('<a/>');
-                        if (returncode === 0) {
-                            {% if request.session.task_next %}
-                                next_link.attr('href', '/next_task');
-                                next_link.html('Continue');
-                                next_link.addClass('btn').addClass('btn-primary');
-                            {% else %}
-                                next_link.attr('href', '{{ request.session.last_page|urlencode }}');
-                                next_link.html('Continue');
-                                next_link.addClass('btn').addClass('btn-primary');
-                            {% endif %}
-                        } else {
+                    let f = $('#footer');
+                    let t = $('#results_title');
+
+                    let next_link = $('<a/>');
+                    if (returncode === 0) {
+                        let old_title = t.html();
+                        t.html("Completed: " + old_title);
+                        {% if request.session.task_next %}
+                            next_link.attr('href', '/next_task');
+                            next_link.html('Continue');
+                            next_link.addClass('btn').addClass('btn-primary');
+                        {% else %}
                             next_link.attr('href', '{{ request.session.last_page|urlencode }}');
                             next_link.html('Continue');
-                            next_link.addClass('btn').addClass('btn-danger');
-                            c.append('Error Executing Task');
-                            c.append('<br>');
-                        }
-                        f.append(next_link);
+                            next_link.addClass('btn').addClass('btn-primary');
+                        {% endif %}
+                    } else {
+                        next_link.attr('href', '{{ request.session.last_page|urlencode }}');
+                        next_link.html('Continue');
+                        next_link.addClass('btn').addClass('btn-danger');
+                        c.append('Error Executing Task');
+                        c.append('<br>');
                     }
-                },
-                'headers': {"X-CSRFToken": "{{ csrf_token }}"}
-            });
+                    f.append(next_link);
+                }
+            })
+                .fail(function () {
+                    let c = $('#countdown');
+                    c.empty();
+                    cancel_countdown = true;
+                    let next_link = $('<a/>');
+                    next_link.attr('href', '{{ request.session.last_page|urlencode }}');
+                    next_link.html('Continue');
+                    next_link.addClass('btn').addClass('btn-danger');
+                    c.append('Error Executing Task');
+                    c.append('<br>');
+                    let f = $('#footer');
+                    f.append(next_link);});
         }
 
         function countdown() {
             let c = $('#countdown');
+            if (cancel_countdown === true) {
+                c.empty();
+                return;
+            }
             c.html('Checking again in ' + time_left);
             time_left = time_left - 1;
             console.log(time_left);
@@ -87,7 +117,7 @@
             </div>
         </div>
         <div class="card-body">
-            <h4 class="card-title">
+            <h4 class="card-title" id="results_title">
                 {% if title %}
                     {{ title }}
                 {% else %}

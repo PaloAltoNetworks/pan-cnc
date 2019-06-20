@@ -1,9 +1,12 @@
 import json
 import os
 from pathlib import Path
+import shlex
 
 from celery.result import AsyncResult
 from celery.result import EagerResult
+
+from pan_cnc.celery import app as cnc_celery_app
 
 from pan_cnc.lib.exceptions import CCFParserError
 from pan_cnc.tasks import terraform_init, terraform_validate, terraform_plan, terraform_apply, terraform_refresh, \
@@ -16,16 +19,16 @@ def __build_cmd_seq_vars(resource_def, snippet_context):
         print('No resource def found or mis-configured')
         return None
 
-    tf_vars = dict()
+    sanity_checked_vars = dict()
     for v in list(resource_def['variables']):
         var_name = v['name']
         if var_name in snippet_context:
-            tf_vars[var_name] = snippet_context[var_name]
+            sanity_checked_vars[var_name] = snippet_context[var_name]
         else:
             print('Not found in snippet_context')
 
-    print(tf_vars)
-    return tf_vars
+    print(sanity_checked_vars)
+    return sanity_checked_vars
 
 
 def perform_init(resource_def, snippet_context) -> AsyncResult:
@@ -82,7 +85,8 @@ def python3_check_no_requirements(resource_def) -> bool:
 
 def python3_execute_bare(resource_def, args) -> AsyncResult:
     (script_path, script_name) = _normalize_python_script_path(resource_def)
-    return python3_execute_bare_script.delay(script_path, script_name, args)
+    input_type = get_python_input_options(resource_def)
+    return python3_execute_bare_script.delay(script_path, script_name, input_type, args)
 
 
 def python3_init(resource_def) -> AsyncResult:
@@ -112,7 +116,8 @@ def python3_init(resource_def) -> AsyncResult:
 
 def python3_execute(resource_def, args) -> AsyncResult:
     (script_path, script_name) = _normalize_python_script_path(resource_def)
-    return python3_execute_script.delay(script_path, script_name, args)
+    input_type = get_python_input_options(resource_def)
+    return python3_execute_script.delay(script_path, script_name, input_type, args)
 
 
 def python3_init_complete(resource_def) -> bool:
@@ -155,6 +160,37 @@ def _normalize_python_script_path(resource_def: dict) -> tuple:
         raise CCFParserError('Malformed .meta-cnc file for python3 execution - Malformed snippet')
 
 
+def get_python_input_options(resource_def: dict) -> str:
+    """
+    Determine how input variables from the view should be passed to this script. An optional snippet parameter
+    called 'input_type' is checked to determine whether 'cli' or 'env' should be used. 'cli' indicates input
+    variables will be passed along as long form arguments to the python script on the cli (for example:
+    --first_arg=arg1_val --second_arg=arg2_val). 'env' indicates env variables will be set (for example:
+    export first_arg=arg1_var; export second_arg=arg2_val)
+
+    :param resource_def: the compiled .meta-cnc file
+    :return: str of either 'cli' or 'env'
+    """
+    if 'snippet_path' not in resource_def:
+        raise CCFParserError('Malformed .meta-cnc file for python3 execution')
+
+    try:
+        if 'snippets' in resource_def and len(resource_def['snippets']) > 0:
+            # python type only uses first snippet from list
+            snippet = resource_def['snippets'][0]
+            if 'input_type' in snippet:
+                if str(snippet['input_type']).lower() == 'cli':
+                    return 'cli'
+                elif str(snippet['input_type']).lower() == 'env':
+                    return 'env'
+                else:
+                    return 'cli'
+
+            return 'cli'
+    except TypeError:
+        raise CCFParserError('Malformed .meta-cnc file for python3 execution - Malformed snippet')
+
+
 def verify_clean_state(resource_def) -> bool:
     # Verify the tfstate file does NOT exist or contain resources if it does exist
     resource_dir = resource_def['snippet_path']
@@ -177,3 +213,26 @@ def verify_clean_state(resource_def) -> bool:
                         return True
 
     return True
+
+
+def purge_all_tasks() -> None:
+    num_tasks = cnc_celery_app.control.purge()
+    print(f'Purged {num_tasks} tasks from queue')
+    return None
+
+
+def clean_task_output(output: str) -> str:
+    """
+    Remove CNC metadata from task output. In some cases we need to return data from the task to the cnc application.
+    The only available route to do this is by injecting metadata into the text output from the task. This is done by
+    simply prefixing out metadata with 'CNC:'. This function will remove any metadata from the task output in order
+    to present it to the user
+    :param output: str of output with metadata possibly present
+    :return: str of output with no metadata present
+    """
+    cleaned_output = ""
+    for line in output.splitlines():
+        if not line.startswith('CNC:'):
+            cleaned_output += f'{line}\n'
+
+    return cleaned_output

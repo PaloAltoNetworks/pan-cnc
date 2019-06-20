@@ -25,6 +25,8 @@ from jinja2.loaders import BaseLoader
 from yaml.constructor import ConstructorError
 from yaml.parser import ParserError
 from yaml.scanner import ScannerError
+from yaml.reader import ReaderError
+from yaml.error import YAMLError
 
 from . import cnc_utils
 from . import jinja_filters
@@ -114,6 +116,15 @@ def load_snippets_of_type_from_dir(app_name: str, directory: str, snippet_type=N
 
     snippets_dir = Path(directory)
 
+    try:
+        snippets_dir.stat()
+    except PermissionError:
+        print(f'Permission Denied access {snippets_dir}')
+        return snippet_list
+    except OSError:
+        print(f'Could not access {snippets_dir}')
+        return snippet_list
+
     if not snippets_dir.exists():
         print(f'Could not find meta-cnc files in dir {directory}')
         return snippet_list
@@ -202,6 +213,21 @@ def _check_dir(directory: Path, snippet_type: str, snippet_list: list) -> list:
             print(ce)
             err_condition = True
             continue
+        except ReaderError as re:
+            print('Could not parse metadata file in dir %s' % d.parent)
+            print(re)
+            err_condition = True
+            continue
+        except YAMLError as ye:
+            print('YAMLError: Could not parse metadata file in dir %s' % d.parent)
+            print(ye)
+            err_condition = True
+            continue
+        except Exception as ex:
+            print('Caught unknown exception!')
+            print(ex)
+            err_condition = True
+            continue
 
     # Do not descend into sub dirs after a .meta-cnc file has already been found
     if snippet_list:
@@ -223,6 +249,89 @@ def _check_dir(directory: Path, snippet_type: str, snippet_list: list) -> list:
             snippet_list.extend(_check_dir(d, snippet_type, list()))
 
     return snippet_list
+
+
+def debug_snippets_in_repo(directory: Path, err_list: list) -> list:
+    """
+    Recursive function to look for all files in the current directory with a name matching '.meta-cnc.yaml'
+    otherwise, iterate through all sub-dirs and skip dirs with name that match '.git', '.venv', and '.terraform'
+    will descend into all other dirs and call itself again.
+    Returns a list of skillet errors
+    :param directory: PosixPath of directory to begin searching
+    :param err_list: combined list of all skillet errors
+    :return: list of dicts containing skillet errors
+    """
+
+    err_condition = False
+    err_detail = dict()
+    for d in directory.glob('.meta-cnc.y*'):
+        snippet_path = str(d.parent.absolute())
+        err_detail['path'] = snippet_path
+        print(f'debug snippet_path: {snippet_path}')
+        try:
+            with d.open(mode='r') as sc:
+                raw_service_config = oyaml.safe_load(sc.read())
+                errs = _debug_skillet_structure(raw_service_config)
+                if errs:
+                    err_condition = True
+                    err_detail['severity'] = 'warn'
+                    err_detail['err_list'] = errs
+
+        except IOError as ioe:
+            err = 'Could not open metadata file in dir %s' % d.parent
+            print(ioe)
+            err_condition = True
+            err_detail['severity'] = 'error'
+            err_detail['err_list'] = [err, str(ioe)]
+            continue
+        except ParserError as pe:
+            err = 'Could not parse metadata file in dir %s' % d.parent
+            print(pe)
+            err_condition = True
+            err_detail['severity'] = 'error'
+            err_detail['err_list'] = [err, str(pe)]
+            continue
+        except ScannerError as se:
+            err = 'Could not parse meta-cnc file in dir %s' % d.parent
+            print(se)
+            err_condition = True
+            err_detail['severity'] = 'error'
+            err_detail['err_list'] = [err, str(se)]
+            continue
+        except ConstructorError as ce:
+            err = 'Could not parse metadata file in dir %s' % d.parent
+            print(ce)
+            err_condition = True
+            err_detail['severity'] = 'error'
+            err_detail['err_list'] = [err, str(ce)]
+            continue
+        # catch everything else that should be generated from oyaml libraries
+        except YAMLError as ye:
+            err = 'YAMLError: Could not parse metadata file in dir %s' % d.parent
+            print(ye)
+            err_condition = True
+            err_detail['severity'] = 'error'
+            err_detail['err_list'] = [err, str(ye)]
+            continue
+
+    # Do not descend into sub dirs after a .meta-cnc file has already been found
+    if err_condition:
+        err_list.append(err_detail)
+        return err_list
+
+    for d in directory.iterdir():
+        if d.is_file():
+            continue
+        if '.git' in d.name:
+            continue
+        if '.venv' in d.name:
+            continue
+        if '.terraform' in d.name:
+            continue
+        if d.is_dir():
+            err_list.extend(debug_snippets_in_repo(d, list()))
+
+    return err_list
 
 
 def load_snippet_with_name(snippet_name, app_dir) -> (dict, None):
@@ -487,6 +596,12 @@ def _normalize_snippet_structure(skillet: dict) -> dict:
     :return: skillet/snippet that has been 'fixed'
     """
 
+    if skillet is None:
+        skillet = dict()
+
+    if type(skillet) is not dict:
+        skillet = dict()
+
     if 'name' not in skillet:
         skillet['name'] = 'Unknown Skillet'
 
@@ -516,6 +631,19 @@ def _normalize_snippet_structure(skillet: dict) -> dict:
     elif type(skillet['labels']) is not OrderedDict and type(skillet['labels']) is not dict:
         skillet['labels'] = OrderedDict()
 
+    # ensure we have a collection label
+    if 'collection' not in skillet['labels'] or type(skillet['labels']['collection']) is None:
+        # do not force a collection for 'app' type skillets as these aren't meant to be shown to the end user
+        if skillet['type'] != 'app':
+            skillet['labels']['collection'] = list()
+            skillet['labels']['collection'].append('Unknown')
+
+    elif type(skillet['labels']['collection']) is str:
+        new_collection = list()
+        old_value = skillet['labels']['collection']
+        new_collection.append(old_value)
+        skillet['labels']['collection'] = new_collection
+
     # verify snippets stanza is present and is a list
     if 'snippets' not in skillet:
         skillet['snippets'] = list()
@@ -527,3 +655,40 @@ def _normalize_snippet_structure(skillet: dict) -> dict:
         skillet['snippets'] = list()
 
     return skillet
+
+
+def _debug_skillet_structure(skillet: dict) -> list:
+    """
+    Verifies the structure of a skillet and returns a list of errors or warning if found, None otherwise
+    :param skillet: loaded skillet
+    :return: list of errors or warnings if found
+    """
+
+    errs = list()
+
+    if skillet is None:
+        errs.append('Skillet is blank or could not be loaded')
+        return errs
+
+    if type(skillet) is not dict:
+        errs.append('Skillet is malformed')
+        return errs
+
+    # verify labels stanza is present and is a OrderedDict
+    if 'labels' not in skillet:
+        errs.append('No labels attribute present in skillet')
+    else:
+        if 'collection' not in skillet['labels']:
+            errs.append('No collection defined in skillet')
+
+    if 'label' not in skillet:
+        errs.append('No label attribute in skillet')
+
+    if 'type' not in skillet:
+        errs.append('No type attribute in skillet')
+    else:
+        valid_types = ['panos', 'panorama', 'panorama-gpcs', 'python3', 'rest', 'terraform', 'template', 'workflow']
+        if skillet['type'] not in valid_types:
+            errs.append(f'Unknown type {skillet["type"]} in skillet')
+
+    return errs

@@ -25,6 +25,10 @@ class LoginRequired(Exception):
     pass
 
 
+class TargetCommitException(Exception):
+    pass
+
+
 class TargetConnectionException(Exception):
     pass
 
@@ -45,4 +49,5 @@ class SnippetNotFoundException(Exception):
     pass
 
 
-
+class ImportRepositoryException(Exception):
+    pass

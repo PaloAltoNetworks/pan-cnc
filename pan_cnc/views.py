@@ -27,6 +27,8 @@ Use at your own risk.
 
 import copy
 import json
+import os
+import re
 from collections import OrderedDict
 from typing import Any
 
@@ -34,8 +36,14 @@ from celery.result import AsyncResult
 from django import forms
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.core.validators import MaxValueValidator
+from django.core.validators import MinValueValidator
+from django.core.validators import RegexValidator
+from django.core.validators import URLValidator
 from django.http import JsonResponse
-from django.shortcuts import render, HttpResponseRedirect, HttpResponse
+from django.shortcuts import HttpResponse
+from django.shortcuts import HttpResponseRedirect
+from django.shortcuts import render
 from django.views.generic import RedirectView
 from django.views.generic import TemplateView
 from django.views.generic import View
@@ -47,8 +55,15 @@ from pan_cnc.lib import pan_utils
 from pan_cnc.lib import rest_utils
 from pan_cnc.lib import snippet_utils
 from pan_cnc.lib import task_utils
-from pan_cnc.lib.exceptions import SnippetRequiredException, CCFParserError, TargetConnectionException, \
-    TargetLoginException, TargetGenericException
+from pan_cnc.lib.exceptions import CCFParserError
+from pan_cnc.lib.exceptions import SnippetRequiredException
+from pan_cnc.lib.exceptions import TargetCommitException
+from pan_cnc.lib.exceptions import TargetConnectionException
+from pan_cnc.lib.exceptions import TargetGenericException
+from pan_cnc.lib.exceptions import TargetLoginException
+from pan_cnc.lib.validators import Cidr
+from pan_cnc.lib.validators import FqdnOrIp
+from pan_cnc.lib.validators import JSONValidator
 
 
 class CNCBaseAuth(LoginRequiredMixin, View):
@@ -112,6 +127,8 @@ class CNCBaseAuth(LoginRequiredMixin, View):
 
         workflow = self.get_workflow()
         workflow[var_name] = var_value
+        self.request.session[self.app_dir] = workflow
+        self.request.session.modified = True
 
     def save_dict_to_workflow(self, dict_to_save: dict) -> None:
         """
@@ -168,7 +185,8 @@ class CNCBaseAuth(LoginRequiredMixin, View):
         """
         # context = self.get_workflow()
         # context.update(self.get_environment_secrets())
-        context = self.get_environment_secrets()
+        context = dict()
+        context.update(self.get_environment_secrets())
         context.update(self.get_workflow())
         return context
 
@@ -438,6 +456,7 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
         context['base_html'] = self.base_html
         context['app_dir'] = self.app_dir
         context['snippet_name'] = self.get_snippet()
+        context['view'] = self
 
         return context
 
@@ -499,7 +518,7 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
     def generate_dynamic_form(self, data=None) -> forms.Form:
         """
         The heart of this class. This will generate a Form object based on the value of the self.snippet
-        All variables defined in a snippet metadata.xml file will be converted into a form field depending on it's
+        All variables defined in a snippet .meta-cnc.yaml file will be converted into a form field depending on it's
         type_hint. The initial value of the variable will be the value of the 'default' key defined in the metadata file
         or the value of a secret from the currently loaded environment if it contains the same name.
 
@@ -566,8 +585,11 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
             description = variable.get('description', '')
             variable_default = variable.get('default', '')
 
+            required = variable.get('required', False)
             force_default = variable.get('force_default', False)
+
             if force_default:
+                print('Using variable as default')
                 default = variable_default
             else:
                 # if the user has entered this before, let's grab it from the session
@@ -581,22 +603,57 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
                 for item in dd_list:
                     if 'key' in item and 'value' in item:
                         print(item)
+                        if default == item['key'] and default != item['value']:
+                            # user set the key as the default and not the value, just fix it for them here
+                            default = item['value']
+
                         choice = (item['value'], item['key'])
                         choices_list.append(choice)
                 dynamic_form.fields[field_name] = forms.ChoiceField(choices=tuple(choices_list), label=description,
-                                                                    initial=default)
+                                                                    initial=default, required=required)
             elif type_hint == "text_area":
                 dynamic_form.fields[field_name] = forms.CharField(widget=forms.Textarea, label=description,
-                                                                  initial=default)
+                                                                  initial=default, required=required)
+            elif type_hint == 'json':
+                dynamic_form.fields[field_name] = forms.CharField(widget=forms.Textarea, label=description,
+                                                                  initial=default, required=required,
+                                                                  validators=[JSONValidator])
             elif type_hint == "email":
                 dynamic_form.fields[field_name] = forms.CharField(widget=forms.EmailInput, label=description,
-                                                                  initial=default)
+                                                                  initial=default, required=required)
             elif type_hint == "ip_address":
                 dynamic_form.fields[field_name] = forms.GenericIPAddressField(label=description,
-                                                                              initial=default)
+                                                                              initial=default, required=required)
+            elif type_hint == "number":
+                attrs = dict()
+                if 'attributes' in variable:
+                    if 'min' in variable['attributes'] and 'max' in variable['attributes']:
+                        attrs['min'] = variable['attributes']['min']
+                        attrs['max'] = variable['attributes']['max']
+                        dynamic_form.fields[field_name] = forms.IntegerField(widget=forms.NumberInput(attrs=attrs),
+                                                                             label=description,
+                                                                             initial=default, required=required,
+                                                                             validators=[
+                                                                                 MaxValueValidator(attrs['max']),
+                                                                                 MinValueValidator(attrs['min'])])
+                else:
+                    dynamic_form.fields[field_name] = forms.IntegerField(widget=forms.NumberInput(),
+                                                                         label=description,
+                                                                         initial=default, required=required)
+
+            elif type_hint == "fqdn_or_ip":
+                dynamic_form.fields[field_name] = forms.CharField(label=description,
+                                                                  initial=default,
+                                                                  validators=[FqdnOrIp], required=required)
+
+            elif type_hint == "cidr":
+                dynamic_form.fields[field_name] = forms.CharField(label=description,
+                                                                  initial=default,
+                                                                  validators=[Cidr], required=required)
             elif type_hint == "password":
                 dynamic_form.fields[field_name] = forms.CharField(widget=forms.PasswordInput(render_value=True),
-                                                                  initial=default)
+                                                                  initial=default,
+                                                                  label=description, required=required)
             elif type_hint == "radio" and "rad_list":
                 rad_list = variable['rad_list']
                 choices_list = list()
@@ -604,20 +661,51 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
                     choice = (item['value'], item['key'])
                     choices_list.append(choice)
                 dynamic_form.fields[field_name] = forms.ChoiceField(widget=forms.RadioSelect, choices=choices_list,
-                                                                    label=description, initial=default)
+                                                                    label=description, initial=default,
+                                                                    required=required)
             elif type_hint == "checkbox" and "cbx_list":
                 cbx_list = variable['cbx_list']
                 choices_list = list()
                 for item in cbx_list:
                     choice = (item['value'], item['key'])
                     choices_list.append(choice)
-                dynamic_form.fields[field_name] = forms.ChoiceField(widget=forms.CheckboxSelectMultiple,
-                                                                    choices=choices_list,
-                                                                    label=description, initial=default)
+                dynamic_form.fields[field_name] = forms.MultipleChoiceField(widget=forms.CheckboxSelectMultiple,
+                                                                            choices=choices_list,
+                                                                            label=description, initial=default,
+                                                                            required=required)
             elif type_hint == 'disabled':
-                dynamic_form.fields[field_name] = forms.CharField(label=description, initial=default, disabled=True)
+                dynamic_form.fields[field_name] = forms.CharField(label=description, initial=default,
+                                                                  disabled=True, required=required)
+
+            elif type_hint == 'url':
+                dynamic_form.fields[field_name] = forms.CharField(label=description,
+                                                                  initial=default,
+                                                                  required=required,
+                                                                  validators=[
+                                                                      URLValidator(message='Entry must be '
+                                                                                           'a valid URL',
+                                                                                   code='invalid_format')
+                                                                  ])
             else:
-                dynamic_form.fields[field_name] = forms.CharField(label=description, initial=default)
+                if 'allow_special_characters' in variable and variable['allow_special_characters'] is False:
+                    print('Using allow_special_characters')
+                    dynamic_form.fields[field_name] = forms.CharField(label=description,
+                                                                      initial=default,
+                                                                      required=required,
+                                                                      validators=[
+                                                                          RegexValidator(
+                                                                              regex='^[a-zA-Z0-9-_ \.]*$',
+                                                                              message='Only Letters, number, hyphens, '
+                                                                                      'underscores and spaces are '
+                                                                                      'allowed',
+                                                                              code='invalid_format'
+                                                                          ),
+                                                                      ])
+                else:
+                    dynamic_form.fields[field_name] = forms.CharField(label=description,
+                                                                      initial=default,
+                                                                      required=required
+                                                                      )
 
         return dynamic_form
 
@@ -779,7 +867,7 @@ class ProvisionSnippetView(CNCBaseFormView):
     use form_valid as it will always be true in this case.
     """
     snippet = ''
-    header = 'Provision Configuration'
+    header = 'Execute Skillet'
     title = 'Customize Variables'
 
     def get_context_data(self, **kwargs):
@@ -842,7 +930,7 @@ class ProvisionSnippetView(CNCBaseFormView):
             return super().form_valid(form)
 
         if self.service is None:
-            print('Unknonw Error, Skillet was None')
+            print('Unknown Error, Skillet was None')
             messages.add_message(self.request, messages.ERROR, 'Process Error - No Skillet was loaded')
             return self.form_invalid(form)
 
@@ -850,6 +938,7 @@ class ProvisionSnippetView(CNCBaseFormView):
             template = snippet_utils.render_snippet_template(self.service, self.app_dir, self.get_workflow())
             if len(self.service['snippets']) == 0:
                 template = 'Could not find a valid template to load!'
+                snippet = dict()
             else:
                 snippet = self.service['snippets'][0]
                 # check for and handle outputs
@@ -862,7 +951,11 @@ class ProvisionSnippetView(CNCBaseFormView):
             context['base_html'] = self.base_html
             # context['header'] = f"Results for {self.service['label']}"
             self.header = f"Results for {self.service['label']}"
-            context['title'] = "Rendered Output"
+            if 'template_title' in snippet:
+                context['title'] = snippet['template_title']
+            else:
+                context['title'] = "Rendered Output"
+
             context['results'] = template
             context['view'] = self
             return render(self.request, 'pan_cnc/results.html', context)
@@ -947,7 +1040,7 @@ class EditTargetView(CNCBaseAuth, FormView):
     # form to render, override if you need a specific html fragment to render the form
     template_name = 'pan_cnc/panos_target_form.html'
     # Head to show on the rendered dynamic form - Main header
-    header = 'PAN-OS Utils'
+    header = 'PAN-OS Skillet'
     # title to show on dynamic form
     title = 'Title'
     # where to go after this? once the form has been submitted, redirect to where?
@@ -958,9 +1051,16 @@ class EditTargetView(CNCBaseAuth, FormView):
     # link to external documentation
     documentation_link = ''
     # help text - inline documentation text
-    help_text = 'The Target is the endpoint or device where the configured template will be applied. ' \
-                'This us usually a PAN-OS or other network device depending on the type of template to ' \
-                'be provisioned'
+    help_text = 'The Target is the PAN-OS device where the configured template will be applied. ' \
+                'The supplied username needs to have API access rights. \n\n Commit options allows you ' \
+                'to control how the commit operation happens. A fast commit will queue the commit and return ' \
+                'immediately with a job id. No commit will push configuration changes to the device but will not' \
+                'perform a commit. Commit and wait to finish will only return after the commit operation has fully' \
+                'completed. This may take some time depending on the platform, however you will immediately see any' \
+                'commit or validation errors. \n\n Perform Backup will record a on-device backup prior to any changes' \
+                'being pushed to the device. To view the backups, you may use the `load config from` CLI command.'
+    help_link_title = 'More information'
+    help_link = 'https://panhandler.readthedocs.io/en/master/using.html'
 
     meta = None
 
@@ -1038,9 +1138,10 @@ class EditTargetView(CNCBaseAuth, FormView):
         target_username = self.get_value_from_workflow('TARGET_USERNAME', '')
         target_password = self.get_value_from_workflow('TARGET_PASSWORD', '')
 
-        target_ip_field = forms.CharField(label=target_ip_label, initial=target_ip, required=False)
-        target_username_field = forms.CharField(label=target_username_label, initial=target_username, required=False)
-        target_password_field = forms.CharField(widget=forms.PasswordInput(render_value=True), required=False,
+        target_ip_field = forms.CharField(label=target_ip_label, initial=target_ip, required=True,
+                                          validators=[FqdnOrIp])
+        target_username_field = forms.CharField(label=target_username_label, initial=target_username, required=True)
+        target_password_field = forms.CharField(widget=forms.PasswordInput(render_value=True), required=True,
                                                 label=target_password_label,
                                                 initial=target_password)
 
@@ -1051,9 +1152,16 @@ class EditTargetView(CNCBaseAuth, FormView):
         form.fields['TARGET_PASSWORD'] = target_password_field
         form.fields['debug'] = debug_field
 
-        if 'type' in meta and 'panos' in meta['type']:
+        if 'type' in meta and 'pan' in meta['type']:
             # add option to perform commit operation or not
-            perform_commit = forms.BooleanField(label='Perform Commit', initial=True, label_suffix='', required=False)
+            # perform_commit = forms.BooleanField(label='Perform Commit', initial=True, label_suffix='', required=False)
+            choices_list = list()
+            choices_list.append(('commit', 'Fast Commit. Do not wait on commit to finish'))
+            choices_list.append(('no_commit', 'Do not Commit. Push changes only'))
+            choices_list.append(('sync_commit', 'Commit and wait to finish'))
+
+            choices_set = tuple(choices_list)
+            perform_commit = forms.ChoiceField(choices=choices_set, label='Commit Options', initial='commit')
             form.fields['perform_commit'] = perform_commit
             perform_backup = forms.BooleanField(label='Perform Backup', initial=True, label_suffix='', required=False)
             form.fields['perform_backup'] = perform_backup
@@ -1180,22 +1288,24 @@ class EditTargetView(CNCBaseAuth, FormView):
             return self.form_invalid(form)
 
         # check if type is 'panos' and if the user wants to perform a commit or not
-        if 'type' in meta and meta['type'] == 'panos':
-            # check if perform commit is set
-            perform_commit_str = self.request.POST.get('perform_commit', 'off')
-            perform_commit = False
+        # check if perform commit is set
+        perform_commit_str = self.request.POST.get('perform_commit', 'commit')
 
-            if perform_commit_str == 'on':
-                perform_commit = True
+        perform_commit = False
+        force_sync = False
 
-            perform_backup_str = self.request.POST.get('perform_backup', 'off')
-            perform_backup = False
-
-            if perform_backup_str == 'on':
-                perform_backup = True
-        else:
-            # ensure commit happens for everything other than panos
+        if perform_commit_str == 'commit':
             perform_commit = True
+        elif perform_commit_str == 'no_commit':
+            perform_commit = False
+        elif perform_commit_str == 'sync_commit':
+            perform_commit = True
+            force_sync = True
+
+        perform_backup_str = self.request.POST.get('perform_backup', 'off')
+        perform_backup = False
+
+        if perform_backup_str == 'on':
             perform_backup = True
 
         print(f'Got a perform_commit of {perform_commit}')
@@ -1234,18 +1344,29 @@ class EditTargetView(CNCBaseAuth, FormView):
                         messages.add_message(self.request, messages.ERROR,
                                              f'Could not push baseline Configuration: {cpe}')
                         return HttpResponseRedirect(f"{self.app_dir}/")
+                    except TargetCommitException as tce:
+                        messages.add_message(self.request, messages.ERROR,
+                                             f'Could not push baseline Configuration: {tce}')
+                        return HttpResponseRedirect(f"{self.app_dir}/")
 
         try:
-            job_id = pan_utils.push_meta(meta, jinja_context, False, perform_commit)
+            job_id = pan_utils.push_meta(meta, jinja_context, force_sync, perform_commit)
         except CCFParserError as cpe:
             messages.add_message(self.request, messages.ERROR, f'Could not push Configuration: {cpe}')
+            return HttpResponseRedirect(f"{self.app_dir}/")
+        except TargetCommitException as tce:
+            messages.add_message(self.request, messages.ERROR,
+                                 f'Could not push Configuration: {tce}')
             return HttpResponseRedirect(f"{self.app_dir}/")
 
         if job_id is not None:
             messages.add_message(self.request, messages.SUCCESS,
                                  f'Configuration Push Queued successfully with Job ID: {job_id}')
         else:
-            messages.add_message(self.request, messages.SUCCESS, 'Configuration Push Queued successfully')
+            if force_sync:
+                messages.add_message(self.request, messages.SUCCESS, 'Configuration Pushed successfully')
+            else:
+                messages.add_message(self.request, messages.SUCCESS, 'Configuration Push Queued successfully')
 
         return HttpResponseRedirect(f"{self.app_dir}/")
 
@@ -1496,7 +1617,27 @@ class CancelTaskView(CNCBaseAuth, RedirectView):
         if 'task_id' in self.request.session:
             task_id = self.request.session['task_id']
             task = AsyncResult(task_id)
+
+            try:
+                if task.state == 'PROGRESS':
+                    output = task.info
+                    pid_matches = re.match(r'CNC: Spawned Process: (\d+)', output)
+                    if pid_matches is not None:
+                        pid_str = pid_matches[1]
+                        pid = int(pid_str)
+                        print(f'Terminating Child process: {pid}')
+                        os.kill(pid, 9)
+
+            except TypeError as te:
+                print(te)
+                pass
+            except ValueError as ve:
+                print(ve)
+                pass
+
             task.revoke(terminate=True)
+            task_utils.purge_all_tasks()
+            self.request.session.pop('task_id')
             messages.add_message(self.request, messages.INFO, f'Cancelled Task Successfully')
         else:
             messages.add_message(self.request, messages.ERROR, f'No Task found to cancel')
@@ -1751,13 +1892,16 @@ class TaskLogsView(CNCBaseAuth, View):
                     print(ve)
                     logs_output['output'] = task_result.result
 
+                # remove task_id from session as this one is completed!
+                self.request.session.pop('task_id')
                 logs_output['status'] = 'exited'
             elif task_result.failed():
                 logs_output['status'] = 'exited'
                 logs_output['output'] = 'Task Failed, check logs for details'
             elif task_result.status == 'PROGRESS':
                 logs_output['status'] = task_result.state
-                logs_output['output'] = task_result.info
+                task_output = str(task_result.info)
+                logs_output['output'] = task_utils.clean_task_output(task_output)
 
             else:
                 logs_output['output'] = 'Task is still Running'
@@ -1768,7 +1912,9 @@ class TaskLogsView(CNCBaseAuth, View):
 
             request.session['task_logs'][task_id] = logs_output
         else:
-            logs_output['status'] = 'no task found'
+            logs_output['status'] = 'exited'
+            logs_output['output'] = 'No task found'
+            logs_output['returncode'] = 255
 
         try:
             logs_out_str = json.dumps(logs_output)
@@ -1823,6 +1969,9 @@ class WorkflowView(CNCBaseAuth, RedirectView):
 
         print(f"found skillet name {skillet_name}")
         self.meta = snippet_utils.load_snippet_with_name(skillet_name, self.app_dir)
+        if self.meta is None:
+            messages.add_message(self.request, messages.ERROR, 'Process Error - No skillet could be loaded')
+            return '/'
 
         if 'snippets' not in self.meta or 'type' not in self.meta:
             messages.add_message(self.request, messages.ERROR, 'Malformed .meta-cnc')
