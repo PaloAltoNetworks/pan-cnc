@@ -92,27 +92,8 @@ def python3_execute_bare(resource_def, args) -> AsyncResult:
 def python3_init(resource_def) -> AsyncResult:
     print(f"Performing python3 init")
     (resource_dir, script_name) = _normalize_python_script_path(resource_def)
-
-    print(f"Resource dir is {resource_dir}")
-    req_file = os.path.join(resource_dir, 'requirements.txt')
-    print(f"req_file is {req_file}")
-
-    init_done_file = os.path.join(resource_dir, '.python3_init_done')
-
-    with open(init_done_file, 'w+') as init_done:
-        init_done.write('y')
-
-    venv_path = os.path.join(resource_dir, '.venv')
-    if os.path.exists(req_file) and os.path.exists(venv_path):
-        return python3_init_existing.delay(resource_dir)
-
-    elif os.path.exists(req_file):
-        print('requirements.txt exists')
-        tools_dir = os.path.join(settings.CNC_PATH, 'tools')
-        return python3_init_with_deps.delay(resource_dir, tools_dir)
-    else:
-        print('no requirements.txt exists')
-        return python3_init_env.delay(resource_dir)
+    tools_dir = os.path.join(settings.CNC_PATH, 'tools')
+    return python3_init_with_deps.delay(resource_dir, tools_dir)
 
 
 def python3_execute(resource_def, args) -> AsyncResult:

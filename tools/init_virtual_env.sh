@@ -16,6 +16,12 @@ then
     exit 1
 fi
 
+if [[ -f .python3_init_done && -d .venv ]];
+then
+    echo "Environment already set up"
+    exit 0
+fi
+
 python3 -m virtualenv ./.venv
 
 if [[ $? -ne 0 ]];
@@ -24,21 +30,14 @@ then
     exit 1
 fi
 
-
 if [[ ! -f requirements.txt ]];
 then
     touch .python3_init_done
     exit 0
 fi
 
-source ./.venv/bin/activate
-if [[ $? -ne 0 ]];
-then
-    echo "Could not activate virtualenv"
-    exit 1
-fi
-
-pip3 install -r requirements.txt
+echo "Installing requirements"
+./.venv/bin/pip3 install -r requirements.txt
 
 if [[ $? -ne 0 ]];
 then
