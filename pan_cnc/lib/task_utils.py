@@ -233,6 +233,6 @@ def clean_task_output(output: str) -> str:
     cleaned_output = ""
     for line in output.splitlines():
         if not line.startswith('CNC:'):
-            cleaned_output += output
+            cleaned_output += f'{line}\n'
 
     return cleaned_output
