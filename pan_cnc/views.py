@@ -55,6 +55,7 @@ from pan_cnc.lib import pan_utils
 from pan_cnc.lib import rest_utils
 from pan_cnc.lib import snippet_utils
 from pan_cnc.lib import task_utils
+from pan_cnc.lib import widgets
 from pan_cnc.lib.exceptions import CCFParserError
 from pan_cnc.lib.exceptions import SnippetRequiredException
 from pan_cnc.lib.exceptions import TargetCommitException
@@ -111,9 +112,14 @@ class CNCBaseAuth(LoginRequiredMixin, View):
 
                 for variable in self.service['variables']:
                     var_name = variable['name']
+                    var_type = variable['type_hint']
                     if var_name in self.request.POST:
-                        print('Adding variable %s to session' % var_name)
-                        current_workflow[var_name] = self.request.POST.get(var_name)
+                        if var_type == 'list':
+                            print(f'Adding variable {var_name} to session as list')
+                            current_workflow[var_name] = self.request.POST.getlist(var_name)
+                        else:
+                            print(f'Adding variable {var_name} to session')
+                            current_workflow[var_name] = self.request.POST.get(var_name)
 
         self.request.session[self.app_dir] = current_workflow
 
@@ -618,6 +624,9 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
                 dynamic_form.fields[field_name] = forms.CharField(widget=forms.Textarea, label=description,
                                                                   initial=default, required=required,
                                                                   validators=[JSONValidator])
+            elif type_hint == "list":
+                dynamic_form.fields[field_name] = forms.CharField(widget=widgets.ListInput, label=description,
+                                                                  initial=default, required=required)
             elif type_hint == "email":
                 dynamic_form.fields[field_name] = forms.CharField(widget=forms.EmailInput, label=description,
                                                                   initial=default, required=required)

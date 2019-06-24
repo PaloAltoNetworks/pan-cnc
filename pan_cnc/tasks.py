@@ -243,7 +243,7 @@ def python3_init_with_deps(working_dir, tools_dir):
 @shared_task
 def python3_init_existing(working_dir):
     print('Executing task Python3 init with Dependencies')
-    cmd_seq = ['./.venv/bin/python3', '-m', 'pip', 'install', '--upgrade', '-r', 'requirements.txt']
+    cmd_seq = [f'{working_dir}/.venv/bin/pip3', 'install', '--upgrade', '-r', 'requirements.txt']
     env = dict()
     env['PYTHONUNBUFFERED'] = "1"
     return exec_local_task(cmd_seq, working_dir, env)
@@ -259,10 +259,14 @@ def python3_execute_script(working_dir, script, input_type, args):
     env['PYTHONUNBUFFERED'] = "1"
 
     for k, v in args.items():
-        if input_type == 'env':
-            env[k] = v
+        if type(v) is list:
+            val = ",".join(v)
         else:
-            cmd_seq.append(f'--{k}={v}')
+            val = v
+        if input_type == 'env':
+            env[k] = val
+        else:
+            cmd_seq.append(f'--{k}={val}')
 
     print(cmd_seq)
     return exec_local_task(cmd_seq, working_dir, env)
@@ -277,9 +281,13 @@ def python3_execute_bare_script(working_dir, script, input_type, args):
     env['PYTHONUNBUFFERED'] = "1"
 
     for k, v in args.items():
-        if input_type == 'env':
-            env[k] = v
+        if type(v) is list:
+            val = ",".join(v)
         else:
-            cmd_seq.append(f'--{k}={v}')
+            val = v
+        if input_type == 'env':
+            env[k] = val
+        else:
+            cmd_seq.append(f'--{k}={val}')
 
     return exec_local_task(cmd_seq, working_dir, env)

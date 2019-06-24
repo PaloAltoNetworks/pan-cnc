@@ -1,0 +1,13 @@
+<div id="widget_{{ widget.name }}">
+    <div class="input-group">
+        <input type="{{ widget.type }}" name="{{ widget.name }}"{% if widget.value != None %}
+               value="{{ widget.value|stringformat:'s' }}"{% endif %}{% include "django/forms/widgets/attrs.html" %}>
+        <div class="input-group-append">
+        <span class="input-group-text">
+            <a href="#" onclick="add_list_item('widget_{{ widget.name }}', '{{ widget.name }}');">
+                <i class="fa fa-plus"></i>
+            </a>
+        </span>
+        </div>
+    </div>
+</div>
