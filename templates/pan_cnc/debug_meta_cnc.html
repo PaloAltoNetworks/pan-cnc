@@ -25,7 +25,9 @@
         </div>
         <div class="card-body">
             <pre><code class="yaml">{{ skillet }}</code></pre>
+            <p>Found skillet in dir: <span class="text-primary">{{ meta.snippet_path }}</span></p>
         </div>
+
         <div class="card-footer text-right">
             <p class="card-text">
                 <a href="{{ request.session.last_page|urlencode }}" class="btn btn-primary">Continue</a>

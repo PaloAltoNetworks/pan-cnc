@@ -510,7 +510,7 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
             else:
                 print('This form is not valid!')
                 return self.form_invalid(form)
-        except TypeError as te:
+        except (TypeError, KeyError) as te:
             print('Caught error checking Form input values')
             print(te)
             messages.add_message(self.request, messages.ERROR, 'Could not validate Form')
@@ -2456,12 +2456,18 @@ class DebugMetadataView(CNCView):
     def get_context_data(self, **kwargs):
         snippet_data = snippet_utils.get_snippet_metadata(self.snippet_name, self.app_dir)
         snippet = snippet_utils.load_snippet_with_name(self.snippet_name, self.app_dir)
+        context = super().get_context_data()
+        context['header'] = 'Debug Metadata'
+        context['title'] = 'Metadata for %s' % self.snippet_name
+
+        if snippet is None:
+            messages.add_message(self.request, messages.ERROR, f'Could not load skillet with name {self.snippet_name}')
+            return context
+
         print(f"loaded snippet from {snippet['snippet_path']}")
         context = super().get_context_data()
         context['skillet'] = snippet_data
         context['meta'] = snippet
-        context['header'] = 'Debug Metadata'
-        context['title'] = 'Metadata for %s' % self.snippet_name
         return context
 
 
