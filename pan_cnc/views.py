@@ -36,7 +36,9 @@ from celery.result import AsyncResult
 from django import forms
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.core.validators import MaxLengthValidator
 from django.core.validators import MaxValueValidator
+from django.core.validators import MinLengthValidator
 from django.core.validators import MinValueValidator
 from django.core.validators import RegexValidator
 from django.core.validators import URLValidator
@@ -84,7 +86,7 @@ class CNCBaseAuth(LoginRequiredMixin, View):
 
         if request.method.lower() == 'get':
             if 'last_page' not in self.request.session:
-                print('Seeding last_page session atrribute')
+                print('Seeding last_page session attribute')
                 self.request.session['last_page'] = '/'
 
         return super().dispatch(request, *args, **kwargs)
@@ -497,15 +499,21 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
         self.service = snippet_utils.load_snippet_with_name(self.get_snippet(), self.app_dir)
         form = self.generate_dynamic_form(self.request.POST)
 
-        if form.is_valid():
-            # load the snippet into the class attribute here so it's available to all other methods throughout the
-            # call chain in the child classes
-            # go ahead and save all our current POSTed variables to the session for use later
-            self.save_workflow_to_session()
+        try:
+            if form.is_valid():
+                # load the snippet into the class attribute here so it's available to all other methods throughout the
+                # call chain in the child classes
+                # go ahead and save all our current POSTed variables to the session for use later
+                self.save_workflow_to_session()
 
-            return self.form_valid(form)
-        else:
-            print('This form is not valid!')
+                return self.form_valid(form)
+            else:
+                print('This form is not valid!')
+                return self.form_invalid(form)
+        except TypeError as te:
+            print('Caught error checking Form input values')
+            print(te)
+            messages.add_message(self.request, messages.ERROR, 'Could not validate Form')
             return self.form_invalid(form)
 
     def render_snippet_template(self) -> str:
@@ -696,25 +704,34 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
                                                                                    code='invalid_format')
                                                                   ])
             else:
+                # default input type if text
+                validators = list()
                 if 'allow_special_characters' in variable and variable['allow_special_characters'] is False:
-                    print('Using allow_special_characters')
-                    dynamic_form.fields[field_name] = forms.CharField(label=description,
-                                                                      initial=default,
-                                                                      required=required,
-                                                                      validators=[
-                                                                          RegexValidator(
-                                                                              regex='^[a-zA-Z0-9-_ \.]*$',
-                                                                              message='Only Letters, number, hyphens, '
-                                                                                      'underscores and spaces are '
-                                                                                      'allowed',
-                                                                              code='invalid_format'
-                                                                          ),
-                                                                      ])
-                else:
-                    dynamic_form.fields[field_name] = forms.CharField(label=description,
-                                                                      initial=default,
-                                                                      required=required
-                                                                      )
+                    validators.append(RegexValidator(
+                        regex=r'^[a-zA-Z0-9-_ \.]*$',
+                        message='Only Letters, number, hyphens, '
+                                'underscores and spaces are '
+                                'allowed',
+                        code='invalid_format'
+                    ))
+                if 'attributes' in variable:
+                    if 'min' in variable['attributes'] and type(variable['attributes']['min']) is int:
+                        validators.append(
+                            MinLengthValidator(
+                                variable['attributes']['min']
+                            )
+                        )
+                    if 'max' in variable['attributes'] and type(variable['attributes']['max']) is int:
+                        validators.append(
+                            MaxLengthValidator(
+                                variable['attributes']['max']
+                            )
+                        )
+                dynamic_form.fields[field_name] = forms.CharField(label=description,
+                                                                  initial=default,
+                                                                  required=required,
+                                                                  validators=validators
+                                                                  )
 
         return dynamic_form
 
@@ -2417,7 +2434,8 @@ class DebugMetadataView(CNCView):
     """
     Debug class
     """
-    template_name = 'pan_cnc/results.html'
+    template_name = 'pan_cnc/debug_meta_cnc.html'
+    header = 'Skillet Detail'
 
     def __init__(self):
         self.snippet_name = ''
@@ -2432,12 +2450,16 @@ class DebugMetadataView(CNCView):
             return HttpResponseRedirect('')
         return super().dispatch(request, *args, **kwargs)
 
+    def set_last_page_visit(self) -> None:
+        pass
+
     def get_context_data(self, **kwargs):
         snippet_data = snippet_utils.get_snippet_metadata(self.snippet_name, self.app_dir)
         snippet = snippet_utils.load_snippet_with_name(self.snippet_name, self.app_dir)
         print(f"loaded snippet from {snippet['snippet_path']}")
         context = super().get_context_data()
-        context['results'] = snippet_data
+        context['skillet'] = snippet_data
+        context['meta'] = snippet
         context['header'] = 'Debug Metadata'
         context['title'] = 'Metadata for %s' % self.snippet_name
         return context
