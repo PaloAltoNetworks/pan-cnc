@@ -1,0 +1,57 @@
+{% extends base_html|default:'pan_cnc/base.html' %}
+{% load static %}
+{% block head %}
+    <link href="{% static 'css/highlight-atom-one-light.css' %}" rel="stylesheet">
+    <script src="{% static 'js/highlight.pack.js' %}"></script>
+    <script type="text/javascript">
+
+        function set_cursor() {
+            let doc = $(document.documentElement);
+            doc.css('cursor', 'progress');
+            $('#submit_button').prop("disabled", true);
+            $('#dynamic_form').submit();
+        }
+
+        hljs.initHighlightingOnLoad();
+
+    </script>
+{% endblock %}
+{% block content %}
+    <div class="card border-primary mb-5 shadow-lg">
+        <div class="card-header">
+            <h4 class="mb-0">
+                Debug output for: <span class="text-primary">{{ meta.label }}</span>
+            </h4>
+        </div>
+        <div class="card-body border-bottom">
+            <p>
+                Here is a list of all configuration elements that will be pushed to the PAN-OS device:
+                <span class="text-primary">{{ target_ip }}</span>.
+            </p>
+            <p>
+                Each section contains the xpath along with the XML contents with all
+                user supplied variables interpolated and included in the output.
+            </p>
+        </div>
+        {% for k,v in results.items %}
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <a href="#{{ k }}_div" data-toggle="collapse">{{ k }}</a>
+                </h5>
+            </div>
+            <div id="{{ k }}_div" class="card-body collapse show">
+                <code>
+                    {{ v.xpath }}
+                </code>
+                <hr/>
+                <pre><code class="xml">{{ v.xml }}</code></pre>
+
+            </div>
+        {% endfor %}
+        <div class="card-footer text-right">
+            <p class="card-text">
+                <a href="{{ request.session.last_page|urlencode }}" class="btn btn-primary">Continue</a>
+            </p>
+        </div>
+    </div>
+{% endblock %}

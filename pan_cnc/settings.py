@@ -35,8 +35,12 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SITE_PATH = os.path.abspath(os.path.dirname(__file__))
 PROJECT_PATH = os.path.normpath(os.path.join(SITE_PATH, '..', '..'))
 SRC_PATH = os.path.join(PROJECT_PATH, 'src')
+CNC_PATH = os.path.join(PROJECT_PATH, 'cnc')
 if SRC_PATH not in sys.path:
     sys.path.insert(0, SRC_PATH)
+
+if CNC_PATH not in sys.path:
+    sys.path.insert(0, CNC_PATH)
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/2.1/howto/deployment/checklist/

@@ -226,10 +226,14 @@ button::-moz-focus-inner,
   padding: 0;
   border-style: none; }
 
+/* PAN EDIT - nembery show these inline */
 input[type="radio"],
 input[type="checkbox"] {
   box-sizing: border-box;
-  padding: 0; }
+  padding: 0;
+  display: inline;
+  width: min-content;
+}
 
 input[type="date"],
 input[type="time"],
@@ -1278,6 +1282,12 @@ select.form-control:not([size]):not([multiple]) {
 select.form-control:focus::-ms-value {
   color: #495057;
   background-color: #fff; }
+
+/* PAN EDITS */
+.form-control li {
+  list-style: none;
+}
+
 
 .form-control-file,
 .form-control-range {

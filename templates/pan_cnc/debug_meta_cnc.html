@@ -1,0 +1,36 @@
+{% extends base_html|default:'pan_cnc/base.html' %}
+{% load static %}
+{% block head %}
+    <link href="{% static 'css/highlight-atom-one-light.css' %}" rel="stylesheet">
+    <script src="{% static 'js/highlight.pack.js' %}"></script>
+    <script type="text/javascript">
+
+        function set_cursor() {
+            let doc = $(document.documentElement);
+            doc.css('cursor', 'progress');
+            $('#submit_button').prop("disabled", true);
+            $('#dynamic_form').submit();
+        }
+
+        hljs.initHighlightingOnLoad();
+
+    </script>
+{% endblock %}
+{% block content %}
+    <div class="card border-primary mb-5 shadow-lg">
+        <div class="card-header">
+            <h4 class="mb-0">
+                Skillet Metadata for: <span class="text-primary">{{ meta.label }}</span>
+            </h4>
+        </div>
+        <div class="card-body">
+            <pre><code class="yaml">{{ skillet }}</code></pre>
+            <p>Found skillet in dir: <span class="text-primary">{{ meta.snippet_path }}</span></p>
+        </div>
+
+        <div class="card-footer text-right">
+            <p class="card-text">
+                <a href="{{ request.session.last_page|urlencode }}" class="btn btn-primary">Continue</a>
+            </p>
+        </div>
+{% endblock %}

@@ -15,16 +15,18 @@
 # Author: Nathan Embery nembery@paloaltonetworks.com
 
 
+import json
 import os
-from pathlib import Path
 
 import requests
-from django.conf import settings
 from jinja2 import BaseLoader
 from jinja2 import Environment
 from urllib3.exceptions import HTTPError
+from requests.exceptions import MissingSchema
+from requests.exceptions import RequestException
 
 from pan_cnc.lib import jinja_filters
+from pan_cnc.lib import output_utils
 from pan_cnc.lib.exceptions import CCFParserError
 
 
@@ -47,24 +49,43 @@ def execute_all(meta_cnc, app_dir, context):
     if 'snippet_path' in meta_cnc:
         snippets_dir = meta_cnc['snippet_path']
     else:
-        snippets_dir = Path(os.path.join(settings.BASE_DIR, app_dir, 'snippets', meta_cnc['name']))
+        # snippets_dir = Path(os.path.join(settings.BASE_DIR, app_dir, 'snippets', meta_cnc['name']))
+        raise CCFParserError('Could not locate .meta-cnc for REST execution')
 
-    responses = dict()
+    response = dict()
+    response['status'] = 'success'
+    response['message'] = 'A-OK'
+    response['snippets'] = dict()
+
+    session = requests.Session()
 
     try:
+        # execute our rest call for each item in the 'snippets' stanza of the meta-cnc file
         for snippet in meta_cnc['snippets']:
-            if 'rest_path' not in snippet or 'rest_op' not in snippet:
+            if 'path' not in snippet:
                 print('Malformed meta-cnc error')
                 raise CCFParserError
 
             name = snippet.get('name', '')
-            rest_path = snippet.get('rest_path', '/api')
-            rest_op = snippet.get('rest_operation', 'get')
+            rest_path = snippet.get('path', '/api')
+            rest_op = str(snippet.get('operation', 'get')).lower()
             payload_name = snippet.get('payload', '')
+            header_dict = snippet.get('headers', dict())
+
+            # fix for issue #42
+            if type(header_dict) is not dict:
+                header_dict = dict()
 
             # FIXME - implement this to give some control over what will be sent to rest server
             content_type = snippet.get('content_type', '')
             accepts_type = snippet.get('accepts_type', '')
+
+            headers = dict()
+            if content_type:
+                headers["Content-Type"] = content_type
+
+            if accepts_type:
+                headers['Accepts-Type'] = accepts_type
 
             environment = Environment(loader=BaseLoader())
 
@@ -73,7 +94,13 @@ def execute_all(meta_cnc, app_dir, context):
                     environment.filters[f] = getattr(jinja_filters, f)
 
             path_template = environment.from_string(rest_path)
-            path_string = path_template.render(context)
+            url = path_template.render(context)
+
+            for k, v in header_dict.items():
+                v_template = environment.from_string(v)
+                v_interpolated = v_template.render(context)
+                print(f'adding {k} as {v_interpolated} to headers')
+                headers[k] = v_interpolated
 
             # keep track of response text or json object
             r = ''
@@ -82,29 +109,73 @@ def execute_all(meta_cnc, app_dir, context):
                 with open(payload_path, 'r') as payload_file:
                     payload_string = payload_file.read()
                     payload_template = environment.from_string(payload_string)
-                    payload = payload_template.render(context)
+                    payload_interpolated = payload_template.render(context)
+                    if 'Content-Type' in headers and 'form' in headers['Content-Type']:
+                        print('Loading json data from payload')
+                        try:
+                            payload = json.loads(payload_interpolated)
+                        except ValueError as ve:
+                            print('Could not load payload as json data!')
+                            payload = payload_interpolated
+                    else:
+                        payload = payload_interpolated
+
+                    print('Using payload of')
+                    print(payload)
+                    print(url)
+                    print(headers)
                     # FIXME - assumes JSON content_type and accepts, should take into account the values
                     # FIXME - of content-type and accepts_type from above if they were supplied
-                    response = requests.post(path_string, json=payload)
-                    if response.status_code != 200:
+                    res = session.post(url, data=payload, verify=False, headers=headers)
+                    if res.status_code != 200:
                         print('Found a non-200 response status_code!')
-                        print(response.status_code)
-                        responses[name] = response.text
+                        print(res.status_code)
+                        response['snippets'][name] = res.text
                         break
 
-                    # all good, record the results and move on
-                    r = response.json()
+                r = res.text
 
             elif rest_op == 'get':
-                response = requests.get(path_string)
-                r = response.json()
+                print('Performing REST get')
+                res = session.get(url, verify=False)
+                r = res.text
+                if res.status_code != 200:
+                    response['status'] = 'error'
+                    response['snippets'][name] = r
+                    break
+
+            else:
+                print('Unknown REST operation found')
+                response['status'] = 'Error'
+                response['message'] = 'Unkonwn REST operation found'
+                return response
 
             # collect the response text or json and continue
-            responses[name] = r
+            response['snippets'][name] = dict()
+            response['snippets'][name]['results'] = r
+            response['snippets'][name]['outputs'] = dict()
 
-        # return all the collected responses
-        return responses
+            if 'outputs' in snippet:
+                outputs = output_utils.parse_outputs(meta_cnc, snippet, r)
+                response['snippets'][name]['outputs'] = outputs
+
+        # return all the collected response
+        return response
 
     except HTTPError as he:
-        print(he)
-        return 'HTTP Error during REST operation'
+        response['status'] = 'error'
+        response['message'] = str(he)
+        return response
+    except requests.exceptions.ConnectionError as ce:
+        response['status'] = 'error'
+        response['message'] = str(ce)
+        return response
+    except MissingSchema as ms:
+        response['status'] = 'error'
+        response['message'] = ms
+        return response
+    except RequestException as re:
+        response['status'] = 'error'
+        response['message'] = re
+        return response
+
