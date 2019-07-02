@@ -1,5 +1,7 @@
 #!/usr/bin/env sh
 
+export HOME=/home/cnc_user
+
 cd /app/cnc
 su -c "celery -A pan_cnc worker --loglevel=info " -s /bin/sh cnc_user &
 if [[ ! -f /app/cnc/db.sqlite3 ]];
@@ -16,4 +18,4 @@ echo "=================== Welcome to panhandler ============================"
 echo "====="
 echo "====="
 echo "====="
-gunicorn --user cnc_user --group cnc_group --bind 0.0.0.0:80 pan_cnc.wsgi
+gunicorn --user cnc_user --group cnc_group --env HOME=/home/cnc_user --bind 0.0.0.0:80 pan_cnc.wsgi

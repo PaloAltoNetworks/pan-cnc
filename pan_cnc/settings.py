@@ -80,7 +80,7 @@ for app in os.listdir(SRC_PATH):
                         app_conf = yaml.safe_load(app_conf_file.read())
                         app_conf['app_dir'] = app_dir
                         print('Adding app config for app: %s' % app)
-                        print(app_conf)
+                        # print(app_conf)
                         INSTALLED_APPS_CONFIG[app] = app_conf
 
                 except OSError as ose:
@@ -92,6 +92,7 @@ for app in os.listdir(SRC_PATH):
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -167,9 +168,9 @@ SESSION_ENGINE = 'django.contrib.sessions.backends.cache'
 # https://docs.djangoproject.com/en/2.1/howto/static-files/
 
 STATIC_URL = '/static/'
-#STATICFILES_DIRS = [
+# STATICFILES_DIRS = [
 #    os.path.join(BASE_DIR, 'assets')
-#]
+# ]
 
 STATIC_ROOT = os.path.join(BASE_DIR, 'assets/')
 
