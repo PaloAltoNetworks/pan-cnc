@@ -120,10 +120,10 @@ def execute_all(meta_cnc, app_dir, context):
                     else:
                         payload = payload_interpolated
 
-                    print('Using payload of')
-                    print(payload)
-                    print(url)
-                    print(headers)
+                    # print('Using payload of')
+                    # print(payload)
+                    # print(url)
+                    # print(headers)
                     # FIXME - assumes JSON content_type and accepts, should take into account the values
                     # FIXME - of content-type and accepts_type from above if they were supplied
                     res = session.post(url, data=payload, verify=False, headers=headers)
