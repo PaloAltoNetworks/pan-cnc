@@ -216,6 +216,17 @@ class CNCBaseAuth(LoginRequiredMixin, View):
         else:
             return default
 
+    def pop_value_from_workflow(self, var_name, default='') -> Any:
+        """
+        Return the variable value either from the workflow (if it's already been saved there)
+        or the default. If found, go ahead and remove it,
+        :param var_name: name of variable to find and return
+        :param default: default value if nothing has been saved to the workflow or configured in the environment
+        :return: value of variable
+        """
+
+        return self.get_workflow().pop(var_name, default)
+
     def get_environment_secrets(self) -> dict:
         """
         Returns a dict containing the currently loaded environment secrets
@@ -1054,6 +1065,7 @@ class ProvisionSnippetView(CNCBaseFormView):
             return HttpResponseRedirect('/terraform')
         else:
             print('This template type requires a target')
+            self.save_value_to_workflow('next_url', self.next_url)
             return HttpResponseRedirect('/editTarget')
 
 
@@ -1394,7 +1406,8 @@ class EditTargetView(CNCBaseAuth, FormView):
             else:
                 messages.add_message(self.request, messages.SUCCESS, 'Configuration Push Queued successfully')
 
-        return HttpResponseRedirect(f"{self.app_dir}/")
+        next_url = self.pop_value_from_workflow('next_url', '/')
+        return HttpResponseRedirect(f"{self.app_dir}/{next_url}")
 
 
 class EditRestTargetView(CNCBaseAuth, FormView):
@@ -2013,6 +2026,7 @@ class WorkflowView(CNCBaseAuth, RedirectView):
             self.request.session['last_step'] = None
             self.request.session.pop('next_step')
             self.request.session.pop('last_step')
+            self.request.session.pop('next_url')
             return '/'
 
         if 'name' not in self.meta['snippets'][current_step]:
@@ -2029,6 +2043,7 @@ class WorkflowView(CNCBaseAuth, RedirectView):
             print('SETTING LAST STEP')
             self.request.session['last_step'] = next_step
             self.request.session['next_step'] = next_step
+            self.request.session['next_url'] = f'/workflow/{next_step}'
         elif next_step > len(self.meta['snippets']):
             print('All done here!')
             self.request.session['next_step'] = None
@@ -2040,6 +2055,7 @@ class WorkflowView(CNCBaseAuth, RedirectView):
             print('No last step here!')
             self.request.session.pop('last_step', None)
             self.request.session['next_step'] = next_step
+            self.request.session['next_url'] = f'/workflow/{next_step}'
 
         self.save_workflow_to_session()
 
