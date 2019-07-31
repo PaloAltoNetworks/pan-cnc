@@ -14,8 +14,8 @@ fi
 echo "====="
 echo "====="
 echo "====="
-echo "=================== Welcome to panhandler ============================"
+echo "=================== Welcome to ${CNC_APP} ============================"
 echo "====="
 echo "====="
 echo "====="
-gunicorn --user cnc_user --group cnc_group --env HOME=/home/cnc_user --bind 0.0.0.0:80 pan_cnc.wsgi
+gunicorn --user cnc_user --group cnc_group --env HOME=/home/cnc_user --timeout=120 --bind 0.0.0.0:80 pan_cnc.wsgi

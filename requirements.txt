@@ -12,3 +12,5 @@ GitPython
 jsonpath-ng
 netaddr
 whitenoise
+django-widget-tweaks
+gunicorn
