@@ -2,9 +2,9 @@
 
 export HOME=/home/cnc_user
 
-cd /app/cnc
+cd /app/cnc || exit 1
 su -c "celery -A pan_cnc worker --loglevel=info " -s /bin/sh cnc_user &
-if [[ ! -f /app/cnc/db.sqlite3 ]];
+if [ ! -f /app/cnc/db.sqlite3 ];
   then
     su -c "python /app/cnc/manage.py migrate" -s /bin/sh cnc_user && \
     su -c "python /app/cnc/manage.py collectstatic --noinput" -s /bin/sh cnc_user && \

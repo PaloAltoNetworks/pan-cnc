@@ -368,7 +368,7 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
     title = 'Title'
     # where to go after this? once the form has been submitted, redirect to where?
     # this should match a 'view name' from the pan_cnc.yaml file
-    next_url = '/provision'
+    next_url = None
     # the action of the form if it needs to differ (it shouldn't)
     action = '/'
     # the app dir should match the app name and is used to load app specific snippets
@@ -1061,11 +1061,10 @@ class ProvisionSnippetView(CNCBaseFormView):
             # Found a skillet type of 'workflow'
             return HttpResponseRedirect('/workflow/0')
         elif self.service['type'] == 'terraform':
-            self.save_value_to_workflow('next_url', self.next_url)
+            self.request.session['next_url'] = self.next_url
             return HttpResponseRedirect('/terraform')
         else:
-            print('This template type requires a target')
-            self.save_value_to_workflow('next_url', self.next_url)
+            self.request.session['next_url'] = self.next_url
             return HttpResponseRedirect('/editTarget')
 
 
@@ -1083,7 +1082,7 @@ class EditTargetView(CNCBaseAuth, FormView):
     title = 'Title'
     # where to go after this? once the form has been submitted, redirect to where?
     # this should match a 'view name' from the pan_cnc.yaml file
-    next_url = '/'
+    next_url = None
     # base html - allow sub apps to override this with special html base if desired
     base_html = 'pan_cnc/base.html'
     # link to external documentation
@@ -1400,12 +1399,21 @@ class EditTargetView(CNCBaseAuth, FormView):
             else:
                 messages.add_message(self.request, messages.SUCCESS, 'Configuration Push Queued successfully')
 
-        # fix for #74, in non-workflow case, revert to using our captured last_page visit
-        next_url = self.pop_value_from_workflow('next_url', None)
+        # fix for #72, in non-workflow case, revert to using our captured last_page visit
+        # next_url = self.pop_value_from_workflow('next_url', None)
+        next_step = self.request.session.get('next_step', None)
+        if next_step is not None:
+            # this is a workflow
+            return HttpResponseRedirect(f'/workflow/{next_step}')
+
+        # this is not a workflow, check for next_url captured in session
+        next_url = self.request.session.get('next_url', None)
         if next_url is None:
             next_url = self.request.session.get('last_page', '/')
+            return HttpResponseRedirect(next_url)
 
-        return HttpResponseRedirect(f"{self.app_dir}/{next_url}")
+        print(f'Redirecting to {next_url}')
+        return HttpResponseRedirect(f"{next_url}")
 
 
 class EditRestTargetView(CNCBaseAuth, FormView):
@@ -1422,7 +1430,7 @@ class EditRestTargetView(CNCBaseAuth, FormView):
     title = 'Enter Rest Endpoint'
     # where to go after this? once the form has been submitted, redirect to where?
     # this should match a 'view name' from the pan_cnc.yaml file
-    next_url = '/'
+    next_url = None
     # base html - allow sub apps to override this with special html base if desired
     base_html = 'pan_cnc/base.html'
     # link to external documentation
@@ -1548,7 +1556,7 @@ class EditTerraformView(CNCBaseAuth, FormView):
     title = 'Choose the action to perform'
     # where to go after this? once the form has been submitted, redirect to where?
     # this should match a 'view name' from the pan_cnc.yaml file
-    next_url = '/'
+    next_url = None
     # base html - allow sub apps to override this with special html base if desired
     base_html = 'pan_cnc/base.html'
     # link to external documentation
@@ -2019,13 +2027,13 @@ class WorkflowView(CNCBaseAuth, RedirectView):
             return '/'
 
         if len(self.meta['snippets']) <= current_step:
-            print('All done here! Redirect Home')
-            self.request.session['next_step'] = None
-            self.request.session['last_step'] = None
-            self.request.session.pop('next_step')
-            self.request.session.pop('last_step')
-            self.request.session.pop('next_url')
-            return '/'
+            print('All done here! Redirect to last captured page')
+            self.request.session.pop('next_step', '')
+            self.request.session.pop('last_step', '')
+            self.request.session.pop('next_url', '')
+            self.pop_value_from_workflow('workflow_name', '')
+            last_page = self.request.session.pop('last_page', '/')
+            return last_page
 
         if 'name' not in self.meta['snippets'][current_step]:
             messages.add_message(self.request, messages.ERROR, 'Malformed .meta-cnc workflow step')
@@ -2055,7 +2063,7 @@ class WorkflowView(CNCBaseAuth, RedirectView):
             self.request.session['next_step'] = next_step
             self.request.session['next_url'] = f'/workflow/{next_step}'
 
-        self.save_workflow_to_session()
+        # self.save_workflow_to_session()
 
         return '/provision'
 
