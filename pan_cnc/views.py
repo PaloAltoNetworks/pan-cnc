@@ -1247,14 +1247,11 @@ class EditTargetView(CNCBaseAuth, FormView):
 
         meta = snippet_utils.load_snippet_with_name(snippet_name, self.app_dir)
         tip = self.get_value_from_workflow('TARGET_IP', '')
-        print(f'found current target_ip in workflow of {tip}')
         # Grab the values from the form, this is always hard-coded in this class
         target_ip = self.request.POST.get('TARGET_IP', None)
         target_username = self.request.POST.get('TARGET_USERNAME', None)
         target_password = self.request.POST.get('TARGET_PASSWORD', None)
         debug = self.request.POST.get('debug', False)
-
-        print(f'Found a debug setting of {debug}')
 
         # Always grab all the default values, then update them based on user input in the workflow
         jinja_context = dict()
@@ -1282,8 +1279,6 @@ class EditTargetView(CNCBaseAuth, FormView):
             self.request.session['last_page'] = '/editTarget'
             return render(self.request, 'pan_cnc/debug_panos_skillet.html', context=context)
 
-        print(f'saving target_ip {target_ip} to workflow')
-
         self.save_value_to_workflow('TARGET_IP', target_ip)
         self.save_value_to_workflow('TARGET_USERNAME', target_username)
 
@@ -1291,7 +1286,6 @@ class EditTargetView(CNCBaseAuth, FormView):
         self.request.session[self.app_dir] = workflow
 
         err_condition = False
-        print(f'TARGET_IP is now :{target_ip}:')
         if target_ip is None or target_ip == '':
             form.add_error('TARGET_IP', 'Host entry cannot be blank')
             err_condition = True
@@ -1406,7 +1400,11 @@ class EditTargetView(CNCBaseAuth, FormView):
             else:
                 messages.add_message(self.request, messages.SUCCESS, 'Configuration Push Queued successfully')
 
-        next_url = self.pop_value_from_workflow('next_url', '/')
+        # fix for #74, in non-workflow case, revert to using our captured last_page visit
+        next_url = self.pop_value_from_workflow('next_url', None)
+        if next_url is None:
+            next_url = self.request.session.get('last_page', '/')
+
         return HttpResponseRedirect(f"{self.app_dir}/{next_url}")
 
 

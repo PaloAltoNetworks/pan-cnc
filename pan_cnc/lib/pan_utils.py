@@ -161,10 +161,8 @@ def get_panos_credentials(pan_device_ip, pan_device_username, pan_device_passwor
 
     api_key = cache.get('panorama_api_key', None)
     if api_key is not None:
-        print('Using API KEY')
         credentials['api_key'] = api_key
 
-    print(credentials)
     return credentials
 
 
