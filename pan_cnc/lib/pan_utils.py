@@ -230,8 +230,9 @@ def push_meta(meta, context, force_sync=False, perform_commit=True) -> (str, Non
 
                 xml_template = environment.from_string(xml_string)
                 xpath_template = environment.from_string(xpath)
-                xml_snippet = xml_template.render(context).replace('\n', '')
-                xpath_string = xpath_template.render(context)
+                # fix for #74, ensure multiline xpaths do not contain newlines or spaces
+                xml_snippet = xml_template.render(context).strip().replace('\n', '')
+                xpath_string = xpath_template.render(context).strip().replace('\n', '').replace(' ', '')
                 print('Pushing xpath: %s' % xpath_string)
                 try:
                     xapi.set(xpath=xpath_string, element=xml_snippet)
