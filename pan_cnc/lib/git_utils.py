@@ -24,8 +24,7 @@ from git import GitError
 from git import InvalidGitRepositoryError
 from git import NoSuchPathError
 from git import Repo
-from requests import ConnectionError
-from requests import Timeout
+from requests import RequestException
 
 from pan_cnc.lib import cnc_utils
 from pan_cnc.lib.exceptions import ImportRepositoryException
@@ -262,8 +261,14 @@ def get_repo_upstream_details(repo_name: str, repo_url: str, app_name: str) -> d
         return details
 
     cache_repo_name = repo_name.replace(' ', '_')
-    details = cnc_utils.get_long_term_cached_value(app_name, f'git_utils_upstream_{cache_repo_name}')
-    if details is not None:
+    cached_details = cnc_utils.get_long_term_cached_value(app_name, f'git_utils_upstream_{cache_repo_name}')
+    # fix for issue #70, details will be None after cache miss, use a new var name to keep details as a dict
+    if cached_details is not None:
+        return cached_details
+
+    api_throttle_active = cnc_utils.get_long_term_cached_value(app_name, f'git_utils_api_throttle')
+    if api_throttle_active:
+        print('Skipping get_repo_upstream_details due to availability')
         return details
 
     print('Not found in cache, loading from upstream')
@@ -273,24 +278,35 @@ def get_repo_upstream_details(repo_name: str, repo_url: str, app_name: str) -> d
 
     try:
         api_url = f'https://api.github.com/repos/{owner}/{repo}'
-        detail_string = requests.get(api_url, verify=False, timeout=5)
-        details = detail_string.json()
-        cnc_utils.set_long_term_cached_value(app_name, f'git_utils_upstream_{cache_repo_name}', details, 86400,
+        # fix for issue #70, increase timeout to 30 seconds
+        detail_response = requests.get(api_url, verify=False, timeout=30)
+        if detail_response.status_code != 200:
+            print(f'response was {detail_response.status_code}, disabling upstream api queries')
+            cnc_utils.set_long_term_cached_value(app_name, 'git_utils_api_throttle', True, 3601,
+                                                 'git_repo_details')
+            return details
+
+        details = detail_response.json()
+        # fix for issue #70, cache this value for 3 days instead of 1
+        cnc_utils.set_long_term_cached_value(app_name, f'git_utils_upstream_{cache_repo_name}', details, 259200,
                                              'git_repo_details')
     except ConnectionResetError as cre:
         print('Could not get github details due to ConnectionResetError')
         print(cre)
-    except ConnectionError as ce:
-        print('Could not get github details due to ConnectionError')
+        api_throttle_active = True
+    except RequestException as ce:
+        print('Could not get github details due to RequestException')
         print(ce)
-    except Timeout as te:
-        print('Timed out getting details from git repo upstream')
-        print(te)
+        api_throttle_active = True
     except Exception as e:
         print(type(e))
         print(e)
-        raise
+        api_throttle_active = True
 
+    if api_throttle_active:
+        print(f'Disabling upstream api queries for 1 hour')
+        cnc_utils.set_long_term_cached_value(app_name, 'git_utils_api_throttle', True, 3601,
+                                             'git_repo_details')
     return details
 
 
