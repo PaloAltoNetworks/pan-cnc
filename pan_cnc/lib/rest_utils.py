@@ -138,7 +138,7 @@ def execute_all(meta_cnc, app_dir, context):
                 r = res.text
 
             elif rest_op == 'get':
-                print('Performing REST get')
+                print(f'Performing REST get for snippet: {name}')
                 res = session.get(url, verify=False)
                 r = res.text
                 if res.status_code != 200:

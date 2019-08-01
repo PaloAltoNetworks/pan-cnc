@@ -1002,7 +1002,8 @@ class ProvisionSnippetView(CNCBaseFormView):
 
             context = dict()
             context['base_html'] = self.base_html
-            context['results'] = results
+            # fix for #65 - show nicer output for rest type skillet
+            context['results'] = json.dumps(results, indent=2)
             context['view'] = self
 
             # Most REST actions will only have a single action/path taken. If so, we can simplify the results
@@ -1014,7 +1015,7 @@ class ProvisionSnippetView(CNCBaseFormView):
 
             # results is a dict containing 'snippets' 'status' 'message'
             if 'snippets' not in results or 'status' not in results or 'message' not in results:
-                print('Results from rest_utils is malformed')
+                print('Result from rest_utils is malformed')
             else:
                 # Save all results into the workflow
                 for result in results['snippets']:
