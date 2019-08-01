@@ -198,7 +198,7 @@ class CNCBaseAuth(LoginRequiredMixin, View):
         context.update(self.get_workflow())
         return context
 
-    def get_value_from_workflow(self, var_name, default='') -> Any:
+    def get_value_from_workflow(self, var_name: str, default=None) -> Any:
         """
         Return the variable value either from the workflow (if it's already been saved there)
         or from the environment, if it happens to be configured there
@@ -1194,15 +1194,20 @@ class EditTargetView(CNCBaseAuth, FormView):
         if 'type' in meta and 'pan' in meta['type']:
             # add option to perform commit operation or not
             # perform_commit = forms.BooleanField(label='Perform Commit', initial=True, label_suffix='', required=False)
+            saved_perform_commit = self.get_value_from_workflow('perform_commit', 'commit')
+            saved_perform_backup = self.get_value_from_workflow('perform_backup', False)
+
             choices_list = list()
             choices_list.append(('commit', 'Fast Commit. Do not wait on commit to finish'))
             choices_list.append(('no_commit', 'Do not Commit. Push changes only'))
             choices_list.append(('sync_commit', 'Commit and wait to finish'))
 
             choices_set = tuple(choices_list)
-            perform_commit = forms.ChoiceField(choices=choices_set, label='Commit Options', initial='commit')
+            perform_commit = forms.ChoiceField(choices=choices_set, label='Commit Options',
+                                               initial=saved_perform_commit)
             form.fields['perform_commit'] = perform_commit
-            perform_backup = forms.BooleanField(label='Perform Backup', initial=True, label_suffix='', required=False)
+            perform_backup = forms.BooleanField(label='Perform Backup', initial=saved_perform_backup,
+                                                label_suffix='', required=False)
             form.fields['perform_backup'] = perform_backup
 
         return form
@@ -1247,12 +1252,18 @@ class EditTargetView(CNCBaseAuth, FormView):
             raise SnippetRequiredException
 
         meta = snippet_utils.load_snippet_with_name(snippet_name, self.app_dir)
-        tip = self.get_value_from_workflow('TARGET_IP', '')
         # Grab the values from the form, this is always hard-coded in this class
         target_ip = self.request.POST.get('TARGET_IP', None)
         target_username = self.request.POST.get('TARGET_USERNAME', None)
         target_password = self.request.POST.get('TARGET_PASSWORD', None)
         debug = self.request.POST.get('debug', False)
+
+        # capture backup and commit preferences for future use
+        if 'type' in meta and 'pan' in meta['type']:
+            saved_perform_commit = self.request.POST.get('perform_commit', 'commit')
+            saved_perform_backup = self.request.POST.get('perform_backup', False)
+            self.save_value_to_workflow('perform_commit', saved_perform_commit)
+            self.save_value_to_workflow('perform_backup', saved_perform_backup)
 
         # Always grab all the default values, then update them based on user input in the workflow
         jinja_context = dict()
