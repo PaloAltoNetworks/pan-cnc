@@ -14,6 +14,7 @@
 
 # Author: Nathan Embery nembery@paloaltonetworks.com
 
+import datetime
 import subprocess
 from pathlib import Path
 
@@ -159,18 +160,27 @@ def get_repo_details(repo_name, repo_dir, app_name='cnc'):
     if 'repo' not in url_details or url_details['repo'] is None or url_details['repo'] == '':
         url_details['repo'] = repo_name
 
+    branch = 'master'
+    commit_log = list()
+    last_updated = 0
+    last_updated_str = ''
+
     try:
         branch = repo.active_branch.name
         commits = repo.iter_commits(branch, max_count=5)
 
-        commit_log = list()
         for c in commits:
             commit_detail = dict()
-            commit_detail['time'] = str(c.committed_datetime)
+            timestamp = datetime.datetime.fromtimestamp(c.committed_date)
+            commit_detail['time'] = timestamp.strftime('%Y-%m-%d %H:%M')
             commit_detail['author'] = c.author.name
             commit_detail['message'] = c.message
             commit_detail['id'] = str(c)
             commit_log.append(commit_detail)
+
+            if c.committed_date > last_updated:
+                last_updated = c.committed_date
+                last_updated_str = commit_detail['time']
 
     except GitCommandError as gce:
         print('Could not get commits from repo')
@@ -188,6 +198,8 @@ def get_repo_details(repo_name, repo_dir, app_name='cnc'):
     repo_detail['branch'] = branch
     repo_detail['commits'] = commit_log
     repo_detail['commits_url'] = get_repo_commits_url(url)
+    repo_detail['last_updated'] = last_updated_str
+    repo_detail['last_updated_time'] = last_updated
 
     upstream_details = get_repo_upstream_details(repo_name, url, app_name)
     if 'description' in upstream_details:
