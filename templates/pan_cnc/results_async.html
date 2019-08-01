@@ -47,7 +47,7 @@
                     let next_link = $('<a/>');
                     if (returncode === 0) {
                         let old_title = t.html();
-                        t.html("Completed: " + old_title);
+                        t.html("Completed: {{ view.service.label }}");
                         {% if request.session.task_next %}
                             next_link.attr('href', '/next_task');
                             next_link.html('Continue');
