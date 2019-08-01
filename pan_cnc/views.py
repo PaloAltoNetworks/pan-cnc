@@ -998,7 +998,6 @@ class ProvisionSnippetView(CNCBaseFormView):
             return render(self.request, 'pan_cnc/results.html', context)
         elif self.service['type'] == 'rest':
             # Found a skillet type of 'rest'
-            # return HttpResponseRedirect('/editRestTarget')
             results = rest_utils.execute_all(self.service, self.app_dir, self.get_workflow())
 
             context = dict()
@@ -1024,12 +1023,10 @@ class ProvisionSnippetView(CNCBaseFormView):
                         for output in result_snippet['outputs']:
                             print(f"Saving value for key {output} to session")
                             v = result_snippet['outputs'][output]
-                            print(v)
+                            # print(v)
                             self.save_value_to_workflow(output, v)
 
-                        self.save_workflow_to_session()
-                    else:
-                        print('no outputs for this one')
+                        # self.save_workflow_to_session()
 
             return render(self.request, 'pan_cnc/results.html', context)
 
@@ -1427,135 +1424,6 @@ class EditTargetView(CNCBaseAuth, FormView):
 
         print(f'Redirecting to {next_url}')
         return HttpResponseRedirect(f"{next_url}")
-
-
-class EditRestTargetView(CNCBaseAuth, FormView):
-    """
-    Edit or update the current rest endpoint
-    """
-    # base form class, you should not need to override this
-    form_class = forms.Form
-    # form to render, override if you need a specific html fragment to render the form
-    template_name = 'pan_cnc/dynamic_form.html'
-    # Head to show on the rendered dynamic form - Main header
-    header = 'Rest Configuration'
-    # title to show on dynamic form
-    title = 'Enter Rest Endpoint'
-    # where to go after this? once the form has been submitted, redirect to where?
-    # this should match a 'view name' from the pan_cnc.yaml file
-    next_url = None
-    # base html - allow sub apps to override this with special html base if desired
-    base_html = 'pan_cnc/base.html'
-    # link to external documentation
-    documentation_link = ''
-    # help text - inline documentation text
-    help_text = 'The Target is the endpoint or device where the configured template will be applied. ' \
-                'This us usually a PAN-OS or other network device depending on the type of template to ' \
-                'be provisioned'
-
-    def get(self, request, *args, **kwargs) -> Any:
-        """
-            Handle GET requests
-            Ensure we have a snippet_name in the workflow somewhere, otherwise, we need to redirect out of here
-            Fixes issue where a user goes to the editTarget URL directly
-        """
-        # load the snippet into the class attribute here so it's available to all other methods throughout the
-        # call chain in the child classes
-        snippet_name = self.get_value_from_workflow('snippet_name', '')
-        if snippet_name != '':
-            return self.render_to_response(self.get_context_data())
-        else:
-            messages.add_message(self.request, messages.ERROR, 'Process Error - Meta not found')
-            return HttpResponseRedirect('/')
-
-    def get_context_data(self, **kwargs) -> dict:
-        context = super().get_context_data(**kwargs)
-
-        snippet_name = self.get_value_from_workflow('snippet_name', '')
-        if snippet_name != '':
-            meta = snippet_utils.load_snippet_with_name(snippet_name, self.app_dir)
-        else:
-            print('Could not find a valid meta-cnc def')
-            raise SnippetRequiredException
-
-        form = forms.Form()
-
-        target_ip_label = 'Endpoint Host'
-
-        workflow = self.get_workflow()
-
-        target_ip = self.get_value_from_workflow('TARGET_IP', '')
-
-        target_ip_field = forms.CharField(label=target_ip_label, initial=target_ip)
-
-        form.fields['TARGET_IP'] = target_ip_field
-
-        context['form'] = form
-        context['base_html'] = self.base_html
-        context['header'] = meta['label']
-        context['title'] = self.title
-        return context
-
-    def form_valid(self, form):
-        """
-        form_valid is always called on a blank / new form, so this is essentially going to get called on every POST
-        self.request.POST should contain all the variables defined in the service identified by the hidden field
-        'service_id'
-        :param form: blank form data from request
-        :return: render of a success template after service is provisioned
-        """
-        snippet_name = self.get_value_from_workflow('snippet_name', '')
-        if snippet_name != '':
-            meta = snippet_utils.load_snippet_with_name(snippet_name, self.app_dir)
-        else:
-            print('Could not find a valid meta-cnc def')
-            raise SnippetRequiredException
-
-        target_ip = self.request.POST.get('TARGET_IP', None)
-
-        if target_ip is None:
-            messages.add_message(self.request, messages.ERROR, 'Endpoint cannot be blank')
-            return self.form_invalid(form)
-
-        if not str(target_ip).startswith('http'):
-            print('Adding https to endpoint')
-            target_ip = f'https://{target_ip}'
-
-        self.save_value_to_workflow('TARGET_IP', target_ip)
-
-        results = rest_utils.execute_all(meta, self.app_dir, self.get_workflow())
-
-        context = dict()
-        context['base_html'] = self.base_html
-        context['results'] = results
-        context['view'] = self
-
-        # Most REST actions will only have a single action/path taken. If so, we can simplify the results
-        # shown to the user by default
-        if len(results['snippets']) == 1:
-            first_key = list(results['snippets'].keys())[0]
-            if type(results['snippets'][first_key]) is dict and 'results' in results['snippets'][first_key]:
-                context['results'] = results['snippets'][first_key]['results']
-
-        # results is a dict containing 'snippets' 'status' 'message'
-        if 'snippets' not in results or 'status' not in results or 'message' not in results:
-            print('Results from rest_utils is malformed')
-        else:
-            # Save all results into the workflow
-            for result in results['snippets']:
-                result_snippet = results['snippets'][result]
-                if 'outputs' in result_snippet:
-                    for output in result_snippet['outputs']:
-                        print(f"Saving value for key {output} to session")
-                        v = result_snippet['outputs'][output]
-                        print(v)
-                        self.save_value_to_workflow(output, v)
-
-                    self.save_workflow_to_session()
-                else:
-                    print('no outputs for this one')
-
-        return render(self.request, 'pan_cnc/results.html', context)
 
 
 class EditTerraformView(CNCBaseAuth, FormView):
