@@ -116,7 +116,8 @@ class CNCBaseAuth(LoginRequiredMixin, View):
                     var_name = variable['name']
                     var_type = variable['type_hint']
                     if var_name in self.request.POST:
-                        if var_type == 'list':
+                        # fix for #64 handle checkbox as list
+                        if var_type == 'list' or var_type == 'checkbox':
                             print(f'Adding variable {var_name} to session as list')
                             current_workflow[var_name] = self.request.POST.getlist(var_name)
                         else:
