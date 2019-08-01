@@ -93,8 +93,7 @@ def panos_login_verbose(pan_device_ip=None, pan_device_username=None, pan_device
                 return xapi_obj
             else:
                 print('Clearing old PanXapi credentials')
-                xapi_obj = None
-                cache.set('panorama_api_key', None)
+                clear_credentials()
 
         else:
             # no new credentials passed, but we have already connected, return the current connection
@@ -115,8 +114,7 @@ def panos_login_verbose(pan_device_ip=None, pan_device_username=None, pan_device
         print(pxe)
         err_msg = str(pxe)
 
-        xapi_obj = None
-        cache.set('panorama_api_key', None)
+        clear_credentials()
 
         if '403' in err_msg:
             raise TargetLoginException('Invalid credentials logging into device')
@@ -239,9 +237,14 @@ def push_meta(meta, context, force_sync=False, perform_commit=True) -> (str, Non
                     elif xapi.status_code == '7':
                         raise CCFParserError(f'xpath {xpath_string} was NOT found for skillet: {name}')
                 except pan.xapi.PanXapiError as pxe:
-                    raise CCFParserError(
-                        f'Could not push skillet {name} / snippet {xml_file_name}! {pxe}'
-                    )
+                    err_msg = str(pxe)
+                    if '403' in err_msg:
+                        # Auth issue, let's clear the api_key and bail out!
+                        xapi = None
+                        clear_credentials()
+
+                    raise CCFParserError(f'Could not push skillet {name} / snippet {xml_file_name}! {pxe}')
+
         if perform_commit:
 
             if 'type' not in meta:
@@ -351,6 +354,12 @@ def debug_meta(meta: dict, context: dict) -> dict:
             raise CCFParserError(err)
 
     return rendered_snippets
+
+
+def clear_credentials():
+    global xapi_obj
+    xapi_obj = None
+    cache.set('panorama_api_key', None)
 
 
 def validate_snippet_present(service, context) -> bool:
