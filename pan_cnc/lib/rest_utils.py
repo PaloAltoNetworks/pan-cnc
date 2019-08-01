@@ -67,7 +67,7 @@ def execute_all(meta_cnc, app_dir, context):
                 raise CCFParserError
 
             name = snippet.get('name', '')
-            rest_path = snippet.get('path', '/api')
+            rest_path = snippet.get('path', '/api').strip().replace('\n', '')
             rest_op = str(snippet.get('operation', 'get')).lower()
             payload_name = snippet.get('payload', '')
             header_dict = snippet.get('headers', dict())
