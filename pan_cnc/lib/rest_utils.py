@@ -67,7 +67,7 @@ def execute_all(meta_cnc, app_dir, context):
                 raise CCFParserError
 
             name = snippet.get('name', '')
-            rest_path = snippet.get('path', '/api').strip().replace('\n', '')
+            rest_path = snippet.get('path', '/api').strip().replace('\n', '').replace(' ', '')
             rest_op = str(snippet.get('operation', 'get')).lower()
             payload_name = snippet.get('payload', '')
             header_dict = snippet.get('headers', dict())
@@ -131,6 +131,8 @@ def execute_all(meta_cnc, app_dir, context):
                         print('Found a non-200 response status_code!')
                         print(res.status_code)
                         response['snippets'][name] = res.text
+                        response['status'] = 'error'
+                        response['message'] = res.status_code
                         break
 
                 r = res.text
@@ -141,13 +143,14 @@ def execute_all(meta_cnc, app_dir, context):
                 r = res.text
                 if res.status_code != 200:
                     response['status'] = 'error'
+                    response['message'] = res.status_code
                     response['snippets'][name] = r
                     break
 
             else:
                 print('Unknown REST operation found')
                 response['status'] = 'Error'
-                response['message'] = 'Unkonwn REST operation found'
+                response['message'] = 'Unknown REST operation found'
                 return response
 
             # collect the response text or json and continue
@@ -158,6 +161,7 @@ def execute_all(meta_cnc, app_dir, context):
             if 'outputs' in snippet:
                 outputs = output_utils.parse_outputs(meta_cnc, snippet, r)
                 response['snippets'][name]['outputs'] = outputs
+                context.update(outputs)
 
         # return all the collected response
         return response
