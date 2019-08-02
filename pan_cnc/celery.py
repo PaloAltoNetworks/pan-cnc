@@ -44,9 +44,9 @@ for d in os.listdir(SRC_PATH):
     print(f'Adding package {d} to celery')
     cnc_apps.append(d)
 
-__broker_inout = '/tmp/celery'
-__broker_processed = '/tmp/celery_processed'
-__backend_results = '/tmp/celery_results'
+__broker_inout = '/tmp/celery/jobs'
+__broker_processed = '/tmp/celery/jobs/celery_processed'
+__backend_results = '/tmp/celery/jobs/celery_results'
 
 if not os.path.exists(__broker_inout):
     os.makedirs(__broker_inout)

@@ -92,7 +92,7 @@ for app in os.listdir(SRC_PATH):
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
-    'whitenoise.middleware.WhiteNoiseMiddleware',
+    # 'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -168,11 +168,11 @@ SESSION_ENGINE = 'django.contrib.sessions.backends.cache'
 # https://docs.djangoproject.com/en/2.1/howto/static-files/
 
 STATIC_URL = '/static/'
-# STATICFILES_DIRS = [
-#    os.path.join(BASE_DIR, 'assets')
-# ]
+STATICFILES_DIRS = [
+   os.path.join(BASE_DIR, 'assets')
+]
 
-STATIC_ROOT = os.path.join(BASE_DIR, 'assets/')
+# STATIC_ROOT = os.path.join(BASE_DIR, 'assets/')
 
 # Keep the caches / sessions in memory only
 CACHES = {
