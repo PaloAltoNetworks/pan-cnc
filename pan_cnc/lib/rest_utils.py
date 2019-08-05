@@ -114,18 +114,12 @@ def execute_all(meta_cnc, app_dir, context):
                         print('Loading json data from payload')
                         try:
                             payload = json.loads(payload_interpolated)
-                        except ValueError as ve:
+                        except ValueError:
                             print('Could not load payload as json data!')
                             payload = payload_interpolated
                     else:
                         payload = payload_interpolated
 
-                    # print('Using payload of')
-                    # print(payload)
-                    # print(url)
-                    # print(headers)
-                    # FIXME - assumes JSON content_type and accepts, should take into account the values
-                    # FIXME - of content-type and accepts_type from above if they were supplied
                     res = session.post(url, data=payload, verify=False, headers=headers)
                     if res.status_code != 200:
                         print('Found a non-200 response status_code!')
@@ -135,12 +129,26 @@ def execute_all(meta_cnc, app_dir, context):
                         response['message'] = res.status_code
                         break
 
-                r = res.text
+                    if res.headers.get('content-type') == 'application/json':
+                        try:
+                            r = res.json()
+                        except ValueError:
+                            print('Could not parse JSON response from request')
+                            r = res.text
+                    else:
+                        r = res.text
 
             elif rest_op == 'get':
                 print(f'Performing REST get for snippet: {name}')
                 res = session.get(url, verify=False)
-                r = res.text
+                if res.headers.get('content-type') == 'application/json':
+                    try:
+                        r = res.json()
+                    except ValueError:
+                        r = res.text
+                else:
+                    r = res.text
+
                 if res.status_code != 200:
                     response['status'] = 'error'
                     response['message'] = res.status_code
