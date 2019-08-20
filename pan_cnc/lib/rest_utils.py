@@ -59,6 +59,13 @@ def execute_all(meta_cnc, app_dir, context):
 
     session = requests.Session()
 
+    # create our jinja env and load filters only once
+    environment = Environment(loader=BaseLoader())
+
+    for f in jinja_filters.defined_filters:
+        if hasattr(jinja_filters, f):
+            environment.filters[f] = getattr(jinja_filters, f)
+
     try:
         # execute our rest call for each item in the 'snippets' stanza of the meta-cnc file
         for snippet in meta_cnc['snippets']:
@@ -86,12 +93,6 @@ def execute_all(meta_cnc, app_dir, context):
 
             if accepts_type:
                 headers['Accepts-Type'] = accepts_type
-
-            environment = Environment(loader=BaseLoader())
-
-            for f in jinja_filters.defined_filters:
-                if hasattr(jinja_filters, f):
-                    environment.filters[f] = getattr(jinja_filters, f)
 
             path_template = environment.from_string(rest_path)
             url = path_template.render(context)
