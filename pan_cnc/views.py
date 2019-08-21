@@ -1193,7 +1193,7 @@ class EditTargetView(CNCBaseAuth, FormView):
         if 'type' in meta and 'pan' in meta['type']:
             # add option to perform commit operation or not
             # perform_commit = forms.BooleanField(label='Perform Commit', initial=True, label_suffix='', required=False)
-            saved_perform_commit = self.get_value_from_workflow('perform_commit', 'commit')
+            saved_perform_commit = self.get_value_from_workflow('perform_commit', 'no_commit')
             saved_perform_backup = self.get_value_from_workflow('perform_backup', False)
 
             choices_list = list()
