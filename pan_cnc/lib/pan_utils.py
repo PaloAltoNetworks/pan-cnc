@@ -215,6 +215,14 @@ def push_meta(meta, context, force_sync=False, perform_commit=True) -> (str, Non
             xpath = snippet['xpath']
             xml_file_name = snippet['file']
 
+            # allow snippets to be skipped using the 'when' attribute
+            if 'when' in snippet:
+                when_template = environment.from_string(snippet.get('when', ''))
+                when_result = str(when_template.render(context))
+                if when_result.lower() == 'false' or when_result.lower() == 'no':
+                    print(f'Skipping snippet {name} due to when condition false')
+                    continue
+
             xml_full_path = os.path.join(snippets_dir, xml_file_name)
             with open(xml_full_path, 'r') as xml_file:
                 xml_string = xml_file.read()

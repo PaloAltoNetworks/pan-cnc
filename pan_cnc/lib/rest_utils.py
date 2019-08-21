@@ -74,6 +74,15 @@ def execute_all(meta_cnc, app_dir, context):
                 raise CCFParserError
 
             name = snippet.get('name', '')
+
+            # allow snippets to be skipped using the 'when' attribute
+            if 'when' in snippet:
+                when_template = environment.from_string(snippet.get('when', ''))
+                when_result = str(when_template.render(context))
+                if when_result.lower() == 'false' or when_result.lower() == 'no':
+                    print(f'Skipping snippet {name} due to when condition false')
+                    continue
+
             rest_path = snippet.get('path', '/api').strip().replace('\n', '').replace(' ', '')
             rest_op = str(snippet.get('operation', 'get')).lower()
             payload_name = snippet.get('payload', '')
