@@ -639,6 +639,23 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
                         choices_list.append(choice)
                 dynamic_form.fields[field_name] = forms.ChoiceField(choices=tuple(choices_list), label=description,
                                                                     initial=default, required=required)
+
+            # FR #85 - Add dynamic dropdown / radio / checkbox
+            elif type_hint == 'dropdown' and 'source' in variable:
+                source = variable.get('source', None)
+                source_list = self.get_value_from_workflow(source, [])
+                choices_list = list()
+                if type(source_list) is list:
+                    for item in source_list:
+                        choice = (item, item)
+                        choices_list.append(choice)
+                else:
+                    item = source_list
+                    choice = (item, item)
+                    choices_list.append(choice)
+
+                dynamic_form.fields[field_name] = forms.ChoiceField(choices=tuple(choices_list), label=description,
+                                                                    initial=default, required=required)
             elif type_hint == "text_area":
                 dynamic_form.fields[field_name] = forms.CharField(widget=forms.Textarea, label=description,
                                                                   initial=default, required=required)
@@ -685,7 +702,7 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
                 dynamic_form.fields[field_name] = forms.CharField(widget=forms.PasswordInput(render_value=True),
                                                                   initial=default,
                                                                   label=description, required=required)
-            elif type_hint == "radio" and "rad_list":
+            elif type_hint == "radio" and "rad_list" in variable:
                 rad_list = variable['rad_list']
                 choices_list = list()
                 for item in rad_list:
@@ -694,12 +711,46 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
                 dynamic_form.fields[field_name] = forms.ChoiceField(widget=forms.RadioSelect, choices=choices_list,
                                                                     label=description, initial=default,
                                                                     required=required)
-            elif type_hint == "checkbox" and "cbx_list":
+            # FR #85 - Add dynamic dropdown / radio / checkbox
+            elif type_hint == "radio" and "source" in variable:
+                source = variable.get('source', None)
+                source_list = self.get_value_from_workflow(source, [])
+                choices_list = list()
+                if type(source_list) is list:
+                    for item in source_list:
+                        choice = (item, item)
+                        choices_list.append(choice)
+                else:
+                    item = source_list
+                    choice = (item, item)
+                    choices_list.append(choice)
+                dynamic_form.fields[field_name] = forms.ChoiceField(widget=forms.RadioSelect, choices=choices_list,
+                                                                    label=description, initial=default,
+                                                                    required=required)
+            elif type_hint == "checkbox" and "cbx_list" in variable:
                 cbx_list = variable['cbx_list']
                 choices_list = list()
                 for item in cbx_list:
                     choice = (item['value'], item['key'])
                     choices_list.append(choice)
+                dynamic_form.fields[field_name] = forms.MultipleChoiceField(widget=forms.CheckboxSelectMultiple,
+                                                                            choices=choices_list,
+                                                                            label=description, initial=default,
+                                                                            required=required)
+            # FR #85 - Add dynamic dropdown / radio / checkbox
+            elif type_hint == 'checkbox' and 'source' in variable:
+                source = variable.get('source', None)
+                source_list = self.get_value_from_workflow(source, [])
+                choices_list = list()
+                if type(source_list) is list:
+                    for item in source_list:
+                        choice = (item, item)
+                        choices_list.append(choice)
+                else:
+                    item = source_list
+                    choice = (item, item)
+                    choices_list.append(choice)
+
                 dynamic_form.fields[field_name] = forms.MultipleChoiceField(widget=forms.CheckboxSelectMultiple,
                                                                             choices=choices_list,
                                                                             label=description, initial=default,
