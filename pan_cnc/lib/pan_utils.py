@@ -72,13 +72,15 @@ def panos_login(pan_device_ip=None, pan_device_username=None, pan_device_passwor
         return None
 
 
-def panos_login_verbose(pan_device_ip=None, pan_device_username=None, pan_device_password=None) -> pan.xapi.PanXapi:
+def panos_login_verbose(pan_device_ip=None, pan_device_username=None, pan_device_password=None,
+                        pan_device_port=443) -> pan.xapi.PanXapi:
     """
     Using the pan-xapi to log in to a PAN-OS or Panorama instance. If supplied ip, username, and password are None
     this will attempt to find them via environment variables 'PANORAMA_IP', 'PANORAMA_USERNAME', and 'PANORAMA_PASSWORD'
     :param pan_device_ip: ip address of the target instance
     :param pan_device_username: username to use
     :param pan_device_password: password to use
+    :param pan_device_port: port to use
     :return: PanXapi object
     """
     global xapi_obj
@@ -86,13 +88,13 @@ def panos_login_verbose(pan_device_ip=None, pan_device_username=None, pan_device
     if xapi_obj is not None:
         if pan_device_ip is not None:
             if xapi_obj.hostname == pan_device_ip and xapi_obj.api_username == pan_device_username \
-                    and xapi_obj.api_password == pan_device_password:
+                    and xapi_obj.api_password == pan_device_password and xapi_obj.port == pan_device_port:
                 # an IP was specified and we have already connected to it
-                # oterhwise, fall through to get credentials and do another connection attempt
+                # otherwise, fall through to get credentials and do another connection attempt
                 print('Returning cached xapi object')
                 return xapi_obj
             else:
-                print('Clearing old PanXapi credentials')
+                print('Clearing old panos credentials')
                 clear_credentials()
 
         else:
@@ -100,7 +102,7 @@ def panos_login_verbose(pan_device_ip=None, pan_device_username=None, pan_device
             return xapi_obj
     try:
         print(f'performing xapi init for {pan_device_ip}')
-        credentials = get_panos_credentials(pan_device_ip, pan_device_username, pan_device_password)
+        credentials = get_panos_credentials(pan_device_ip, pan_device_username, pan_device_password, pan_device_port)
         xapi_obj = pan.xapi.PanXapi(**credentials)
         if 'api_key' not in credentials:
             print('Setting API KEY')
@@ -136,19 +138,21 @@ def test_panorama() -> None:
     print(xapi.xml_result())
 
 
-def get_panos_credentials(pan_device_ip, pan_device_username, pan_device_password) -> dict:
+def get_panos_credentials(pan_device_ip, pan_device_username, pan_device_password, pan_device_port=443) -> dict:
     """
     Returns a dict containing the panorama or PAN-OS credentials. If supplied args are None, attempt to load them
     via the Environment.
-    :param pan_device_ip:
-    :param pan_device_username:
-    :param pan_device_password:
+    :param pan_device_ip: IP or Hostname
+    :param pan_device_username: Username
+    :param pan_device_password: Password
+    :param pan_device_port: Port to use to connect to the device
     :return:
     """
     if pan_device_ip is None or pan_device_username is None or pan_device_password is None:
         # check the env for it if not here
         # FIXME - this should be renamed to TARGET or some other value that is not specific to PANORAMA
         pan_device_ip = os.environ.get('PANORAMA_IP', '0.0.0.0')
+        pan_device_port = os.environ.get('PANORAMA_PORT', '443')
         pan_device_username = os.environ.get('PANORAMA_USERNAME', 'admin')
         pan_device_password = os.environ.get('PANORAMA_PASSWORD', 'admin')
 
@@ -156,6 +160,7 @@ def get_panos_credentials(pan_device_ip, pan_device_username, pan_device_passwor
     credentials["hostname"] = pan_device_ip
     credentials["api_username"] = pan_device_username
     credentials["api_password"] = pan_device_password
+    credentials["api_port"] = pan_device_port
 
     api_key = cache.get('panorama_api_key', None)
     if api_key is not None:

@@ -42,6 +42,8 @@ from django.core.validators import MinLengthValidator
 from django.core.validators import MinValueValidator
 from django.core.validators import RegexValidator
 from django.core.validators import URLValidator
+from django.core.validators import ValidationError
+
 from django.http import JsonResponse
 from django.shortcuts import HttpResponse
 from django.shortcuts import HttpResponseRedirect
@@ -628,7 +630,7 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
                 choices_list = list()
                 for item in dd_list:
                     if 'key' in item and 'value' in item:
-                        print(item)
+                        # print(item)
                         if default == item['key'] and default != item['value']:
                             # user set the key as the default and not the value, just fix it for them here
                             default = item['value']
@@ -1136,15 +1138,19 @@ class EditTargetView(CNCBaseAuth, FormView):
 
         form = self.generate_dynamic_form(self.request.POST)
 
-        if form.is_valid():
-            # load the snippet into the class attribute here so it's available to all other methods throughout the
-            # call chain in the child classes
-            # go ahead and save all our current POSTed variables to the session for use later
-            self.save_workflow_to_session()
+        try:
+            if form.is_valid():
+                # load the snippet into the class attribute here so it's available to all other methods throughout the
+                # call chain in the child classes
+                # go ahead and save all our current POSTed variables to the session for use later
+                self.save_workflow_to_session()
 
-            return self.form_valid(form)
-        else:
-            print('This form is not valid!')
+                return self.form_valid(form)
+            else:
+                print('This form is not valid!')
+                return self.form_invalid(form)
+        except BaseException as te:
+            messages.add_message(self.request, messages.ERROR, str(te))
             return self.form_invalid(form)
 
     def generate_dynamic_form(self, data=None) -> forms.Form:
@@ -1153,9 +1159,10 @@ class EditTargetView(CNCBaseAuth, FormView):
 
         meta = self.meta
         if meta is None:
-            print('Why?')
+            raise SnippetRequiredException('Could not find a valid skillet!!')
 
         target_ip_label = 'Target IP'
+        target_port_label = 'Target Port'
         target_username_label = 'Target Username'
         target_password_label = 'Target Password'
         if 'type' in meta:
@@ -1173,11 +1180,16 @@ class EditTargetView(CNCBaseAuth, FormView):
                 target_password_label = 'Panorama Password'
 
         target_ip = self.get_value_from_workflow('TARGET_IP', '')
+        target_port = self.get_value_from_workflow('TARGET_PORT', 443)
         target_username = self.get_value_from_workflow('TARGET_USERNAME', '')
         target_password = self.get_value_from_workflow('TARGET_PASSWORD', '')
 
         target_ip_field = forms.CharField(label=target_ip_label, initial=target_ip, required=True,
                                           validators=[FqdnOrIp])
+        target_port_field = forms.IntegerField(label=target_port_label, initial=target_port, required=True,
+                                            validators=[
+                                                MaxValueValidator(65535),
+                                                MinValueValidator(0)])
         target_username_field = forms.CharField(label=target_username_label, initial=target_username, required=True)
         target_password_field = forms.CharField(widget=forms.PasswordInput(render_value=True), required=True,
                                                 label=target_password_label,
@@ -1186,6 +1198,7 @@ class EditTargetView(CNCBaseAuth, FormView):
         debug_field = forms.CharField(initial='False', widget=forms.HiddenInput())
 
         form.fields['TARGET_IP'] = target_ip_field
+        form.fields['TARGET_PORT'] = target_port_field
         form.fields['TARGET_USERNAME'] = target_username_field
         form.fields['TARGET_PASSWORD'] = target_password_field
         form.fields['debug'] = debug_field
@@ -1253,6 +1266,7 @@ class EditTargetView(CNCBaseAuth, FormView):
         meta = snippet_utils.load_snippet_with_name(snippet_name, self.app_dir)
         # Grab the values from the form, this is always hard-coded in this class
         target_ip = self.request.POST.get('TARGET_IP', None)
+        target_port = self.request.POST.get('TARGET_IP', 443)
         target_username = self.request.POST.get('TARGET_USERNAME', None)
         target_password = self.request.POST.get('TARGET_PASSWORD', None)
         debug = self.request.POST.get('debug', False)
@@ -1291,6 +1305,7 @@ class EditTargetView(CNCBaseAuth, FormView):
             return render(self.request, 'pan_cnc/debug_panos_skillet.html', context=context)
 
         self.save_value_to_workflow('TARGET_IP', target_ip)
+        self.save_value_to_workflow('TARGET_PORT', target_port)
         self.save_value_to_workflow('TARGET_USERNAME', target_username)
 
         workflow = self.get_workflow()
@@ -1317,7 +1332,8 @@ class EditTargetView(CNCBaseAuth, FormView):
             login = pan_utils.panos_login_verbose(
                 pan_device_ip=target_ip,
                 pan_device_username=target_username,
-                pan_device_password=target_password
+                pan_device_password=target_password,
+                pan_device_port=target_port
             )
         except TargetConnectionException:
             form.add_error('TARGET_IP', 'Connection Refused Error, check the IP and try again')
@@ -1327,7 +1343,7 @@ class EditTargetView(CNCBaseAuth, FormView):
             form.add_error('TARGET_PASSWORD', 'Invalid Credentials, ensure your username and password are correct')
             return self.form_invalid(form)
         except TargetGenericException as tge:
-            form.add_error('TARGET_IP', f'Unknonw Connection Error: {tge}')
+            form.add_error('TARGET_IP', f'Unknown Connection Error: {tge}')
             return self.form_invalid(form)
 
         # check if type is 'panos' and if the user wants to perform a commit or not
