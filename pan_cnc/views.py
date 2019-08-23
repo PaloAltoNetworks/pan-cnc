@@ -1186,10 +1186,11 @@ class EditTargetView(CNCBaseAuth, FormView):
 
         target_ip_field = forms.CharField(label=target_ip_label, initial=target_ip, required=True,
                                           validators=[FqdnOrIp])
+        # FR #82 - Add port to EditTarget Screen
         target_port_field = forms.IntegerField(label=target_port_label, initial=target_port, required=True,
-                                            validators=[
-                                                MaxValueValidator(65535),
-                                                MinValueValidator(0)])
+                                               validators=[
+                                                   MaxValueValidator(65535),
+                                                   MinValueValidator(0)])
         target_username_field = forms.CharField(label=target_username_label, initial=target_username, required=True)
         target_password_field = forms.CharField(widget=forms.PasswordInput(render_value=True), required=True,
                                                 label=target_password_label,
