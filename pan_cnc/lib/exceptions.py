@@ -51,3 +51,8 @@ class SnippetNotFoundException(Exception):
 
 class ImportRepositoryException(Exception):
     pass
+
+
+class DockerExecutionException(Exception):
+    pass
+

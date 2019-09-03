@@ -1116,7 +1116,7 @@ class ProvisionSnippetView(CNCBaseFormView):
             self.request.session['next_url'] = self.next_url
             return HttpResponseRedirect('/terraform')
         else:
-            # CNC apps may create custom hard coded workflows by setting a 'next_url' attibute
+            # CNC apps may create custom hard coded workflows by setting a 'next_url' attribute
             # in the .pan_cnc.yaml file. Let's make sure to capture this before redirecting to editTargetView
             self.request.session['next_url'] = self.next_url
             return HttpResponseRedirect('/editTarget')
