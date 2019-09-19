@@ -29,6 +29,7 @@ import asyncio
 import json
 import os
 import subprocess
+from asyncio import LimitOverrunError
 from subprocess import Popen
 
 from celery import current_task
@@ -78,16 +79,20 @@ async def cmd_runner(cmd_seq: list, cwd: str, env: dict, o: OutputHolder) -> int
     current_task.update_state(state='PROGRESS', meta=o.get_progress())
 
     while True:
-        line = await p.stdout.readline()
-        if line == b'':
-            break
-
         try:
+            line = await p.stdout.readline()
+            if line == b'':
+                break
+
             o.add_output(line.decode())
             current_task.update_state(state='PROGRESS', meta=o.get_progress())
         except UnicodeDecodeError as ude:
             print(f'Could not read results from task')
             print(ude)
+            return 255
+        except LimitOverrunError as loe:
+            print(f'Could not read results from task due to buffer overrun')
+            print(loe)
             return 255
 
     await p.wait()
