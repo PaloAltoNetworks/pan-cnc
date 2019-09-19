@@ -12,11 +12,14 @@ cd "${VIRTUAL_PATH}" || (echo "Could not change directory" && exit 1)
 
 if [ -f .python3_init_done ] && [ -d .venv ];
 then
-    echo "Environment already set up"
+    # Issue #94 - always update the requirements
+    echo "Environment already set up - Checking for updates"
+    ./.venv/bin/pip3 install --upgrade -r requirements.text || (echo "Could not update virtualenv!"; exit 1)
     exit 0
 fi
 
-python3 -m virtualenv ./.venv || (echo "Could not create virtualenv!"; exit 1)
+# Issue #95 - use system-site-packages by default
+python3 -m virtualenv  --system-site-packages ./.venv || (echo "Could not create virtualenv!"; exit 1)
 
 if [ ! -f requirements.txt ];
 then
