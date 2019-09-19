@@ -30,8 +30,11 @@
                         msg = "Completed Execution";
                     }
                 }
+                let r = $('#results');
+                r.html(msg);
+                let r_height = r.get(0).scrollHeight + 10;
+                r.height(r_height);
 
-                $('#results').html(msg);
                 if (status !== 'exited') {
                     console.log('checking again');
                     countdown();
@@ -126,7 +129,7 @@
             </h4>
             <div class="card-text">
                 <p>{{ view_message }}</p>
-                <pre id="results" class="pb-4">{{ results }}</pre>
+                <textarea id="results" class="pb-4 border-0" style="width: 100%; overflow: scroll">{{ results }}</textarea>
                 <pre id="countdown"></pre>
             </div>
 
