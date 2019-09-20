@@ -191,7 +191,7 @@ def _handle_json_outputs(snippet: dict, results: str) -> dict:
             jsonpath_expr = parse(capture_pattern)
             result = jsonpath_expr.find(json_object)
             if len(result) == 1:
-                outputs[var_name] = str(result[0].value)
+                outputs[var_name] = result[0].value
             else:
                 # FR #81 - add ability to capture from a list
                 capture_list = list()
