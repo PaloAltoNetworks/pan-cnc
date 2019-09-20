@@ -290,7 +290,7 @@ class CNCBaseAuth(LoginRequiredMixin, View):
             app_dir = self.app_dir
 
         if app_dir != '':
-            app_config = cnc_utils.get_app_config(self.app_dir)
+            app_config = cnc_utils.get_app_config(app_dir)
             if 'label' in app_config:
                 return app_config['label']
             elif 'name' in app_config:
@@ -2438,7 +2438,6 @@ class DebugMetadataView(CNCView):
             return context
 
         print(f"loaded snippet from {snippet['snippet_path']}")
-        context = super().get_context_data()
         context['skillet'] = snippet_data
         context['meta'] = snippet
         return context
@@ -2454,3 +2453,54 @@ class ClearCacheView(CNCBaseAuth, RedirectView):
         cnc_utils.clear_long_term_cache(self.app_dir)
         messages.add_message(self.request, messages.INFO, 'Long term cache cleared')
         return '/'
+
+
+class DebugContextView(CNCView):
+    """
+    Debug Context class, allows user to see all the variables currently set inside the workflow
+    """
+    template_name = 'pan_cnc/debug_context.html'
+    header = 'Workflow Context Detail'
+
+    def __init__(self):
+        self.snippet_name = ''
+        self.app_dir = ''
+        super().__init__()
+
+    def set_last_page_visit(self) -> None:
+        pass
+
+    def get_context_data(self, **kwargs):
+        workflow = self.get_workflow()
+        context = super().get_context_data()
+        context['header'] = self.header
+        context['title'] = 'Workflow Context'
+        context['workflow'] = json.dumps(workflow, indent=2)
+        return context
+
+
+class ReinitPythonVenv(CNCView):
+    """
+    Upgrades the virtualenv associated with a python skillet
+    """
+
+    template_name = 'pan_cnc/results_async.html'
+
+    def set_last_page_visit(self) -> None:
+        pass
+
+    def get_context_data(self, **kwargs):
+        app_dir = self.kwargs.get('app_dir', '')
+        if app_dir != '':
+            self.app_dir = app_dir
+
+        skillet_name = self.kwargs.get('skillet', '')
+        skillet = snippet_utils.load_snippet_with_name(skillet_name, app_dir)
+        context = super().get_context_data()
+        context['base_html'] = self.base_html
+        context['title'] = f"Upgrading Environment for: {skillet['label']}"
+        r = task_utils.python3_init(skillet)
+        self.request.session['task_id'] = r.id
+        return context
+
+

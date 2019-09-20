@@ -61,7 +61,9 @@ urlpatterns = [
     path('editTarget', pan_cnc_views.EditTargetView.as_view()),
     path('provision', pan_cnc_views.ProvisionSnippetView.as_view()),
     path('terraform', pan_cnc_views.EditTerraformView.as_view()),
-    path('clear_cache', pan_cnc_views.ClearCacheView.as_view())
+    path('clear_cache', pan_cnc_views.ClearCacheView.as_view()),
+    path('view_workflow', pan_cnc_views.DebugContextView.as_view()),
+    path('reinit/<app_dir>/<skillet>', pan_cnc_views.ReinitPythonVenv.as_view())
 ]
 
 print('Configuring URLs for installed apps')
