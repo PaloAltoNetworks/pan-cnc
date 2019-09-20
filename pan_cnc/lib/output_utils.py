@@ -186,7 +186,8 @@ def _handle_json_outputs(snippet: dict, results: str) -> dict:
 
             json_object = json.loads(results)
             var_name = output['name']
-            capture_pattern = output['capture_pattern']
+            # Fix for #96 - allow default capture pattern of the root object
+            capture_pattern = output.get('capture_pattern', '$')
             jsonpath_expr = parse(capture_pattern)
             result = jsonpath_expr.find(json_object)
             if len(result) == 1:
