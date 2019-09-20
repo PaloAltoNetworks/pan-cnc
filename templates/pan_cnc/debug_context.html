@@ -20,12 +20,11 @@
     <div class="card border-primary mb-5 shadow-lg">
         <div class="card-header">
             <h4 class="mb-0">
-                Skillet Metadata for: <span class="text-primary">{{ meta.label }}</span>
+                {{ header }}
             </h4>
         </div>
         <div class="card-body">
-            <pre><code class="yaml">{{ skillet }}</code></pre>
-            <p>Found skillet in dir: <span class="text-primary">{{ meta.snippet_path }}</span></p>
+            <pre><code class="json">{{ workflow }}</code></pre>
         </div>
 
         <div class="card-footer text-right">
