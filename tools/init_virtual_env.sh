@@ -14,7 +14,7 @@ if [ -f .python3_init_done ] && [ -d .venv ];
 then
     # Issue #94 - always update the requirements
     echo "Environment already set up - Checking for updates"
-    ./.venv/bin/pip3 install --upgrade -r requirements.text || (echo "Could not update virtualenv!"; exit 1)
+    ./.venv/bin/pip3 install --upgrade -r requirements.txt || (echo "Could not update virtualenv!"; exit 1)
     exit 0
 fi
 
