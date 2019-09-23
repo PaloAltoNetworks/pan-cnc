@@ -63,7 +63,38 @@ def parse_outputs(meta: dict, snippet: dict, results: str) -> dict:
         outputs = _handle_base64_outputs(snippet, results)
     elif snippet['output_type'] == 'json':
         outputs = _handle_json_outputs(snippet, results)
+    elif snippet['output_type'] == 'text':
+        # FR: allow output_type = 'text'
+        outputs = _handle_text_outputs(snippet, results)
 
+    return outputs
+
+
+def _handle_text_outputs(snippet: dict, results: str) -> dict:
+    """
+    Parse the results string as a text blob into a single variable.
+
+    - name: system_info
+      path: /api/?type=op&cmd=<show><system><info></info></system></show>&key={{ api_key }}
+      output_type: text
+      outputs:
+        - name: system_info_as_xml
+
+    :param snippet: snippet definition from the Skillet
+    :param results: results string from the action
+    :return: dict of outputs, in this case a single entry
+    """
+    snippet_name = snippet['name']
+    outputs = dict()
+
+    if 'outputs' not in snippet:
+        print('No outputs defined in this snippet')
+        return outputs
+
+    outputs_config = snippet.get('outputs', [])
+    first_output = outputs_config[0]
+    output_name = first_output.get('name', snippet_name)
+    outputs[output_name] = results
     return outputs
 
 
