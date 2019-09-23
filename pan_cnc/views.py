@@ -2472,10 +2472,11 @@ class DebugContextView(CNCView):
 
     def get_context_data(self, **kwargs):
         workflow = self.get_workflow()
+        w = dict(sorted(workflow.items()))
         context = super().get_context_data()
         context['header'] = self.header
         context['title'] = 'Workflow Context'
-        context['workflow'] = json.dumps(workflow, indent=2)
+        context['workflow'] = json.dumps(w, indent=2)
         return context
 
 
