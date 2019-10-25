@@ -994,26 +994,6 @@ class ProvisionSnippetView(CNCBaseFormView):
 
         return super().get_context_data(**kwargs)
 
-    def get_snippet(self):
-        print('Checking app_dir')
-        print(self.app_dir)
-
-        session_cache = self.request.session.get(self.app_dir, {})
-
-        if 'snippet_name' in self.request.POST:
-            print('found snippet in post')
-            snippet_name = self.request.POST['snippet_name']
-            session_cache['snippet_name'] = snippet_name
-            return snippet_name
-
-        elif self.app_dir in self.request.session:
-            if 'snippet_name' in session_cache:
-                print('returning snippet name: %s from session cache' % session_cache['snippet_name'])
-                return session_cache['snippet_name']
-        else:
-            print('snippet is not set in ProvisionSnippetView:get_snippet')
-            raise SnippetRequiredException
-
     def form_valid(self, form):
         service_name = self.get_value_from_workflow('snippet_name', '')
 
