@@ -126,6 +126,7 @@ class CNCBaseAuth(LoginRequiredMixin, View):
                             print(f'Adding variable {var_name} to session')
                             current_workflow[var_name] = self.request.POST.get(var_name)
 
+            current_workflow['snippet_name'] = self.snippet
         self.request.session[self.app_dir] = current_workflow
 
     def save_value_to_workflow(self, var_name, var_value) -> None:
@@ -444,14 +445,13 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
         print('Getting snippet here in CNCBaseFormView:get_snippet')
         if 'snippet_name' in self.request.POST:
             print('found snippet defined in the POST')
-            return self.request.POST['snippet_name']
+            self.snippet = self.request.POST['snippet_name']
 
         elif self.app_dir in self.request.session:
             session_cache = self.request.session[self.app_dir]
             if 'snippet_name' in session_cache:
                 print('found snippet defined in the session')
-                print('returning snippet name: %s' % session_cache['snippet_name'])
-                return session_cache['snippet_name']
+                self.snippet = session_cache['snippet_name']
 
         # default case is to use the snippet defined directly on the class
         print(f'Returning snippet: {self.snippet}')
@@ -993,26 +993,6 @@ class ProvisionSnippetView(CNCBaseFormView):
                 print(f'Found unknown type {t} for form customization in ProvisionSnippetView:get_context_data')
 
         return super().get_context_data(**kwargs)
-
-    def get_snippet(self):
-        print('Checking app_dir')
-        print(self.app_dir)
-
-        session_cache = self.request.session.get(self.app_dir, {})
-
-        if 'snippet_name' in self.request.POST:
-            print('found snippet in post')
-            snippet_name = self.request.POST['snippet_name']
-            session_cache['snippet_name'] = snippet_name
-            return snippet_name
-
-        elif self.app_dir in self.request.session:
-            if 'snippet_name' in session_cache:
-                print('returning snippet name: %s from session cache' % session_cache['snippet_name'])
-                return session_cache['snippet_name']
-        else:
-            print('snippet is not set in ProvisionSnippetView:get_snippet')
-            raise SnippetRequiredException
 
     def form_valid(self, form):
         service_name = self.get_value_from_workflow('snippet_name', '')
