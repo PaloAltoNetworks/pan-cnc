@@ -126,8 +126,9 @@ class CNCBaseAuth(LoginRequiredMixin, View):
                             print(f'Adding variable {var_name} to session')
                             current_workflow[var_name] = self.request.POST.get(var_name)
 
-            # ensure we always capture the current snippetß
-            current_workflow['snippet_name'] = self.snippet
+            # ensure we always capture the current snippet if set on this class!
+            if self.snippet != '':
+                current_workflow['snippet_name'] = self.snippet
         self.request.session[self.app_dir] = current_workflow
 
     def save_value_to_workflow(self, var_name, var_value) -> None:
