@@ -640,6 +640,23 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
                     dynamic_form.fields[field_name] = forms.IntegerField(widget=forms.NumberInput(),
                                                                          label=description,
                                                                          initial=default, required=required)
+            # add support for float per #103
+            elif type_hint == "float":
+                attrs = dict()
+                if 'attributes' in variable:
+                    if 'min' in variable['attributes'] and 'max' in variable['attributes']:
+                        attrs['min'] = variable['attributes']['min']
+                        attrs['max'] = variable['attributes']['max']
+                        dynamic_form.fields[field_name] = forms.FloatField(widget=forms.NumberInput(attrs=attrs),
+                                                                           label=description,
+                                                                           initial=default, required=required,
+                                                                           validators=[
+                                                                               MaxValueValidator(attrs['max']),
+                                                                               MinValueValidator(attrs['min'])])
+                else:
+                    dynamic_form.fields[field_name] = forms.FloatField(widget=forms.NumberInput(),
+                                                                       label=description,
+                                                                       initial=default, required=required)
 
             elif type_hint == "fqdn_or_ip":
                 dynamic_form.fields[field_name] = forms.CharField(label=description,
