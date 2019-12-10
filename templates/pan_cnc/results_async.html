@@ -14,6 +14,7 @@
                 let msg = '';
                 let status = '';
                 let returncode = 255;
+                let output = '';
 
                 if (typeof (json_data) === "string") {
                     msg = 'Error executing task';
@@ -24,7 +25,9 @@
                     msg = json_data['output'];
                     status = json_data['status'];
                     returncode = json_data['returncode'];
-
+                    if ('output' in json_data) {
+                        output = json_data['output'];
+                    }
                     if ('captured_output' in json_data) {
                         console.log(json_data['captured_output']);
                         msg = "Completed Execution";
@@ -32,8 +35,10 @@
                 }
                 let r = $('#results');
                 r.html(msg);
-                let r_height = r.get(0).scrollHeight + 10;
-                r.height(r_height);
+                if (msg !== '') {
+                    let r_height = r.get(0).scrollHeight + 10;
+                    r.height(r_height);
+                }
 
                 if (status !== 'exited') {
                     console.log('checking again');
@@ -49,21 +54,34 @@
 
                     let next_link = $('<a/>');
                     if (returncode === 0) {
-                        let old_title = t.html();
                         t.html("Completed: {{ view.service.label }}");
                         {% if request.session.task_next %}
                             next_link.attr('href', '/next_task');
-                            next_link.html('Continue');
+                            next_link.html('Next');
                             next_link.addClass('btn').addClass('btn-primary');
+                        {% elif request.session.next_step %}
+                            next_link.attr('href', '/workflow/{{ request.session.next_step }}');
+                            next_link.addClass('btn').addClass('btn-primary');
+                               {% if request.session.last_step %}
+                                   next_link.html('Complete');
+                               {% else %}
+                                   next_link.html('Next');
+                               {% endif %}
                         {% else %}
                             next_link.attr('href', '{{ request.session.last_page|urlencode }}');
                             next_link.html('Continue');
                             next_link.addClass('btn').addClass('btn-primary');
                         {% endif %}
                     } else {
+                        f.empty();
                         next_link.attr('href', '{{ request.session.last_page|urlencode }}');
                         next_link.html('Continue');
                         next_link.addClass('btn').addClass('btn-danger');
+                        if (output !== '') {
+                            r.html(output);
+                            let r_height = r.get(0).scrollHeight + 10;
+                            r.height(r_height);
+                        }
                         c.append('Error Executing Task');
                         c.append('<br>');
                     }
@@ -81,6 +99,7 @@
                     c.append('Error Executing Task');
                     c.append('<br>');
                     let f = $('#footer');
+                    f.empty();
                     f.append(next_link);});
         }
 
@@ -136,14 +155,8 @@
         </div>
         <div class="card-footer text-right">
             <p class="card-text" id="footer">
-                {% if request.session.next_step %}
-                    {% if request.session.last_step %}
-                        <a href="/workflow/{{ request.session.next_step }}" class="btn btn-primary">Complete</a>
-                    {% else %}
-                        <a href="/workflow/{{ request.session.next_step }}" class="btn btn-primary">Continue</a>
-                    {% endif %}
-                {% elif completed %}
-                    <a href="{{ request.session.last_page|urlencode }}" class="btn btn-primary">Continue</a>
+                {% if completed %}
+                    <a href="{{ request.session.last_page|urlencode }}" class="btn btn-primary">Complete</a>
                 {% endif %}
             </p>
         </div>
