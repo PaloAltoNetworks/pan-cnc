@@ -113,23 +113,25 @@ def exec_local_task(cmd_seq: list, cwd: str, env=None) -> str:
     if env is not None and type(env) is dict:
         process_env.update(env)
 
-    o = OutputHolder()
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    r = loop.run_until_complete(cmd_runner(cmd_seq, cwd, process_env, o))
-    loop.stop()
-    print(f'Task {current_task.request.id} return code is {r}')
     state = dict()
-    state['returncode'] = r
-
-    # clean out CNC related informational messages
-    # We need to communicate back some information such as spawned process id, but we don't
-    # need to show these to the user after task completion, so filter them out here
-    # FIXME - there should be a better way to do this?
+    try:
+        o = OutputHolder()
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        r = loop.run_until_complete(cmd_runner(cmd_seq, cwd, process_env, o))
+        loop.stop()
+        print(f'Task {current_task.request.id} return code is {r}')
+        state['returncode'] = r
+        state['out'] = o.get_output()
+        state['err'] = ''
+    except OSError as ose:
+        print('Caught Error executing task!')
+        print(ose)
+        state['returncode'] = 666
+        state['out'] = ose
+        state['err'] = ose
 
     print('returning output')
-    state['out'] = o.get_output()
-    state['err'] = ''
     return json.dumps(state)
 
 
