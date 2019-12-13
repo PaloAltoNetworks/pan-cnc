@@ -29,6 +29,7 @@ import copy
 import json
 import os
 import re
+import tempfile
 from collections import OrderedDict
 from typing import Any
 
@@ -115,6 +116,23 @@ class CNCBaseAuth(LoginRequiredMixin, View):
                 for variable in self.service['variables']:
                     var_name = variable['name']
                     var_type = variable['type_hint']
+                    if var_type == 'file':
+                        try:
+                            if var_name in self.request.FILES:
+                                f = self.request.FILES[var_name]
+                                tmp_fd, tmp_file = tempfile.mkstemp(prefix='cnc_')
+                                with open(tmp_file, 'wb+') as destination:
+                                    for chunk in f.chunks():
+                                        destination.write(chunk)
+
+                                os.close(tmp_fd)
+                                current_workflow[var_name] = tmp_file
+                        except OSError as ose:
+                            print('Could not save file!')
+                            print(ose)
+                            raise RuntimeError('Could not save file')
+
+                        continue
                     if var_name in self.request.POST:
                         # fix for #64 handle checkbox as list
                         if var_type == 'list' or var_type == 'checkbox':
@@ -784,6 +802,9 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
             elif type_hint == 'disabled':
                 dynamic_form.fields[field_name] = forms.CharField(label=description, initial=default,
                                                                   disabled=True, required=required)
+
+            elif type_hint == 'file':
+                dynamic_form.fields[field_name] = forms.FileField(label=description, required=required)
 
             elif type_hint == 'url':
                 dynamic_form.fields[field_name] = forms.CharField(label=description,
