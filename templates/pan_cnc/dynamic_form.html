@@ -18,11 +18,11 @@
     <div class="card-header">
         {{ view.get_header|default:header }}
         <div class="float-right">
-            {% if view.help_text != '' %}
+            {% if view.help_text and view_help_text != '' %}
             <a href="#" data-toggle="modal" data-target="#helpTextModal" title="Help">
                 <i class="fas fa-question-circle text-primary mr-1"></i>
             </a>
-            {% elif view.service.descripion != '' %}
+            {% elif view.service.description and view.service.description != '' %}
             <a href="#" data-toggle="modal" data-target="#helpTextModal" title="Help">
                 <i class="fas fa-question-circle text-primary mr-1"></i>
             </a>
@@ -51,37 +51,5 @@
 </div>
 {%  block after_form %}
 {% endblock %}
-<!-- Modal -->
-<div class="modal fade border-top border-primary" id="helpTextModal" tabindex="-1" role="dialog"
-     aria-labelledby="helpTextModalLabel"
-     aria-hidden="true">
-    <div class="modal-dialog" role="document">
-        <div class="modal-content">
-            <div class="modal-header bg-light">
-                <h5 class="modal-title" id="exampleModalLabel">Help</h5>
-                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                    <span aria-hidden="true">&times;</span>
-                </button>
-            </div>
-            <div class="modal-body">
-                {% if view.help_text != '' %}
-                {{ view.help_text|linebreaksbr }}
-                {% elif view.service.description != '' %}
-                {{ view.service.description }}
-                {% endif %}
-
-                {% if view.help_link_title != '' and view.help_link != '' %}
-                <p class="mt-5">
-                    <a target="_blank" href="{{ view.help_link }}">
-                        {{ view.help_link_title }}
-                    </a>
-                </p>
-                {% endif %}
-            </div>
-            <div class="modal-footer bg-light text-right">
-                <button type="button" class="btn btn-primary" data-dismiss="modal">Close</button>
-            </div>
-        </div>
-    </div>
-</div>
+{% include 'pan_cnc/help_text_modal.html' %}
 {% endblock %}

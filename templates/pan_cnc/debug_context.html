@@ -19,9 +19,14 @@
 {% block content %}
     <div class="card border-primary mb-5 shadow-lg">
         <div class="card-header">
-            <h4 class="mb-0">
-                {{ header }}
-            </h4>
+        {{ view.get_header|default:header }}
+            <div class="float-right">
+            {% if view.help_text != '' %}
+            <a href="#" data-toggle="modal" data-target="#helpTextModal" title="Help">
+                <i class="fas fa-question-circle text-primary mr-1"></i>
+            </a>
+            {% endif %}
+        </div>
         </div>
         <div class="card-body">
             <pre><code class="json">{{ workflow }}</code></pre>
@@ -33,4 +38,5 @@
             </p>
         </div>
     </div>
+    {% include 'pan_cnc/help_text_modal.html' %}
 {% endblock %}

@@ -2276,7 +2276,7 @@ class CreateEnvironmentsView(EnvironmentBase, FormView):
     # base form class, you should not need to override this
     form_class = forms.Form
     base_html = 'pan_cnc/base.html'
-    header = 'Manage Environment'
+    header = 'New Environment'
 
     def get_context_data(self, **kwargs) -> dict:
         context = super().get_context_data(**kwargs)
@@ -2487,7 +2487,10 @@ class DebugContextView(CNCView):
     Debug Context class, allows user to see all the variables currently set inside the workflow
     """
     template_name = 'pan_cnc/debug_context.html'
-    header = 'Workflow Context Detail'
+    header = 'Panhandler Context'
+    help_text = 'This view shows all the values captured into the context. These values will be used to ' \
+                'pre-populate fields when rendering Skillet input forms. The output from one skillet can ' \
+                'be used as the input to another Skillet allowing more complex workflows.'
 
     def __init__(self):
         self.snippet_name = ''
