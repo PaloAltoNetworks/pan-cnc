@@ -5,6 +5,7 @@
     <script type="text/javascript">
         let time_left = 5;
         let cancel_countdown = false;
+        let captured_output = '';
 
         function updateOutput() {
             time_left = 5;
@@ -30,7 +31,8 @@
                     }
                     if ('captured_output' in json_data) {
                         console.log(json_data['captured_output']);
-                        msg = "Completed Execution";
+                        captured_output = json_data['captured_output']
+                        msg = "Successfully captured Skillet output. Click 'Show Captured Values' to view raw output.";
                     }
                 }
                 let r = $('#results');
@@ -85,6 +87,16 @@
                         c.append('Error Executing Task');
                         c.append('<br>');
                     }
+
+                    // check for captured_variables
+                    if ('captured_output' in json_data) {
+                        let debug_link = $('<a/>');
+                        debug_link.attr('href', '#');
+                        debug_link.attr('onclick', 'show_captured_values();');
+                        debug_link.addClass('btn').addClass('btn-success').addClass('mr-2');
+                        debug_link.html('Show Captured Values');
+                        f.append(debug_link);
+                    }
                     f.append(next_link);
                 }
             })
@@ -102,7 +114,13 @@
                     f.empty();
                     f.append(next_link);});
         }
+        function show_captured_values() {
+            let r = $('#results');
+            r.html(captured_output);
 
+            let r_height = r.get(0).scrollHeight + 10;
+            r.height(r_height);
+        }
         function countdown() {
             let c = $('#countdown');
             if (cancel_countdown === true) {
