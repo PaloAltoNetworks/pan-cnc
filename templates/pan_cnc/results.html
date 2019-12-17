@@ -15,7 +15,7 @@
             {% endif %}
         </h4>
         <p class="card-text">
-            <pre class="pb-4">{{ results|linebreaksbr }}</pre>
+            <pre class="pb-4">{{ results | safe  }}</pre>
         </p>
     </div>
     <div class="card-footer text-right">
