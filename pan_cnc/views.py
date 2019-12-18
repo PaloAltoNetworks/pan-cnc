@@ -515,7 +515,10 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
             snippet = self.get_snippet()
             if snippet != '':
                 self.service = snippet_utils.load_snippet_with_name(snippet, self.app_dir)
-            return self.render_to_response(self.get_context_data())
+                return self.render_to_response(self.get_context_data())
+            else:
+                messages.add_message(self.request, messages.ERROR, 'Process Error - Snippet not found')
+                return HttpResponseRedirect('/')
         except SnippetRequiredException:
             print('Snippet was not defined here!')
             messages.add_message(self.request, messages.ERROR, 'Process Error - Snippet not found')
@@ -1032,7 +1035,8 @@ class ProvisionSnippetView(CNCBaseFormView):
     title = 'Customize Variables'
 
     def get_context_data(self, **kwargs):
-        if self.service is not None:
+
+        if self.service is not None and self.service != {}:
 
             if 'type' not in self.service:
                 return super().get_context_data(**kwargs)
@@ -2500,7 +2504,13 @@ class ClearCacheView(CNCBaseAuth, RedirectView):
 
     def get_redirect_url(self, *args, **kwargs):
         print('Clearing Cache')
+
+        # clear everything except our cached imported git repositories
+        repos = cnc_utils.get_long_term_cached_value(self.app_dir, 'imported_repositories')
         cnc_utils.clear_long_term_cache(self.app_dir)
+        cnc_utils.set_long_term_cached_value(self.app_dir, 'imported_repositories', repos, 604800,
+                                             'imported_git_repos')
+
         messages.add_message(self.request, messages.INFO, 'Long term cache cleared')
         return '/'
 

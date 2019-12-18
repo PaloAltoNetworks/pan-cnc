@@ -1,6 +1,22 @@
 {% extends base_html|default:'pan_cnc/base.html' %}
 {% load static %}
-
+{% block head %}
+    <script type="application/javascript">
+        $(document).ready(function () {
+            $('body').on('click', 'a', function (event) {
+                let e = $(this);
+                let target = e.attr('href');
+                if (target.startsWith('#')) {
+                    event.preventDefault();
+                    let t = $(target);
+                    let offset = t.offset();
+                    let scrollto = offset.top - 60; // minus fixed header height
+                    $('html, body').animate({scrollTop: scrollto}, 1000);
+                }
+            });
+        });
+    </script>
+{% endblock %}
 {% block content %}
 <div class="card border-primary mb-5 shadow-lg">
     <div class="card-header">
@@ -15,7 +31,11 @@
             {% endif %}
         </h4>
         <p class="card-text">
-            <pre class="pb-4">{{ results | safe  }}</pre>
+            {%  if view.service.type == 'template' %}
+            <div class="pb-4" style="white-space: pre; overflow-x: scroll">{{ results | safe | linebreaksbr }}</div>
+            {% else %}
+            <pre class="pb-4">{{ results | linebreaksbr  }}</pre>
+            {% endif %}
         </p>
     </div>
     <div class="card-footer text-right">
