@@ -83,7 +83,7 @@ def execute_all(meta_cnc, app_dir, context):
                     print(f'Skipping snippet {name} due to when condition false')
                     continue
 
-            rest_path = snippet.get('path', '/api').strip().replace('\n', '').replace(' ', '')
+            rest_path = snippet.get('path', '/api').strip()
             rest_op = str(snippet.get('operation', 'get')).lower()
             payload_name = snippet.get('payload', '')
             header_dict = snippet.get('headers', dict())
@@ -104,7 +104,9 @@ def execute_all(meta_cnc, app_dir, context):
                 headers['Accepts-Type'] = accepts_type
 
             path_template = environment.from_string(rest_path)
-            url = path_template.render(context)
+            # fix for #111 - ensure we strip and replace only after rendering to ensure inline conditionals work
+            # as expected.
+            url = path_template.render(context).replace('\n', '').replace(' ', '')
 
             for k, v in header_dict.items():
                 v_template = environment.from_string(v)

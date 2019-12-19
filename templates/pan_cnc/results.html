@@ -32,7 +32,7 @@
         </h4>
         <p class="card-text">
             {%  if view.service.type == 'template' %}
-            <div class="pb-4" style="white-space: pre; overflow-x: scroll">{{ results | safe | linebreaksbr }}</div>
+            <pre class="pb-4" style="white-space: pre; overflow-x: scroll">{{ results | safe | linebreaksbr }}</pre>
             {% else %}
             <pre class="pb-4">{{ results | linebreaksbr  }}</pre>
             {% endif %}
