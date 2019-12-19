@@ -71,7 +71,7 @@ async def cmd_runner(cmd_seq: list, cwd: str, env: dict, o: OutputHolder) -> int
     """
     p = await asyncio.create_subprocess_exec(cmd_seq[0], *cmd_seq[1:],
                                              stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT,
-                                             cwd=cwd, env=env)
+                                             cwd=cwd, env=env, limit=524288)
 
     print(f'Spawned process {p.pid}')
     o.add_metadata(f'CNC: Spawned Process: {p.pid}\n')
@@ -93,6 +93,10 @@ async def cmd_runner(cmd_seq: list, cwd: str, env: dict, o: OutputHolder) -> int
         except LimitOverrunError as loe:
             print(f'Could not read results from task due to buffer overrun')
             print(loe)
+            return 255
+        except ValueError as ve:
+            print('Could not read output from task, possible buffer overrun')
+            print(ve)
             return 255
 
     await p.wait()

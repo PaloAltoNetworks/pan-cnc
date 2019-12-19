@@ -1968,8 +1968,10 @@ class TaskLogsView(CNCBaseAuth, View):
 
         try:
             logs_out_str = json.dumps(logs_output)
-        except TypeError:
+        except TypeError as te:
             print('Error serializing json output!')
+            print(te)
+            print(logs_output)
             # smother all issues
             logs_output['output'] = 'Error converting object'
             logs_output['status'] = 'exited'

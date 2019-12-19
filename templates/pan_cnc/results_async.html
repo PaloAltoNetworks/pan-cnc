@@ -11,7 +11,7 @@
             time_left = 5;
             $.get('/logs').done(function (json_data) {
                 console.log(json_data);
-
+                let r = $('#results');
                 let msg = '';
                 let status = '';
                 let returncode = 255;
@@ -33,9 +33,9 @@
                         console.log(json_data['captured_output']);
                         captured_output = json_data['captured_output']
                         msg = "Successfully captured Skillet output. Click 'Show Captured Values' to view raw output.";
+                        r.height(40);
                     }
                 }
-                let r = $('#results');
                 r.html(msg);
                 if (msg !== '') {
                     let r_height = r.get(0).scrollHeight + 10;
