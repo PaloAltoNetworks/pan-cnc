@@ -6,12 +6,12 @@
             $('body').on('click', 'a', function (event) {
                 let e = $(this);
                 let target = e.attr('href');
-                if (target.startsWith('#')) {
-                    event.preventDefault();
+                if (target.startswith('#')) {
+                    event.preventdefault();
                     let t = $(target);
                     let offset = t.offset();
                     let scrollto = offset.top - 60; // minus fixed header height
-                    $('html, body').animate({scrollTop: scrollto}, 1000);
+                    $('html, body').animate({scrolltop: scrollto}, 1000);
                 }
             });
         });
@@ -27,15 +27,11 @@
             {% if title %}
             {{ title }}
             {% else %}
-            Output
+            output
             {% endif %}
         </h4>
         <p class="card-text">
-            {%  if view.service.type == 'template' %}
             <pre class="pb-4" style="white-space: pre; overflow-x: scroll">{{ results | safe | linebreaksbr }}</pre>
-            {% else %}
-            <pre class="pb-4">{{ results | linebreaksbr  }}</pre>
-            {% endif %}
         </p>
     </div>
     <div class="card-footer text-right">

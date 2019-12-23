@@ -31,15 +31,19 @@
                     }
                     if ('captured_output' in json_data) {
                         console.log(json_data['captured_output']);
-                        captured_output = json_data['captured_output']
+                        captured_output = json_data['captured_output'];
                         msg = "Successfully captured Skillet output. Click 'Show Captured Values' to view raw output.";
                         r.height(40);
                     }
                 }
                 r.html(msg);
                 if (msg !== '') {
-                    let r_height = r.get(0).scrollHeight + 10;
-                    r.height(r_height);
+                    let current_height = r.height();
+                    let current_scrollheight = r.get(0).scrollHeight;
+                    if (current_height < current_scrollheight) {
+                        let r_height = r.get(0).scrollHeight + 10;
+                        r.height(r_height);
+                    }
                 }
 
                 if (status !== 'exited') {

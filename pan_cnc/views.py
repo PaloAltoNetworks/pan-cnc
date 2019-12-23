@@ -512,9 +512,12 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
         # load the snippet into the class attribute here so it's available to all other methods throughout the
         # call chain in the child classes
         try:
-            snippet = self.get_snippet()
+            snippet: str = self.get_snippet()
             if snippet != '':
-                self.service = snippet_utils.load_snippet_with_name(snippet, self.app_dir)
+                self.service: dict = snippet_utils.load_snippet_with_name(snippet, self.app_dir)
+                if not self.service.get('variables', []):
+                    return self.post(request)
+
                 return self.render_to_response(self.get_context_data())
             else:
                 messages.add_message(self.request, messages.ERROR, 'Process Error - Snippet not found')
@@ -1774,8 +1777,8 @@ class NextTaskView(CNCView):
             raise SnippetRequiredException
 
     def get_context_data(self, **kwargs):
-        app_dir = self.get_app_dir()
-        skillet = snippet_utils.load_snippet_with_name(self.get_snippet(), app_dir)
+        self.app_dir = self.get_app_dir()
+        skillet = snippet_utils.load_snippet_with_name(self.get_snippet(), self.app_dir)
         context = dict()
         context['base_html'] = self.base_html
 
