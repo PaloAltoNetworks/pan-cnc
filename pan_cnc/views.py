@@ -51,6 +51,7 @@ from django.views.generic import RedirectView
 from django.views.generic import TemplateView
 from django.views.generic import View
 from django.views.generic.edit import FormView
+from skilletlib.snippet.workflow import WorkflowSnippet
 
 from pan_cnc.lib import cnc_utils
 from pan_cnc.lib import output_utils
@@ -2008,11 +2009,8 @@ class WorkflowView(CNCBaseAuth, RedirectView):
             print('Could not parse current step index!')
             print(ve)
 
-        next_step = current_step + 1
-
-        print(f"next step is {next_step}")
         if current_step == 0:
-            # get the actual workflow skillet what was selected
+            # get the actual workflow skillet that was selected
             skillet_name = self.get_value_from_workflow('snippet_name', '')
             # let's save this for later when we are on step #2 or later
             self.save_value_to_workflow('workflow_name', skillet_name)
@@ -2022,7 +2020,7 @@ class WorkflowView(CNCBaseAuth, RedirectView):
             print(f"Getting our original workflow name out of the session")
             skillet_name = self.get_value_from_workflow('workflow_name', '')
 
-        print(f"found skillet name {skillet_name}")
+        print(f"found workflow skillet name {skillet_name}")
         self.meta = snippet_utils.load_snippet_with_name(skillet_name, self.app_dir)
         if self.meta is None:
             messages.add_message(self.request, messages.ERROR, 'Process Error - No skillet could be loaded')
@@ -2050,8 +2048,26 @@ class WorkflowView(CNCBaseAuth, RedirectView):
             return '/'
 
         current_skillet_name = self.meta['snippets'][current_step]['name']
-        print(f"Current skillet name is {current_skillet_name}")
 
+        # find which step we should execute
+        context = self.get_workflow()
+        index = current_step
+        for snippet_def in self.meta['snippets'][index:]:
+            # instantiate a snippet class so we can evaluate the context to determine if we should execute this one
+            # or another skillet later in the list
+            snippet = WorkflowSnippet(self.meta['snippets'][current_step], skillet=None, skillet_loader=None)
+            if snippet.should_execute(context):
+                current_skillet_name = snippet.name
+                break
+            else:
+                print('Skipping next step due to when conditional')
+
+            current_step = current_step + 1
+
+        print(f"Current skillet name is {current_skillet_name}")
+        next_step = current_step + 1
+
+        print(f"next step is {next_step}")
         self.save_value_to_workflow('snippet_name', current_skillet_name)
         # we don't have access to the workflow cache from the view, so save our next step directly to the
         # session - We might have to revisit this once we allow multi apps per instance
