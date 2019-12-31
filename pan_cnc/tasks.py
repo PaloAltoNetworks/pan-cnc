@@ -271,7 +271,13 @@ def python3_execute_script(working_dir, script, input_type, args):
 
     for k, v in args.items():
         if type(v) is list:
-            val = ",".join(v)
+            # do not try to serialize lists of data objects other than str
+            str_list = []
+            for list_item in v:
+                if type(list_item) is str:
+                    str_list.append(list_item)
+
+            val = ",".join(str_list)
         else:
             val = v
         if input_type == 'env':
@@ -293,7 +299,14 @@ def python3_execute_bare_script(working_dir, script, input_type, args):
 
     for k, v in args.items():
         if type(v) is list:
-            val = ",".join(v)
+            if type(v) is list:
+                # do not try to serialize lists of data objects other than str
+                str_list = []
+                for list_item in v:
+                    if type(list_item) is str:
+                        str_list.append(list_item)
+
+                val = ",".join(str_list)
         else:
             val = v
         if input_type == 'env':

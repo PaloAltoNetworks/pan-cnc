@@ -1150,12 +1150,12 @@ class ProvisionSnippetView(CNCBaseFormView):
 
             if task_utils.python3_check_no_requirements(self.service):
                 context['title'] = f"Executing Skillet: {self.service['label']}"
-                r = task_utils.python3_execute_bare(self.service, self.get_snippet_variables_from_workflow())
+                r = task_utils.python3_execute_bare(self.service, self.get_workflow())
                 self.request.session['task_next'] = ''
 
             elif task_utils.python3_init_complete(self.service):
                 context['title'] = f"Executing Skillet: {self.service['label']}"
-                r = task_utils.python3_execute(self.service, self.get_snippet_variables_from_workflow())
+                r = task_utils.python3_execute(self.service, self.get_workflow())
                 self.request.session['task_next'] = ''
             else:
                 context['title'] = f"Preparing environment for: {self.service['label']}"
@@ -1863,7 +1863,7 @@ class NextTaskView(CNCView):
         #
 
         elif task_next == 'python3_execute':
-            r = task_utils.python3_execute(skillet, self.get_snippet_variables_from_workflow(skillet))
+            r = task_utils.python3_execute(skillet, self.get_workflow())
             new_next = ''
             title = f"Executing Script: {skillet['label']}"
 
