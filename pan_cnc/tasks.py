@@ -132,11 +132,16 @@ def exec_local_task(cmd_seq: list, cwd: str, env=None) -> str:
         print('Caught Error executing task!')
         print(ose)
         state['returncode'] = 666
-        state['out'] = ose
-        state['err'] = ose
+        state['out'] = str(ose)
+        state['err'] = str(ose)
 
-    print('returning output')
-    return json.dumps(state)
+    try:
+        print('returning output')
+        return json.dumps(state)
+    except TypeError as te:
+        print('Caught Error Returning Task output!')
+        print(te)
+        return '{{"returncode": 666, "out": "Error Returning Task Output", "err": "TypeError"}}'
 
 
 def exec_sync_local_task(cmd_seq: list, cwd: str, env=None) -> str:
