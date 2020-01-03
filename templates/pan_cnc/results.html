@@ -6,12 +6,12 @@
             $('body').on('click', 'a', function (event) {
                 let e = $(this);
                 let target = e.attr('href');
-                if (target.startswith('#')) {
-                    event.preventdefault();
+                if (target.startsWith('#')) {
+                    event.preventDefault();
                     let t = $(target);
                     let offset = t.offset();
                     let scrollto = offset.top - 60; // minus fixed header height
-                    $('html, body').animate({scrolltop: scrollto}, 1000);
+                    $('html, body').animate({scrollTop: scrollto}, 1000);
                 }
             });
         });

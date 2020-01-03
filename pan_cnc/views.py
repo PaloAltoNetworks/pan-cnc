@@ -51,7 +51,12 @@ from django.views.generic import RedirectView
 from django.views.generic import TemplateView
 from django.views.generic import View
 from django.views.generic.edit import FormView
+from skilletlib.exceptions import PanoplyException
 from skilletlib.snippet.workflow import WorkflowSnippet
+from skilletlib.skillet.rest import RestSkillet
+from skilletlib.snippet.rest import RestSnippet
+from skilletlib.skillet.panos import PanosSkillet
+from skilletlib import Panoply
 
 from pan_cnc.lib import cnc_utils
 from pan_cnc.lib import output_utils
@@ -1110,7 +1115,10 @@ class ProvisionSnippetView(CNCBaseFormView):
             return render(self.request, 'pan_cnc/results.html', context)
         elif self.service['type'] == 'rest':
             # Found a skillet type of 'rest'
-            results = rest_utils.execute_all(self.service, self.app_dir, self.get_workflow())
+            rest_skillet = RestSkillet(self.service)
+            results = rest_skillet.execute(self.get_workflow())
+
+            # results = rest_utils.execute_all(self.service, self.app_dir, self.get_workflow())
 
             context = dict()
             context['base_html'] = self.base_html
@@ -1125,8 +1133,7 @@ class ProvisionSnippetView(CNCBaseFormView):
             #     if type(results['snippets'][first_key]) is dict and 'results' in results['snippets'][first_key]:
             #         context['results'] = results['snippets'][first_key]['results']
 
-            # results is a dict containing 'snippets' 'status' 'message'
-            if 'snippets' not in results or 'status' not in results or 'message' not in results:
+            if 'snippets' not in results:
                 print('Result from rest_utils is malformed')
             else:
                 # Save all results into the workflow
@@ -1376,7 +1383,7 @@ class EditTargetView(CNCBaseAuth, FormView):
         meta = snippet_utils.load_snippet_with_name(snippet_name, self.app_dir)
         # Grab the values from the form, this is always hard-coded in this class
         target_ip = self.request.POST.get('TARGET_IP', None)
-        target_port = self.request.POST.get('TARGET_IP', 443)
+        target_port = self.request.POST.get('TARGET_PORT', 443)
         target_username = self.request.POST.get('TARGET_USERNAME', None)
         target_password = self.request.POST.get('TARGET_PASSWORD', None)
         debug = self.request.POST.get('debug', False)
@@ -1439,12 +1446,17 @@ class EditTargetView(CNCBaseAuth, FormView):
 
         print(f'logging in to pan device with {target_ip}')
         try:
-            login = pan_utils.panos_login_verbose(
-                pan_device_ip=target_ip,
-                pan_device_username=target_username,
-                pan_device_password=target_password,
-                pan_device_port=target_port
-            )
+            # login = pan_utils.panos_login_verbose(
+            #     pan_device_ip=target_ip,
+            #     pan_device_username=target_username,
+            #     pan_device_password=target_password,
+            #     pan_device_port=target_port
+            # )
+            p = Panoply(api_username=target_username,
+                        api_password=target_password,
+                        api_port=target_port,
+                        hostname=target_ip
+                        )
         except TargetConnectionException:
             form.add_error('TARGET_IP', 'Connection Refused Error, check the IP and try again')
             return self.form_invalid(form)
@@ -1481,61 +1493,38 @@ class EditTargetView(CNCBaseAuth, FormView):
         if perform_backup:
             print('Performing configuration backup before Configuration Push')
             try:
-                pan_utils.perform_backup()
-            except TargetConnectionException as tce:
+                p.backup_config()
+            except PanoplyException as tce:
                 messages.add_message(self.request, messages.ERROR, str(tce))
                 return self.form_invalid(form)
 
-        dependencies = snippet_utils.resolve_dependencies(meta, self.app_dir, [])
-        for baseline in dependencies:
-            # prego (it's in there)
-            baseline_service = snippet_utils.load_snippet_with_name(baseline, self.app_dir)
-            # FIX for https://github.com/nembery/vistoq2/issues/5
-            if 'variables' in baseline_service and type(baseline_service['variables']) is list:
-                for v in baseline_service['variables']:
-                    # FIXME - Should include a way show this in UI so we have POSTED values available
-                    if 'default' in v:
-                        # Do not overwrite values if they've arrived from the user via the Form
-                        if v['name'] not in jinja_context:
-                            print('Setting default from baseline on context for %s' % v['name'])
-                            jinja_context[v['name']] = v['default']
-
-            if baseline_service is not None:
-                # check the panorama config to see if it's there or not
-                if not pan_utils.validate_snippet_present(baseline_service, jinja_context):
-                    # no prego (it's not in there)
-                    print('Pushing configuration dependency: %s' % baseline_service['name'])
-                    # make it prego
-                    try:
-                        # never commit on extended baseline skillets
-                        pan_utils.push_meta(baseline_service, jinja_context, False, False)
-                    except CCFParserError as cpe:
-                        messages.add_message(self.request, messages.ERROR,
-                                             f'Could not push baseline Configuration: {cpe}')
-                        return HttpResponseRedirect(f"{self.app_dir}/")
-                    except TargetCommitException as tce:
-                        messages.add_message(self.request, messages.ERROR,
-                                             f'Could not push baseline Configuration: {tce}')
-                        return HttpResponseRedirect(f"{self.app_dir}/")
-
         try:
-            job_id = pan_utils.push_meta(meta, jinja_context, force_sync, perform_commit)
-        except CCFParserError as cpe:
-            messages.add_message(self.request, messages.ERROR, f'Could not push Configuration: {cpe}')
-            return HttpResponseRedirect(f"{self.app_dir}/")
-        except TargetCommitException as tce:
-            messages.add_message(self.request, messages.ERROR,
-                                 f'Could not push Configuration: {tce}')
-            return HttpResponseRedirect(f"{self.app_dir}/")
+            panos_skillet = PanosSkillet(self.meta, p)
+            outputs = panos_skillet.execute(self.get_workflow())
+            result = outputs.get('result', 'failure')
 
-        if job_id is not None:
-            messages.add_message(self.request, messages.SUCCESS,
-                                 f'Configuration Push Queued successfully with Job ID: {job_id}')
-        else:
-            if force_sync:
-                messages.add_message(self.request, messages.SUCCESS, 'Configuration Pushed successfully')
+            if result != 'success':
+                messages.add_message(self.request, messages.ERROR, f'Could not push Configuration!')
+            elif result == 'success' and perform_commit:
+                commit_result = p.commit(force_sync)
+
+                if force_sync:
+                    messages.add_message(self.request, messages.SUCCESS, 'Configuration Pushed successfully')
+                else:
+                    messages.add_message(self.request, messages.SUCCESS, 'Configuration Push Queued successfully')
+                    jobid_match = re.match(r'.* with jobid (\d+)', commit_result)
+                    if jobid_match is not None:
+                        job_id = jobid_match.group(1)
+                        if job_id is not None:
+                            messages.add_message(self.request, messages.SUCCESS,
+                                                 f'Configuration Push Queued successfully with Job ID: {job_id}')
             else:
-                messages.add_message(self.request, messages.SUCCESS, 'Configuration Push Queued successfully')
+                messages.add_message(self.request, messages.SUCCESS,
+                                     'Configuration added to Candidate Config successfully')
+
+        except PanoplyException as pe:
+            messages.add_message(self.request, messages.ERROR, f'Could not push Configuration: {pe}')
+            return HttpResponseRedirect(f"{self.app_dir}/")
 
         # fix for #72, in non-workflow case, revert to using our captured last_page visit
         # next_url = self.pop_value_from_workflow('next_url', None)
@@ -2047,7 +2036,10 @@ class WorkflowView(CNCBaseAuth, RedirectView):
             messages.add_message(self.request, messages.ERROR, 'Malformed .meta-cnc workflow step')
             return '/'
 
-        current_skillet_name = self.meta['snippets'][current_step]['name']
+        # there is no guarantee this skillet will actually run due to when conditionals, set the value to None
+        # and check later
+        # current_skillet_name = self.meta['snippets'][current_step]['name']
+        current_skillet_name = None
 
         # find which step we should execute
         context = self.get_workflow()
@@ -2063,6 +2055,16 @@ class WorkflowView(CNCBaseAuth, RedirectView):
                 print('Skipping next step due to when conditional')
 
             current_step = current_step + 1
+
+        if current_skillet_name is None:
+            # there are no more skillets to run
+            print('All done here!')
+            messages.add_message(self.request, messages.INFO, 'Workflow Completed Successfully')
+            self.request.session['next_step'] = None
+            self.request.session['last_step'] = None
+            self.request.session.pop('next_step')
+            self.request.session.pop('last_step')
+            return self.request.session.get('last_page', '/')
 
         print(f"Current skillet name is {current_skillet_name}")
         next_step = current_step + 1
