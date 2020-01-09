@@ -192,8 +192,14 @@ class CNCBaseAuth(LoginRequiredMixin, View):
             return self.request.session[self.app_dir]
 
     def get_snippet_variables_from_workflow(self, skillet=None):
+        """
+        Returns only the values from the context or the currently loaded environment
+        for each variable in the skillet
+        :param skillet: optional skillet dict to include
+        :return: dict containing the variables defined in the skillet with values from the context or the env
+        """
 
-        workflow = self.get_workflow()
+        combined_workflow = self.get_snippet_context()
         snippet_vars = dict()
         if skillet is None:
             if hasattr(self, 'service'):
@@ -208,8 +214,8 @@ class CNCBaseAuth(LoginRequiredMixin, View):
                 if 'name' not in variable:
                     continue
                 var_name = variable['name']
-                if var_name in workflow:
-                    snippet_vars[var_name] = workflow[var_name]
+                if var_name in combined_workflow:
+                    snippet_vars[var_name] = combined_workflow[var_name]
 
         return snippet_vars
 
@@ -521,10 +527,14 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
             snippet: str = self.get_snippet()
             if snippet != '':
                 self.service: dict = snippet_utils.load_snippet_with_name(snippet, self.app_dir)
-                if not self.service.get('variables', []):
-                    return self.post(request)
+                # if we have NO variables or only hidden variables, then continue right to the post
+                # otherwise, we need to render the form field
+                for v in self.service.get('variables', []):
+                    if v.get('type_hint', 'text') != 'hidden':
+                        return self.render_to_response(self.get_context_data())
 
-                return self.render_to_response(self.get_context_data())
+                return self.post(request)
+
             else:
                 messages.add_message(self.request, messages.ERROR, 'Process Error - Snippet not found')
                 return HttpResponseRedirect('/')
@@ -850,6 +860,10 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
                                                                                    code='invalid_format')
                                                                   ],
                                                                   help_text=help_text)
+            elif type_hint == 'hidden':
+                # hidden does not get rendered to the screen
+                continue
+
             else:
                 # default input type if text
                 validators = list()
@@ -1089,7 +1103,8 @@ class ProvisionSnippetView(CNCBaseFormView):
             return self.form_invalid(form)
 
         if self.service['type'] == 'template':
-            template = snippet_utils.render_snippet_template(self.service, self.app_dir, self.get_workflow())
+            template = snippet_utils.render_snippet_template(self.service, self.app_dir,
+                                                             self.get_snippet_variables_from_workflow())
             if len(self.service['snippets']) == 0:
                 template = 'Could not find a valid template to load!'
                 snippet = dict()
@@ -1116,7 +1131,7 @@ class ProvisionSnippetView(CNCBaseFormView):
         elif self.service['type'] == 'rest':
             # Found a skillet type of 'rest'
             rest_skillet = RestSkillet(self.service)
-            results = rest_skillet.execute(self.get_workflow())
+            results = rest_skillet.execute(self.get_snippet_variables_from_workflow())
 
             # results = rest_utils.execute_all(self.service, self.app_dir, self.get_workflow())
 
@@ -1157,12 +1172,12 @@ class ProvisionSnippetView(CNCBaseFormView):
 
             if task_utils.python3_check_no_requirements(self.service):
                 context['title'] = f"Executing Skillet: {self.service['label']}"
-                r = task_utils.python3_execute_bare(self.service, self.get_workflow())
+                r = task_utils.python3_execute_bare(self.service, self.get_snippet_variables_from_workflow())
                 self.request.session['task_next'] = ''
 
             elif task_utils.python3_init_complete(self.service):
                 context['title'] = f"Executing Skillet: {self.service['label']}"
-                r = task_utils.python3_execute(self.service, self.get_workflow())
+                r = task_utils.python3_execute(self.service, self.get_snippet_variables_from_workflow())
                 self.request.session['task_next'] = ''
             else:
                 context['title'] = f"Preparing environment for: {self.service['label']}"
@@ -1500,7 +1515,7 @@ class EditTargetView(CNCBaseAuth, FormView):
 
         try:
             panos_skillet = PanosSkillet(self.meta, p)
-            outputs = panos_skillet.execute(self.get_workflow())
+            outputs = panos_skillet.execute(self.get_snippet_variables_from_workflow())
             result = outputs.get('result', 'failure')
 
             if result != 'success':
@@ -1613,17 +1628,17 @@ class EditTerraformView(CNCBaseAuth, FormView):
         if terraform_action == 'validate':
             print('Launching terraform init')
             context['title'] = 'Executing Task: Terraform Init'
-            r = task_utils.perform_init(meta, self.get_snippet_context())
+            r = task_utils.perform_init(meta, self.get_snippet_variables_from_workflow())
             self.request.session['task_next'] = 'terraform_validate'
         elif terraform_action == 'refresh':
             print('Launching terraform refresh')
             context['title'] = 'Executing Task: Terraform Refresh'
-            r = task_utils.perform_refresh(meta, self.get_snippet_context())
+            r = task_utils.perform_refresh(meta, self.get_snippet_variables_from_workflow())
             self.request.session['task_next'] = 'terraform_output'
         elif terraform_action == 'destroy':
             print('Launching terraform destroy')
             context['title'] = 'Executing Task: Terraform Destroy'
-            r = task_utils.perform_destroy(meta, self.get_snippet_context())
+            r = task_utils.perform_destroy(meta, self.get_snippet_variables_from_workflow())
             self.request.session['task_next'] = ''
         else:
             self.request.session['task_next'] = ''

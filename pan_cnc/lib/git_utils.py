@@ -157,6 +157,8 @@ def get_repo_details(repo_name, repo_dir, app_name='cnc'):
     if 'github' in url:
         link = f"https://github.com/{url_details['owner']}/{url_details['repo']}"
         is_github = True
+    elif 'spring.palo' in url:
+        link = f"https://spring.paloaltonetworks.com/{url_details['owner']}/{url_details['repo']}"
     else:
         link = url
 
