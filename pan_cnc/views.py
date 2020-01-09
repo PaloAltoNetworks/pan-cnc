@@ -51,26 +51,23 @@ from django.views.generic import RedirectView
 from django.views.generic import TemplateView
 from django.views.generic import View
 from django.views.generic.edit import FormView
+from skilletlib.exceptions import LoginException
 from skilletlib.exceptions import PanoplyException
-from skilletlib.snippet.workflow import WorkflowSnippet
-from skilletlib.skillet.rest import RestSkillet
-from skilletlib.snippet.rest import RestSnippet
+from skilletlib.exceptions import TargetConnectionException
+from skilletlib.exceptions import TargetGenericException
+from skilletlib.panoply import Panos
 from skilletlib.skillet.panos import PanosSkillet
-from skilletlib import Panoply
+from skilletlib.skillet.rest import RestSkillet
+from skilletlib.snippet.workflow import WorkflowSnippet
 
 from pan_cnc.lib import cnc_utils
 from pan_cnc.lib import output_utils
 from pan_cnc.lib import pan_utils
-from pan_cnc.lib import rest_utils
 from pan_cnc.lib import snippet_utils
 from pan_cnc.lib import task_utils
 from pan_cnc.lib import widgets
 from pan_cnc.lib.exceptions import CCFParserError
 from pan_cnc.lib.exceptions import SnippetRequiredException
-from pan_cnc.lib.exceptions import TargetCommitException
-from pan_cnc.lib.exceptions import TargetConnectionException
-from pan_cnc.lib.exceptions import TargetGenericException
-from pan_cnc.lib.exceptions import TargetLoginException
 from pan_cnc.lib.validators import Cidr
 from pan_cnc.lib.validators import FqdnOrIp
 from pan_cnc.lib.validators import JSONValidator
@@ -1461,21 +1458,16 @@ class EditTargetView(CNCBaseAuth, FormView):
 
         print(f'logging in to pan device with {target_ip}')
         try:
-            # login = pan_utils.panos_login_verbose(
-            #     pan_device_ip=target_ip,
-            #     pan_device_username=target_username,
-            #     pan_device_password=target_password,
-            #     pan_device_port=target_port
-            # )
-            p = Panoply(api_username=target_username,
-                        api_password=target_password,
-                        api_port=target_port,
-                        hostname=target_ip
-                        )
+
+            p = Panos(api_username=target_username,
+                      api_password=target_password,
+                      api_port=target_port,
+                      hostname=target_ip
+                      )
         except TargetConnectionException:
             form.add_error('TARGET_IP', 'Connection Refused Error, check the IP and try again')
             return self.form_invalid(form)
-        except TargetLoginException:
+        except LoginException:
             form.add_error('TARGET_USERNAME', 'Invalid Credentials, ensure your username and password are correct')
             form.add_error('TARGET_PASSWORD', 'Invalid Credentials, ensure your username and password are correct')
             return self.form_invalid(form)
