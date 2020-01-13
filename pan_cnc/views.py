@@ -1474,6 +1474,9 @@ class EditTargetView(CNCBaseAuth, FormView):
         except TargetGenericException as tge:
             form.add_error('TARGET_IP', f'Unknown Connection Error: {tge}')
             return self.form_invalid(form)
+        except Exception as e:
+            form.add_error('TARGET_IP', f'Unknown Connection Error: {e}')
+            return self.form_invalid(form)
 
         # check if type is 'panos' and if the user wants to perform a commit or not
         # check if perform commit is set
