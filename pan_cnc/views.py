@@ -896,6 +896,19 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
                                                                   validators=validators,
                                                                   help_text=help_text)
 
+            # fix for #118 - add ability to toggle visibility based on value of another field
+            toggle_hint = variable.get('toggle_hint', {})
+
+            #     toggle_hint:
+            #       - source: bgp_type
+            #         value: disable
+
+            if toggle_hint != {}:
+                f = dynamic_form.fields[field_name]
+                w = f.widget
+                w.attrs.update({'data-source': toggle_hint.get('source', '')})
+                w.attrs.update({'data-value': toggle_hint.get('value', '')})
+
         return dynamic_form
 
     def form_valid(self, form):

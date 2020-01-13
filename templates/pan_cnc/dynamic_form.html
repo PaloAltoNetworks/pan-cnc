@@ -9,6 +9,45 @@
         $('#submit_button').prop("disabled", true);
         $('#dynamic_form').submit();
     }
+
+    function toggle_visibility(object_id) {
+        console.log('finding all with source = "' + object_id + '"');
+        let source_value = $('#id_' + object_id).val();
+        $('[data-source="'+ object_id + '"]').each(function(i, e) {
+            let this_object = $(e);
+            let parent = $(e).parent();
+            let data_value = this_object.attr('data-value');
+            if (data_value !== source_value) {
+                console.log(' need to hide this guy');
+                parent.hide();
+            } else{
+                console.log(' need to show this guys');
+                parent.show();
+            }
+        });
+    }
+
+    $(document).ready(function() {
+        $('[data-source][data-value]').each(function (i, e) {
+            let input_object = $(e);
+            let source_object_id = input_object.attr('data-source');
+            let test_value = input_object.attr('data-value');
+
+            let source_object = $('#id_' + source_object_id);
+            source_object.change(function() {
+                console.log(this.name);
+                toggle_visibility(this.name);
+            });
+
+            if (source_object.val() !== test_value) {
+                let parent = input_object.parent();
+                parent.toggle();
+                console.log('hiding');
+            }
+
+        });
+    });
+
 </script>
 
 {%  block before_form %}
