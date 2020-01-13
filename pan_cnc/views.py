@@ -524,6 +524,11 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
             snippet: str = self.get_snippet()
             if snippet != '':
                 self.service: dict = snippet_utils.load_snippet_with_name(snippet, self.app_dir)
+
+                # always render the form for pan_validation as this type will dynamically add fields
+                if self.service.get('type', '') == 'pan_validation':
+                    return self.render_to_response(self.get_context_data())
+
                 # if we have NO variables or only hidden variables, then continue right to the post
                 # otherwise, we need to render the form field
                 for v in self.service.get('variables', []):
