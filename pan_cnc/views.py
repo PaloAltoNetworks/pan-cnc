@@ -525,6 +525,10 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
             if snippet != '':
                 self.service: dict = snippet_utils.load_snippet_with_name(snippet, self.app_dir)
 
+                if self.service is None:
+                    messages.add_message(self.request, messages.ERROR,
+                                         f'Process Error - Snippet with name: {snippet} not found')
+                    return HttpResponseRedirect('/')
                 # always render the form for pan_validation as this type will dynamically add fields
                 if self.service.get('type', '') == 'pan_validation':
                     return self.render_to_response(self.get_context_data())
@@ -1166,17 +1170,9 @@ class ProvisionSnippetView(CNCBaseFormView):
             if 'snippets' not in results:
                 print('Result from rest_utils is malformed')
             else:
-                # Save all results into the workflow
-                for result in results['snippets']:
-                    result_snippet = results['snippets'][result]
-                    if 'outputs' in result_snippet:
-                        for output in result_snippet['outputs']:
-                            print(f"Saving value for key {output} to session")
-                            v = result_snippet['outputs'][output]
-                            # print(v)
-                            self.save_value_to_workflow(output, v)
-
-                        # self.save_workflow_to_session()
+                if 'outputs' in results and type(results['outputs']) is dict:
+                    for k, v in results['outputs'].items():
+                        self.save_value_to_workflow(k, v)
 
             return render(self.request, 'pan_cnc/results.html', context)
 
@@ -1530,6 +1526,10 @@ class EditTargetView(CNCBaseAuth, FormView):
             panos_skillet = PanosSkillet(self.meta, p)
             outputs = panos_skillet.execute(self.get_snippet_variables_from_workflow())
             result = outputs.get('result', 'failure')
+            # save outputs wherever possible
+            if 'outputs' in outputs and type(outputs['outputs']) is dict:
+                for k, v in outputs['outputs'].items():
+                    self.save_value_to_workflow(k, v)
 
             if result != 'success':
                 messages.add_message(self.request, messages.ERROR, f'Could not push Configuration!')
@@ -1931,6 +1931,7 @@ class TaskLogsView(CNCBaseAuth, View):
                         skillet_name = self.get_value_from_workflow('snippet_name', '')
                         if skillet_name != '':
                             meta = snippet_utils.load_snippet_with_name(skillet_name, self.app_dir)
+                            # FIXME right here for python types
                             if 'snippets' in meta:
                                 for snippet in meta['snippets']:
                                     if 'output_type' in snippet and 'name' in snippet:
