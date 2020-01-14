@@ -144,6 +144,9 @@ class CNCBaseAuth(LoginRequiredMixin, View):
                         else:
                             print(f'Adding variable {var_name} to session')
                             current_workflow[var_name] = self.request.POST.get(var_name)
+                    else:
+                        if var_type in ['checkbox', 'list']:
+                            current_workflow[var_name] = []
 
             # ensure we always capture the current snippet if set on this class!
             if self.snippet != '':
