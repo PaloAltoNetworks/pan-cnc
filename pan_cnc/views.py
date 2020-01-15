@@ -2083,7 +2083,10 @@ class WorkflowView(CNCBaseAuth, RedirectView):
             snippet = WorkflowSnippet(self.meta['snippets'][current_step], skillet=None, skillet_loader=None)
             if snippet.should_execute(context):
                 current_skillet_name = snippet.name
-                current_skillet_type = snippet.skillet.type
+                # find and load hhe next skillet here soo we can gather it's type
+                skillet = snippet_utils.load_snippet_with_name(snippet.name, self.app_dir)
+                if skillet is not None:
+                    current_skillet_type = skillet.get('type', None)
                 break
             else:
                 print('Skipping next step due to when conditional')
@@ -2132,7 +2135,7 @@ class WorkflowView(CNCBaseAuth, RedirectView):
         elif current_skillet_type == 'pan_validation':
             # fixme - very ugly mixing of code here, this should be pushed up into panhandler
             # of the validate stuff should be pushed here
-            return '/panhandler/validate'
+            return f'/panhandler/validate/{snippet.name}'
         else:
             return '/provision'
 
