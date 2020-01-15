@@ -9,6 +9,45 @@
         $('#submit_button').prop("disabled", true);
         $('#dynamic_form').submit();
     }
+
+    function toggle_visibility(object_id) {
+        console.log('finding all with source = "' + object_id + '"');
+        let source_value = $('#id_' + object_id).val();
+        $('[data-source="'+ object_id + '"]').each(function(i, e) {
+            let this_object = $(e);
+            let parent = $(e).parent();
+            let data_value = this_object.attr('data-value');
+            if (data_value !== source_value) {
+                console.log(' need to hide this guy');
+                parent.hide();
+            } else{
+                console.log(' need to show this guys');
+                parent.show();
+            }
+        });
+    }
+
+    $(document).ready(function() {
+        $('[data-source][data-value]').each(function (i, e) {
+            let input_object = $(e);
+            let source_object_id = input_object.attr('data-source');
+            let test_value = input_object.attr('data-value');
+
+            let source_object = $('#id_' + source_object_id);
+            source_object.change(function() {
+                console.log(this.name);
+                toggle_visibility(this.name);
+            });
+
+            if (source_object.val() !== test_value) {
+                let parent = input_object.parent();
+                parent.toggle();
+                console.log('hiding');
+            }
+
+        });
+    });
+
 </script>
 
 {%  block before_form %}
@@ -18,11 +57,11 @@
     <div class="card-header">
         {{ view.get_header|default:header }}
         <div class="float-right">
-            {% if view.help_text != '' %}
+            {% if view.help_text and view_help_text != '' %}
             <a href="#" data-toggle="modal" data-target="#helpTextModal" title="Help">
                 <i class="fas fa-question-circle text-primary mr-1"></i>
             </a>
-            {% elif view.service.descripion != '' %}
+            {% elif view.service.description and view.service.description != '' %}
             <a href="#" data-toggle="modal" data-target="#helpTextModal" title="Help">
                 <i class="fas fa-question-circle text-primary mr-1"></i>
             </a>
@@ -38,7 +77,7 @@
     <div class="card-body">
         <h4 class="card-title">{{ title }}</h4>
         <p class="card-text">
-        <form action="{{ action }}" id="dynamic_form" method="post">
+        <form action="{{ action }}" id="dynamic_form" method="post" enctype="multipart/form-data">
             {% csrf_token %}
             {% include 'pan_cnc/bootstrap_form.html' with form=form %}
         </form>
@@ -51,37 +90,5 @@
 </div>
 {%  block after_form %}
 {% endblock %}
-<!-- Modal -->
-<div class="modal fade border-top border-primary" id="helpTextModal" tabindex="-1" role="dialog"
-     aria-labelledby="helpTextModalLabel"
-     aria-hidden="true">
-    <div class="modal-dialog" role="document">
-        <div class="modal-content">
-            <div class="modal-header bg-light">
-                <h5 class="modal-title" id="exampleModalLabel">Help</h5>
-                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                    <span aria-hidden="true">&times;</span>
-                </button>
-            </div>
-            <div class="modal-body">
-                {% if view.help_text != '' %}
-                {{ view.help_text|linebreaksbr }}
-                {% elif view.service.description != '' %}
-                {{ view.service.description }}
-                {% endif %}
-
-                {% if view.help_link_title != '' and view.help_link != '' %}
-                <p class="mt-5">
-                    <a target="_blank" href="{{ view.help_link }}">
-                        {{ view.help_link_title }}
-                    </a>
-                </p>
-                {% endif %}
-            </div>
-            <div class="modal-footer bg-light text-right">
-                <button type="button" class="btn btn-primary" data-dismiss="modal">Close</button>
-            </div>
-        </div>
-    </div>
-</div>
+{% include 'pan_cnc/help_text_modal.html' %}
 {% endblock %}

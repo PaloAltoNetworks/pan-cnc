@@ -29,6 +29,7 @@ import asyncio
 import json
 import os
 import subprocess
+from asyncio import LimitOverrunError
 from subprocess import Popen
 
 from celery import current_task
@@ -70,7 +71,7 @@ async def cmd_runner(cmd_seq: list, cwd: str, env: dict, o: OutputHolder) -> int
     """
     p = await asyncio.create_subprocess_exec(cmd_seq[0], *cmd_seq[1:],
                                              stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT,
-                                             cwd=cwd, env=env)
+                                             cwd=cwd, env=env, limit=524288)
 
     print(f'Spawned process {p.pid}')
     o.add_metadata(f'CNC: Spawned Process: {p.pid}\n')
@@ -78,16 +79,24 @@ async def cmd_runner(cmd_seq: list, cwd: str, env: dict, o: OutputHolder) -> int
     current_task.update_state(state='PROGRESS', meta=o.get_progress())
 
     while True:
-        line = await p.stdout.readline()
-        if line == b'':
-            break
-
         try:
+            line = await p.stdout.readline()
+            if line == b'':
+                break
+
             o.add_output(line.decode())
             current_task.update_state(state='PROGRESS', meta=o.get_progress())
         except UnicodeDecodeError as ude:
             print(f'Could not read results from task')
             print(ude)
+            return 255
+        except LimitOverrunError as loe:
+            print(f'Could not read results from task due to buffer overrun')
+            print(loe)
+            return 255
+        except ValueError as ve:
+            print('Could not read output from task, possible buffer overrun')
+            print(ve)
             return 255
 
     await p.wait()
@@ -108,24 +117,31 @@ def exec_local_task(cmd_seq: list, cwd: str, env=None) -> str:
     if env is not None and type(env) is dict:
         process_env.update(env)
 
-    o = OutputHolder()
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    r = loop.run_until_complete(cmd_runner(cmd_seq, cwd, process_env, o))
-    loop.stop()
-    print(f'Task {current_task.request.id} return code is {r}')
     state = dict()
-    state['returncode'] = r
+    try:
+        o = OutputHolder()
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        r = loop.run_until_complete(cmd_runner(cmd_seq, cwd, process_env, o))
+        loop.stop()
+        print(f'Task {current_task.request.id} return code is {r}')
+        state['returncode'] = r
+        state['out'] = o.get_output()
+        state['err'] = ''
+    except OSError as ose:
+        print('Caught Error executing task!')
+        print(ose)
+        state['returncode'] = 666
+        state['out'] = str(ose)
+        state['err'] = str(ose)
 
-    # clean out CNC related informational messages
-    # We need to communicate back some information such as spawned process id, but we don't
-    # need to show these to the user after task completion, so filter them out here
-    # FIXME - there should be a better way to do this?
-
-    print('returning output')
-    state['out'] = o.get_output()
-    state['err'] = ''
-    return json.dumps(state)
+    try:
+        print('returning output')
+        return json.dumps(state)
+    except TypeError as te:
+        print('Caught Error Returning Task output!')
+        print(te)
+        return '{{"returncode": 666, "out": "Error Returning Task Output", "err": "TypeError"}}'
 
 
 def exec_sync_local_task(cmd_seq: list, cwd: str, env=None) -> str:
@@ -243,7 +259,7 @@ def python3_init_with_deps(working_dir, tools_dir):
 @shared_task
 def python3_init_existing(working_dir):
     print('Executing task Python3 init with Dependencies')
-    cmd_seq = ['./.venv/bin/python3', '-m', 'pip', 'install', '--upgrade', '-r', 'requirements.txt']
+    cmd_seq = [f'{working_dir}/.venv/bin/pip3', 'install', '--upgrade', '-r', 'requirements.txt']
     env = dict()
     env['PYTHONUNBUFFERED'] = "1"
     return exec_local_task(cmd_seq, working_dir, env)
@@ -259,10 +275,20 @@ def python3_execute_script(working_dir, script, input_type, args):
     env['PYTHONUNBUFFERED'] = "1"
 
     for k, v in args.items():
-        if input_type == 'env':
-            env[k] = v
+        if type(v) is list:
+            # do not try to serialize lists of data objects other than str
+            str_list = []
+            for list_item in v:
+                if type(list_item) is str:
+                    str_list.append(list_item)
+
+            val = ",".join(str_list)
         else:
-            cmd_seq.append(f'--{k}={v}')
+            val = v
+        if input_type == 'env':
+            env[k] = val
+        else:
+            cmd_seq.append(f'--{k}={val}')
 
     print(cmd_seq)
     return exec_local_task(cmd_seq, working_dir, env)
@@ -277,9 +303,20 @@ def python3_execute_bare_script(working_dir, script, input_type, args):
     env['PYTHONUNBUFFERED'] = "1"
 
     for k, v in args.items():
-        if input_type == 'env':
-            env[k] = v
+        if type(v) is list:
+            if type(v) is list:
+                # do not try to serialize lists of data objects other than str
+                str_list = []
+                for list_item in v:
+                    if type(list_item) is str:
+                        str_list.append(list_item)
+
+                val = ",".join(str_list)
         else:
-            cmd_seq.append(f'--{k}={v}')
+            val = v
+        if input_type == 'env':
+            env[k] = val
+        else:
+            cmd_seq.append(f'--{k}={val}')
 
     return exec_local_task(cmd_seq, working_dir, env)

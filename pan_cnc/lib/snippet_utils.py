@@ -141,13 +141,13 @@ def load_snippets_of_type_from_dir(app_name: str, directory: str, snippet_type=N
             snippet_types_dict = dict()
 
         if snippet_type in snippet_types_dict:
-            print(f'Cache hit for {snippet_type}')
+            # print(f'Cache hit for {snippet_type}')
             return snippet_types_dict[snippet_type]
 
         if snippet_type is None:
             # check for JSON deserialized None value. Will appear here as string 'null'
             if 'null' in snippet_types_dict:
-                print(f'Cache hit for {snippet_type}')
+                # print(f'Cache hit for {snippet_type}')
                 return snippet_types_dict['null']
 
         snippet_types_dict[snippet_type] = dict()
@@ -181,7 +181,7 @@ def _check_dir(directory: Path, snippet_type: str, snippet_list: list) -> list:
     err_condition = False
     for d in directory.glob('.meta-cnc.y*'):
         snippet_path = str(d.parent.absolute())
-        print(f'snippet_path is {snippet_path}')
+        # print(f'snippet_path is {snippet_path}')
         try:
             with d.open(mode='r') as sc:
                 raw_service_config = oyaml.safe_load(sc.read())
@@ -621,6 +621,20 @@ def _normalize_snippet_structure(skillet: dict) -> dict:
     elif type(skillet['variables']) is not list:
         skillet['variables'] = list()
 
+    elif type(skillet['variables']) is list:
+        for variable in skillet['variables']:
+            if type(variable) is not dict:
+                print('Removing Invalid Variable Definition')
+                print(type(variable))
+                skillet['variables'].remove(variable)
+            else:
+                if 'name' not in variable:
+                    variable['name'] = 'Unknown variable'
+                if 'type_hint' not in variable:
+                    variable['type_hint'] = 'text'
+                if 'default' not in variable:
+                    variable['default'] = ''
+
     # verify labels stanza is present and is a OrderedDict
     if 'labels' not in skillet:
         skillet['labels'] = OrderedDict()
@@ -687,7 +701,8 @@ def _debug_skillet_structure(skillet: dict) -> list:
     if 'type' not in skillet:
         errs.append('No type attribute in skillet')
     else:
-        valid_types = ['panos', 'panorama', 'panorama-gpcs', 'python3', 'rest', 'terraform', 'template', 'workflow']
+        valid_types = ['panos', 'panorama', 'panorama-gpcs', 'pan_validation',
+                       'python3', 'rest', 'terraform', 'template', 'workflow']
         if skillet['type'] not in valid_types:
             errs.append(f'Unknown type {skillet["type"]} in skillet')
 

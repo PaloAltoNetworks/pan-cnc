@@ -14,6 +14,7 @@
 
 # Author: Nathan Embery nembery@paloaltonetworks.com
 
+import datetime
 import subprocess
 from pathlib import Path
 
@@ -112,7 +113,8 @@ def clone_repository(repo_dir, repo_name, repo_url, branch='master'):
             print(f'USING fake ASKPASS of {true_binary_path}')
             env['GIT_ASKPASS'] = true_binary_path
 
-        Repo.clone_from(repo_url, repo_dir, depth=3, branch=branch, env=env, config='http.sslVerify=false')
+        # remove depth option to allow us to query remote branches
+        Repo.clone_from(repo_url, repo_dir, env=env, config='http.sslVerify=false')
     except (GitCommandError, GitError) as gce:
         raise ImportRepositoryException(gce)
 
@@ -151,26 +153,39 @@ def get_repo_details(repo_name, repo_dir, app_name='cnc'):
     url = str(repo.remotes.origin.url)
     url_details = parse_repo_origin_url(url)
 
+    is_github = False
     if 'github' in url:
         link = f"https://github.com/{url_details['owner']}/{url_details['repo']}"
+        is_github = True
+    elif 'spring.palo' in url:
+        link = f"https://spring.paloaltonetworks.com/{url_details['owner']}/{url_details['repo']}"
     else:
         link = url
 
     if 'repo' not in url_details or url_details['repo'] is None or url_details['repo'] == '':
         url_details['repo'] = repo_name
 
+    branch = 'master'
+    commit_log = list()
+    last_updated = 0
+    last_updated_str = ''
+
     try:
         branch = repo.active_branch.name
         commits = repo.iter_commits(branch, max_count=5)
 
-        commit_log = list()
         for c in commits:
             commit_detail = dict()
-            commit_detail['time'] = str(c.committed_datetime)
+            timestamp = datetime.datetime.fromtimestamp(c.committed_date)
+            commit_detail['time'] = timestamp.strftime('%Y-%m-%d %H:%M')
             commit_detail['author'] = c.author.name
             commit_detail['message'] = c.message
             commit_detail['id'] = str(c)
             commit_log.append(commit_detail)
+
+            if c.committed_date > last_updated:
+                last_updated = c.committed_date
+                last_updated_str = commit_detail['time']
 
     except GitCommandError as gce:
         print('Could not get commits from repo')
@@ -179,6 +194,8 @@ def get_repo_details(repo_name, repo_dir, app_name='cnc'):
         print('Unknown GitError')
         print(ge)
 
+    branches = __get_repo_branches(repo)
+
     repo_detail = dict()
     repo_detail['name'] = repo_name
     repo_detail['label'] = url_details['repo']
@@ -186,8 +203,12 @@ def get_repo_details(repo_name, repo_dir, app_name='cnc'):
     repo_detail['dir'] = repo_name
     repo_detail['url'] = url
     repo_detail['branch'] = branch
+    repo_detail['branches'] = branches
     repo_detail['commits'] = commit_log
     repo_detail['commits_url'] = get_repo_commits_url(url)
+    repo_detail['last_updated'] = last_updated_str
+    repo_detail['last_updated_time'] = last_updated
+    repo_detail['is_github'] = is_github
 
     upstream_details = get_repo_upstream_details(repo_name, url, app_name)
     if 'description' in upstream_details:
@@ -202,10 +223,12 @@ def get_repo_details(repo_name, repo_dir, app_name='cnc'):
     return repo_detail
 
 
-def update_repo(repo_dir):
+def update_repo(repo_dir: str, branch=None):
     """
     Pull the latest updates from a repository
-    :param repo_dir:
+    :param app_name: current application name
+    :param repo_dir: directory of repo to update
+    :param branch: branch to switch to before update
     :return:
     """
     repo_path = Path(repo_dir)
@@ -215,9 +238,18 @@ def update_repo(repo_dir):
 
     try:
         repo = Repo(repo_dir)
+
         changes = repo.index.diff(None)
         if len(changes) > 0:
             print('There are local changes that may get lost if we update!')
+
+        checkout = False
+        if branch is not None:
+            current_branch = repo.active_branch.name
+            if branch != current_branch:
+                print(f'Checking out new branch: {branch}')
+                checkout = True
+                repo.git.checkout(branch)
 
         f = repo.remotes.origin.pull()
     except GitCommandError as gce:
@@ -233,6 +265,9 @@ def update_repo(repo_dir):
         print(ge)
         return 'Could not update, Unknown error with git repository'
 
+    if checkout:
+        return f"Updated to new Branch: {branch}"
+
     if len(f) > 0:
         flags = f[0].flags
         if flags == 4:
@@ -243,6 +278,63 @@ def update_repo(repo_dir):
             return "Error: Unknown flag returned"
 
     return "Unknown Error"
+
+
+def get_repo_branches_from_dir(repo_dir: str) -> list:
+
+    repo = Repo(repo_dir)
+    try:
+        g = repo.git
+        fc = g.config(['--get',  'remote.origin.fetch'])
+        if fc != '+refs/heads/*:refs/remotes/origin/*':
+            print('updating from shallow repo')
+            g.config(['remote.origin.fetch', '+refs/heads/*:refs/remotes/origin/*'])
+
+    except GitCommandError as gce:
+        print(gce)
+    except GitError as ge:
+        print(ge)
+
+    return __get_repo_branches(repo)
+
+
+def __get_repo_branches(repo: Repo) -> list:
+    """
+    Returns a list of branches for the given Git Repo object
+    :param repo: Git Repo object
+    :return: list of branch names available
+    """
+
+    # keep a list of branches
+    branches = list()
+
+    # always keep at least the current active branch
+    branch = repo.active_branch.name
+    branches.append(branch)
+
+    try:
+        repo.git.fetch('--all')
+        raw_branches = repo.git.branch('-r')
+        # branches will be raw output from git command like:
+        # '  origin/HEAD -> origin/master\n  origin/develop\n  origin/master\n'
+        remote_name = repo.remote().name
+        # clean up the output into a list
+        for b in raw_branches.split('\n'):
+            if '->' in b:
+                # skip line that shows currently tracked branch, we don't need that here
+                continue
+            parsed_branch = b.replace(remote_name + '/', '').strip()
+            if parsed_branch not in branches:
+                branches.append(parsed_branch)
+
+    except GitCommandError as gce:
+        print('Could not get branches from repo')
+        print(gce)
+    except GitError as ge:
+        print('Unknown GitError')
+        print(ge)
+    finally:
+        return branches
 
 
 def get_repo_upstream_details(repo_name: str, repo_url: str, app_name: str) -> dict:
@@ -351,3 +443,29 @@ def parse_repo_origin_url(repo_url):
     url_details['repo'] = repo
 
     return url_details
+
+
+def update_repo_in_cache(repo_name: str, repo_dir: str, app_dir: str) -> None:
+    """
+    Updates a single repo_details dict in the imported_repos cached list
+    :param repo_name: name of the repo to update
+    :param repo_dir: dir of the repo to update
+    :param app_dir: current application
+    :return: None
+    """
+    cnc_utils.set_long_term_cached_value(app_dir, f'{repo_name}_detail', None, 0, 'git_repo_details')
+
+    # get updated repo_details
+    updated_repo_details = get_repo_details(repo_name, repo_dir, app_dir)
+
+    # now, find and remove the old details
+    repos = cnc_utils.get_long_term_cached_value(app_dir, 'imported_repositories')
+    for r in repos:
+        if r.get('name', '') == repo_name:
+            repos.remove(r)
+            break
+
+    # add our new repo details and re-cache
+    repos.append(updated_repo_details)
+    cnc_utils.set_long_term_cached_value(app_dir, 'imported_repositories', repos, 604800,
+                                         'imported_git_repos')

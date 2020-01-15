@@ -20,7 +20,7 @@ def save_long_term_cache(sender, **kwargs) -> None:
     for app_name in apps_to_save:
         cache_key = f"{app_name}_cache"
         ltc = cache.get(cache_key, dict())
-        print(f'Saving {app_name} to long term cache')
+        # print(f'Saving {app_name} to long term cache')
         cnc_utils.save_long_term_cache(app_name, ltc)
 
     cache.set('ltc_dirty', list())

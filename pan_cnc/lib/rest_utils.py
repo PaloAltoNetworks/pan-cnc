@@ -59,6 +59,13 @@ def execute_all(meta_cnc, app_dir, context):
 
     session = requests.Session()
 
+    # create our jinja env and load filters only once
+    environment = Environment(loader=BaseLoader())
+
+    for f in jinja_filters.defined_filters:
+        if hasattr(jinja_filters, f):
+            environment.filters[f] = getattr(jinja_filters, f)
+
     try:
         # execute our rest call for each item in the 'snippets' stanza of the meta-cnc file
         for snippet in meta_cnc['snippets']:
@@ -67,7 +74,16 @@ def execute_all(meta_cnc, app_dir, context):
                 raise CCFParserError
 
             name = snippet.get('name', '')
-            rest_path = snippet.get('path', '/api')
+
+            # allow snippets to be skipped using the 'when' attribute
+            if 'when' in snippet:
+                when_template = environment.from_string(snippet.get('when', ''))
+                when_result = str(when_template.render(context))
+                if when_result.lower() == 'false' or when_result.lower() == 'no':
+                    print(f'Skipping snippet {name} due to when condition false')
+                    continue
+
+            rest_path = snippet.get('path', '/api').strip()
             rest_op = str(snippet.get('operation', 'get')).lower()
             payload_name = snippet.get('payload', '')
             header_dict = snippet.get('headers', dict())
@@ -87,14 +103,10 @@ def execute_all(meta_cnc, app_dir, context):
             if accepts_type:
                 headers['Accepts-Type'] = accepts_type
 
-            environment = Environment(loader=BaseLoader())
-
-            for f in jinja_filters.defined_filters:
-                if hasattr(jinja_filters, f):
-                    environment.filters[f] = getattr(jinja_filters, f)
-
             path_template = environment.from_string(rest_path)
-            url = path_template.render(context)
+            # fix for #111 - ensure we strip and replace only after rendering to ensure inline conditionals work
+            # as expected.
+            url = path_template.render(context).replace('\n', '').replace(' ', '')
 
             for k, v in header_dict.items():
                 v_template = environment.from_string(v)
@@ -114,40 +126,51 @@ def execute_all(meta_cnc, app_dir, context):
                         print('Loading json data from payload')
                         try:
                             payload = json.loads(payload_interpolated)
-                        except ValueError as ve:
+                        except ValueError:
                             print('Could not load payload as json data!')
                             payload = payload_interpolated
                     else:
                         payload = payload_interpolated
 
-                    print('Using payload of')
-                    print(payload)
-                    print(url)
-                    print(headers)
-                    # FIXME - assumes JSON content_type and accepts, should take into account the values
-                    # FIXME - of content-type and accepts_type from above if they were supplied
                     res = session.post(url, data=payload, verify=False, headers=headers)
                     if res.status_code != 200:
                         print('Found a non-200 response status_code!')
                         print(res.status_code)
                         response['snippets'][name] = res.text
+                        response['status'] = 'error'
+                        response['message'] = res.status_code
                         break
 
-                r = res.text
+                    if res.headers.get('content-type') == 'application/json':
+                        try:
+                            r = res.json()
+                        except ValueError:
+                            print('Could not parse JSON response from request')
+                            r = res.text
+                    else:
+                        r = res.text
 
             elif rest_op == 'get':
-                print('Performing REST get')
+                print(f'Performing REST get for snippet: {name}')
                 res = session.get(url, verify=False)
-                r = res.text
+                if res.headers.get('content-type') == 'application/json':
+                    try:
+                        r = res.json()
+                    except ValueError:
+                        r = res.text
+                else:
+                    r = res.text
+
                 if res.status_code != 200:
                     response['status'] = 'error'
+                    response['message'] = res.status_code
                     response['snippets'][name] = r
                     break
 
             else:
                 print('Unknown REST operation found')
                 response['status'] = 'Error'
-                response['message'] = 'Unkonwn REST operation found'
+                response['message'] = 'Unknown REST operation found'
                 return response
 
             # collect the response text or json and continue
@@ -158,6 +181,7 @@ def execute_all(meta_cnc, app_dir, context):
             if 'outputs' in snippet:
                 outputs = output_utils.parse_outputs(meta_cnc, snippet, r)
                 response['snippets'][name]['outputs'] = outputs
+                context.update(outputs)
 
         # return all the collected response
         return response

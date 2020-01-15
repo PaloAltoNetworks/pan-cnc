@@ -308,7 +308,7 @@ def get_long_term_cached_value(app_name: str, key: str) -> any:
         print(f'Aging out cache item for {key}')
         return None
 
-    print(f'Cache hit for {key}')
+    # print(f'Cache hit for {key}')
     return ltc.get(key, None)
 
 

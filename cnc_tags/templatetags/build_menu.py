@@ -7,7 +7,6 @@ register = template.Library()
 
 @register.simple_tag
 def build_menu():
-
     menu = cache.get('pan_cnc_menu', None)
     if menu is not None:
         return menu

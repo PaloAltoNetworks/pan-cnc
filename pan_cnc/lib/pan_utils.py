@@ -72,13 +72,15 @@ def panos_login(pan_device_ip=None, pan_device_username=None, pan_device_passwor
         return None
 
 
-def panos_login_verbose(pan_device_ip=None, pan_device_username=None, pan_device_password=None) -> pan.xapi.PanXapi:
+def panos_login_verbose(pan_device_ip=None, pan_device_username=None, pan_device_password=None,
+                        pan_device_port=443) -> pan.xapi.PanXapi:
     """
     Using the pan-xapi to log in to a PAN-OS or Panorama instance. If supplied ip, username, and password are None
     this will attempt to find them via environment variables 'PANORAMA_IP', 'PANORAMA_USERNAME', and 'PANORAMA_PASSWORD'
     :param pan_device_ip: ip address of the target instance
     :param pan_device_username: username to use
     :param pan_device_password: password to use
+    :param pan_device_port: port to use
     :return: PanXapi object
     """
     global xapi_obj
@@ -86,22 +88,21 @@ def panos_login_verbose(pan_device_ip=None, pan_device_username=None, pan_device
     if xapi_obj is not None:
         if pan_device_ip is not None:
             if xapi_obj.hostname == pan_device_ip and xapi_obj.api_username == pan_device_username \
-                    and xapi_obj.api_password == pan_device_password:
+                    and xapi_obj.api_password == pan_device_password and xapi_obj.port == pan_device_port:
                 # an IP was specified and we have already connected to it
-                # oterhwise, fall through to get credentials and do another connection attempt
+                # otherwise, fall through to get credentials and do another connection attempt
                 print('Returning cached xapi object')
                 return xapi_obj
             else:
-                print('Clearing old PanXapi credentials')
-                xapi_obj = None
-                cache.set('panorama_api_key', None)
+                print('Clearing old panos credentials')
+                clear_credentials()
 
         else:
             # no new credentials passed, but we have already connected, return the current connection
             return xapi_obj
     try:
         print(f'performing xapi init for {pan_device_ip}')
-        credentials = get_panos_credentials(pan_device_ip, pan_device_username, pan_device_password)
+        credentials = get_panos_credentials(pan_device_ip, pan_device_username, pan_device_password, pan_device_port)
         xapi_obj = pan.xapi.PanXapi(**credentials)
         if 'api_key' not in credentials:
             print('Setting API KEY')
@@ -115,8 +116,7 @@ def panos_login_verbose(pan_device_ip=None, pan_device_username=None, pan_device
         print(pxe)
         err_msg = str(pxe)
 
-        xapi_obj = None
-        cache.set('panorama_api_key', None)
+        clear_credentials()
 
         if '403' in err_msg:
             raise TargetLoginException('Invalid credentials logging into device')
@@ -138,19 +138,21 @@ def test_panorama() -> None:
     print(xapi.xml_result())
 
 
-def get_panos_credentials(pan_device_ip, pan_device_username, pan_device_password) -> dict:
+def get_panos_credentials(pan_device_ip, pan_device_username, pan_device_password, pan_device_port=443) -> dict:
     """
     Returns a dict containing the panorama or PAN-OS credentials. If supplied args are None, attempt to load them
     via the Environment.
-    :param pan_device_ip:
-    :param pan_device_username:
-    :param pan_device_password:
+    :param pan_device_ip: IP or Hostname
+    :param pan_device_username: Username
+    :param pan_device_password: Password
+    :param pan_device_port: Port to use to connect to the device
     :return:
     """
     if pan_device_ip is None or pan_device_username is None or pan_device_password is None:
         # check the env for it if not here
         # FIXME - this should be renamed to TARGET or some other value that is not specific to PANORAMA
         pan_device_ip = os.environ.get('PANORAMA_IP', '0.0.0.0')
+        pan_device_port = os.environ.get('PANORAMA_PORT', '443')
         pan_device_username = os.environ.get('PANORAMA_USERNAME', 'admin')
         pan_device_password = os.environ.get('PANORAMA_PASSWORD', 'admin')
 
@@ -158,13 +160,12 @@ def get_panos_credentials(pan_device_ip, pan_device_username, pan_device_passwor
     credentials["hostname"] = pan_device_ip
     credentials["api_username"] = pan_device_username
     credentials["api_password"] = pan_device_password
+    credentials["api_port"] = pan_device_port
 
     api_key = cache.get('panorama_api_key', None)
     if api_key is not None:
-        print('Using API KEY')
         credentials['api_key'] = api_key
 
-    print(credentials)
     return credentials
 
 
@@ -219,6 +220,14 @@ def push_meta(meta, context, force_sync=False, perform_commit=True) -> (str, Non
             xpath = snippet['xpath']
             xml_file_name = snippet['file']
 
+            # allow snippets to be skipped using the 'when' attribute
+            if 'when' in snippet:
+                when_template = environment.from_string(snippet.get('when', ''))
+                when_result = str(when_template.render(context))
+                if when_result.lower() == 'false' or when_result.lower() == 'no':
+                    print(f'Skipping snippet {name} due to when condition false')
+                    continue
+
             xml_full_path = os.path.join(snippets_dir, xml_file_name)
             with open(xml_full_path, 'r') as xml_file:
                 xml_string = xml_file.read()
@@ -230,8 +239,9 @@ def push_meta(meta, context, force_sync=False, perform_commit=True) -> (str, Non
 
                 xml_template = environment.from_string(xml_string)
                 xpath_template = environment.from_string(xpath)
-                xml_snippet = xml_template.render(context).replace('\n', '')
-                xpath_string = xpath_template.render(context)
+                # fix for #74, ensure multiline xpaths do not contain newlines or spaces
+                xml_snippet = xml_template.render(context).strip().replace('\n', '')
+                xpath_string = xpath_template.render(context).strip().replace('\n', '').replace(' ', '')
                 print('Pushing xpath: %s' % xpath_string)
                 try:
                     xapi.set(xpath=xpath_string, element=xml_snippet)
@@ -240,9 +250,14 @@ def push_meta(meta, context, force_sync=False, perform_commit=True) -> (str, Non
                     elif xapi.status_code == '7':
                         raise CCFParserError(f'xpath {xpath_string} was NOT found for skillet: {name}')
                 except pan.xapi.PanXapiError as pxe:
-                    raise CCFParserError(
-                        f'Could not push skillet {name} / snippet {xml_file_name}! {pxe}'
-                    )
+                    err_msg = str(pxe)
+                    if '403' in err_msg:
+                        # Auth issue, let's clear the api_key and bail out!
+                        xapi = None
+                        clear_credentials()
+
+                    raise CCFParserError(f'Could not push skillet {name} / snippet {xml_file_name}! {pxe}')
+
         if perform_commit:
 
             if 'type' not in meta:
@@ -352,6 +367,12 @@ def debug_meta(meta: dict, context: dict) -> dict:
             raise CCFParserError(err)
 
     return rendered_snippets
+
+
+def clear_credentials():
+    global xapi_obj
+    xapi_obj = None
+    cache.set('panorama_api_key', None)
 
 
 def validate_snippet_present(service, context) -> bool:

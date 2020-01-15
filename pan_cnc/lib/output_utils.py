@@ -27,6 +27,25 @@ from pan_cnc.lib.exceptions import CCFParserError
 def parse_outputs(meta: dict, snippet: dict, results: str) -> dict:
     """
     Parse the results object and return a list of outputs as defined in the meta-cnc structure
+    Example:
+    - name: system_info
+        path: /api/?type=op&cmd=<show><system><info></info></system></show>&key={{ api_key }}
+        output_type: xml
+        outputs:
+          - name: hostname
+            capture_pattern: result/system/hostname
+          - name: uptime
+            capture_pattern: result/system/uptime
+          - name: sw_version
+            capture_pattern: result/system/sw-version
+
+    JSON Example:
+  - name: addresses
+    path: https://{{ TARGET_IP }}/restapi/9.0/Objects/Addresses?location=vsys&vsys=vsys1&key={{ api_key }}
+    output_type: json
+    outputs:
+      - name: addresses
+        capture_pattern: $.result.entry[*].'@name'
     """
     outputs = dict()
 
@@ -43,9 +62,39 @@ def parse_outputs(meta: dict, snippet: dict, results: str) -> dict:
     elif snippet['output_type'] == 'base64':
         outputs = _handle_base64_outputs(snippet, results)
     elif snippet['output_type'] == 'json':
-        print('GOT JSON OUTPUT')
         outputs = _handle_json_outputs(snippet, results)
+    elif snippet['output_type'] == 'text':
+        # FR: allow output_type = 'text'
+        outputs = _handle_text_outputs(snippet, results)
 
+    return outputs
+
+
+def _handle_text_outputs(snippet: dict, results: str) -> dict:
+    """
+    Parse the results string as a text blob into a single variable.
+
+    - name: system_info
+      path: /api/?type=op&cmd=<show><system><info></info></system></show>&key={{ api_key }}
+      output_type: text
+      outputs:
+        - name: system_info_as_xml
+
+    :param snippet: snippet definition from the Skillet
+    :param results: results string from the action
+    :return: dict of outputs, in this case a single entry
+    """
+    snippet_name = snippet['name']
+    outputs = dict()
+
+    if 'outputs' not in snippet:
+        print('No outputs defined in this snippet')
+        return outputs
+
+    outputs_config = snippet.get('outputs', [])
+    first_output = outputs_config[0]
+    output_name = first_output.get('name', snippet_name)
+    outputs[output_name] = results
     return outputs
 
 
@@ -88,7 +137,23 @@ def _handle_xml_outputs(snippet: dict, results: str) -> dict:
 
             var_name = output['name']
             capture_pattern = output['capture_pattern']
-            outputs[var_name] = xml_doc.findtext(capture_pattern)
+            # FR #81 - add ability to capture list from output
+            # outputs[var_name] = xml_doc.findtext(capture_pattern)
+            print(results)
+            entries = xml_doc.findall(capture_pattern)
+            print(entries)
+            if len(entries) == 1:
+                outputs[var_name] = entries.pop().text
+            else:
+                capture_list = list()
+                for entry in entries:
+                    print('checking entry')
+                    print(entry)
+                    print(elementTree.tostring(entry))
+                    capture_list.append(entry.text)
+
+                outputs[var_name] = capture_list
+
     except ParseError:
         print('Could not parse XML document in output_utils')
         # just return blank outputs here
@@ -152,13 +217,19 @@ def _handle_json_outputs(snippet: dict, results: str) -> dict:
 
             json_object = json.loads(results)
             var_name = output['name']
-            capture_pattern = output['capture_pattern']
+            # Fix for #96 - allow default capture pattern of the root object
+            capture_pattern = output.get('capture_pattern', '$')
             jsonpath_expr = parse(capture_pattern)
             result = jsonpath_expr.find(json_object)
             if len(result) == 1:
-                outputs[var_name] = str(result[0].value)
+                outputs[var_name] = result[0].value
             else:
-                outputs[var_name] = ''
+                # FR #81 - add ability to capture from a list
+                capture_list = list()
+                for r in result:
+                    capture_list.append(r.value)
+
+                outputs[var_name] = capture_list
 
     except ValueError as ve:
         print('Caught error converting results to json')

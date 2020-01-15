@@ -5,15 +5,17 @@
     <script type="text/javascript">
         let time_left = 5;
         let cancel_countdown = false;
+        let captured_output = '';
 
         function updateOutput() {
             time_left = 5;
             $.get('/logs').done(function (json_data) {
                 console.log(json_data);
-
+                let r = $('#results');
                 let msg = '';
                 let status = '';
                 let returncode = 255;
+                let output = '';
 
                 if (typeof (json_data) === "string") {
                     msg = 'Error executing task';
@@ -24,14 +26,28 @@
                     msg = json_data['output'];
                     status = json_data['status'];
                     returncode = json_data['returncode'];
-
+                    if ('output' in json_data) {
+                        output = json_data['output'];
+                    }
                     if ('captured_output' in json_data) {
                         console.log(json_data['captured_output']);
-                        msg = "Completed Execution";
+                        captured_output = json_data['captured_output'];
+                        msg = "Successfully captured Skillet output. Click 'Show Captured Values' to view raw output.";
+                        r.height(40);
+                    }
+                }
+                r.html(msg);
+                if (msg !== '') {
+                    let current_height = r.height();
+                    let current_scrollheight = r.get(0).scrollHeight;
+                    // not sure where this extra 24 px comes from, but we only need to adjust when it's
+                    // greater than 25 or so
+                    if ((current_scrollheight - current_height) > 25) {
+                        let r_height = r.get(0).scrollHeight + 10;
+                        r.height(r_height);
                     }
                 }
 
-                $('#results').html(msg);
                 if (status !== 'exited') {
                     console.log('checking again');
                     countdown();
@@ -46,23 +62,46 @@
 
                     let next_link = $('<a/>');
                     if (returncode === 0) {
-                        let old_title = t.html();
-                        t.html("Completed: " + old_title);
+                        t.html("Completed: {{ view.service.label }}");
                         {% if request.session.task_next %}
                             next_link.attr('href', '/next_task');
-                            next_link.html('Continue');
+                            next_link.html('Next');
                             next_link.addClass('btn').addClass('btn-primary');
+                        {% elif request.session.next_step %}
+                            next_link.attr('href', '/workflow/{{ request.session.next_step }}');
+                            next_link.addClass('btn').addClass('btn-primary');
+                               {% if request.session.last_step %}
+                                   next_link.html('Complete');
+                               {% else %}
+                                   next_link.html('Next');
+                               {% endif %}
                         {% else %}
                             next_link.attr('href', '{{ request.session.last_page|urlencode }}');
                             next_link.html('Continue');
                             next_link.addClass('btn').addClass('btn-primary');
                         {% endif %}
                     } else {
+                        f.empty();
                         next_link.attr('href', '{{ request.session.last_page|urlencode }}');
                         next_link.html('Continue');
                         next_link.addClass('btn').addClass('btn-danger');
+                        if (output !== '') {
+                            r.html(output);
+                            let r_height = r.get(0).scrollHeight + 10;
+                            r.height(r_height);
+                        }
                         c.append('Error Executing Task');
                         c.append('<br>');
+                    }
+
+                    // check for captured_variables
+                    if ('captured_output' in json_data) {
+                        let debug_link = $('<a/>');
+                        debug_link.attr('href', '#');
+                        debug_link.attr('onclick', 'show_captured_values();');
+                        debug_link.addClass('btn').addClass('btn-success').addClass('mr-2');
+                        debug_link.html('Show Captured Values');
+                        f.append(debug_link);
                     }
                     f.append(next_link);
                 }
@@ -78,9 +117,16 @@
                     c.append('Error Executing Task');
                     c.append('<br>');
                     let f = $('#footer');
+                    f.empty();
                     f.append(next_link);});
         }
+        function show_captured_values() {
+            let r = $('#results');
+            r.html(captured_output);
 
+            let r_height = r.get(0).scrollHeight + 10;
+            r.height(r_height);
+        }
         function countdown() {
             let c = $('#countdown');
             if (cancel_countdown === true) {
@@ -126,21 +172,15 @@
             </h4>
             <div class="card-text">
                 <p>{{ view_message }}</p>
-                <pre id="results" class="pb-4">{{ results }}</pre>
+                <textarea id="results" class="text-monospace small pb-4 border-0" style="width: 100%; overflow: scroll">{{ results }}</textarea>
                 <pre id="countdown"></pre>
             </div>
 
         </div>
         <div class="card-footer text-right">
             <p class="card-text" id="footer">
-                {% if request.session.next_step %}
-                    {% if request.session.last_step %}
-                        <a href="/workflow/{{ request.session.next_step }}" class="btn btn-primary">Complete</a>
-                    {% else %}
-                        <a href="/workflow/{{ request.session.next_step }}" class="btn btn-primary">Continue</a>
-                    {% endif %}
-                {% elif completed %}
-                    <a href="{{ request.session.last_page|urlencode }}" class="btn btn-primary">Continue</a>
+                {% if completed %}
+                    <a href="{{ request.session.last_page|urlencode }}" class="btn btn-primary">Complete</a>
                 {% endif %}
             </p>
         </div>

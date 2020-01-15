@@ -35,8 +35,12 @@ def sha512_hash(txt):
 
 
 def b64encode(txt):
-    return urlsafe_b64encode(txt)
+    if type(txt) is str:
+        txt = txt.encode('UTF-8')
+    return urlsafe_b64encode(txt).decode('UTF-8')
 
 
 def b64decode(txt):
-    return urlsafe_b64decode(txt)
+    if type(txt) is str:
+        txt = txt.encode('UTF-8')
+    return urlsafe_b64decode(txt).decode('UTF-8')

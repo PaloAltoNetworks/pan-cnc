@@ -28,12 +28,20 @@ def __build_cmd_seq_vars(resource_def, snippet_context):
     sanity_checked_vars = dict()
     for v in list(resource_def['variables']):
         var_name = v['name']
+        var_type = v['type_hint']
         if var_name in snippet_context:
-            sanity_checked_vars[var_name] = snippet_context[var_name]
+            if var_type == 'list' and type(snippet_context[var_name]) is list:
+                try:
+                    sanity_checked_vars[var_name] = json.dumps(snippet_context[var_name])
+                except ValueError:
+                    print('Could not convert list to terraform list string')
+                    sanity_checked_vars[var_name] = snippet_context[var_name]
+            else:
+                sanity_checked_vars[var_name] = snippet_context[var_name]
         else:
             print('Not found in snippet_context')
 
-    print(sanity_checked_vars)
+    # print(sanity_checked_vars)
     return sanity_checked_vars
 
 

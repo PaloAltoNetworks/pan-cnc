@@ -130,6 +130,18 @@
         </div>
     </div>
 
+        <div class="card border-primary mb-5 shadow-lg rounded">
+        <div class="card-header">Add Secret fron Context</div>
+        <div class="card-body">
+            <p class="card-text">
+            <form action="{{ action }}" method="post">
+                {% csrf_token %}
+                {% include 'pan_cnc/bootstrap_form.html' with form=form %}
+                <button type="submit" class="btn btn-primary">Submit</button>
+            </form>
+            </p>
+        </div>
+    </div>
         <!-- Modal -->
     <div class="modal fade border-top border-primary" id="helpTextModal" tabindex="-1" role="dialog" aria-labelledby="helpTextModalLabel"
          aria-hidden="true">
