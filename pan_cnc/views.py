@@ -338,6 +338,20 @@ class CNCBaseAuth(LoginRequiredMixin, View):
         else:
             return f"Step {next_step}: {self.header}"
 
+    def clean_up_workflow(self):
+        self.request.session.pop('next_step', None)
+        self.request.session.pop('last_step', None)
+        self.request.session.pop('next_url', None)
+        self.pop_value_from_workflow('workflow_name', '')
+
+    def error_out(self, message: str) -> HttpResponseRedirect:
+        messages.add_message(self.request, messages.ERROR, message)
+        # clean up any workflow related items
+        self.clean_up_workflow()
+        # try to grab a sensible next page to redirect to
+        next_url = self.request.session.pop('last_page', '/')
+        return HttpResponseRedirect(next_url)
+
 
 class CNCView(CNCBaseAuth, TemplateView):
     """
@@ -1278,6 +1292,7 @@ class EditTargetView(CNCBaseAuth, FormView):
         meta = snippet_utils.load_snippet_with_name(snippet_name, self.app_dir)
         if meta is None:
             messages.add_message(self.request, messages.ERROR, 'Process Error - Could not load meta')
+            return HttpResponseRedirect('/')
 
         self.meta = meta
 
@@ -1394,6 +1409,7 @@ class EditTargetView(CNCBaseAuth, FormView):
         context['title'] = title
         return context
 
+
     def form_valid(self, form):
         """
         form_valid is always called on a blank / new form, so this is essentially going to get called on every POST
@@ -1406,10 +1422,13 @@ class EditTargetView(CNCBaseAuth, FormView):
         snippet_name = self.get_value_from_workflow('snippet_name', '')
 
         if snippet_name == '':
-            print('Could not find a valid meta-cnc def')
-            raise SnippetRequiredException
+            return self.error_out('No Skilet provided!')
 
         meta = snippet_utils.load_snippet_with_name(snippet_name, self.app_dir)
+
+        if meta is None:
+            return self.error_out('Could not load Skillet!')
+
         # Grab the values from the form, this is always hard-coded in this class
         target_ip = self.request.POST.get('TARGET_IP', None)
         target_port = self.request.POST.get('TARGET_PORT', 443)
@@ -1522,8 +1541,7 @@ class EditTargetView(CNCBaseAuth, FormView):
             try:
                 p.backup_config()
             except PanoplyException as tce:
-                messages.add_message(self.request, messages.ERROR, str(tce))
-                return self.form_invalid(form)
+                return self.error_out('Connected to Device but could not perform backup!')
 
         try:
             panos_skillet = PanosSkillet(self.meta, p)
@@ -1535,7 +1553,9 @@ class EditTargetView(CNCBaseAuth, FormView):
                     self.save_value_to_workflow(k, v)
 
             if result != 'success':
-                messages.add_message(self.request, messages.ERROR, f'Could not push Configuration!')
+                print(outputs)
+                return self.error_out('Could not execute Skillet on device!')
+
             elif result == 'success' and perform_commit:
                 commit_result = p.commit(force_sync)
 
@@ -1554,8 +1574,7 @@ class EditTargetView(CNCBaseAuth, FormView):
                                      'Configuration added to Candidate Config successfully')
 
         except PanoplyException as pe:
-            messages.add_message(self.request, messages.ERROR, f'Could not push Configuration: {pe}')
-            return HttpResponseRedirect(f"{self.app_dir}/")
+            return self.error_out(f'Error Executing Skillet on Device! {pe}')
 
         # fix for #72, in non-workflow case, revert to using our captured last_page visit
         # next_url = self.pop_value_from_workflow('next_url', None)
@@ -1883,7 +1902,7 @@ class NextTaskView(CNCView):
         #
 
         elif task_next == 'python3_execute':
-            r = task_utils.python3_execute(skillet, self.get_workflow())
+            r = task_utils.python3_execute(skillet, self.get_snippet_variables_from_workflow())
             new_next = ''
             title = f"Executing Script: {skillet['label']}"
 
@@ -1973,6 +1992,7 @@ class TaskLogsView(CNCBaseAuth, View):
             elif task_result.failed():
                 logs_output['status'] = 'exited'
                 logs_output['output'] = 'Task Failed, check logs for details'
+                self.clean_up_workflow()
             elif task_result.status == 'PROGRESS':
                 logs_output['status'] = task_result.state
                 task_output = str(task_result.info)
@@ -2001,7 +2021,7 @@ class TaskLogsView(CNCBaseAuth, View):
             logs_output['output'] = 'Error converting object'
             logs_output['status'] = 'exited'
             logs_output['returncode'] = 255
-
+            self.clean_up_workflow()
             return HttpResponse(json.dumps(logs_output), content_type="application/json")
 
         return HttpResponse(logs_out_str, content_type="application/json")
@@ -2021,14 +2041,12 @@ class WorkflowView(CNCBaseAuth, RedirectView):
 
     def get_redirect_url(self, *args, **kwargs):
 
-        current_step_str = self.kwargs.get('step')
-        current_step = 0
+        current_step_str = self.kwargs.get('step', 0)
         print(f"Current step is {current_step_str}")
         try:
             current_step = int(current_step_str)
         except ValueError as ve:
-            print('Could not parse current step index!')
-            print(ve)
+            return self.error_out('Could not find current workflow state')
 
         if current_step == 0:
             # get the actual workflow skillet that was selected
@@ -2044,16 +2062,13 @@ class WorkflowView(CNCBaseAuth, RedirectView):
         print(f"found workflow skillet name {skillet_name}")
         self.meta = snippet_utils.load_snippet_with_name(skillet_name, self.app_dir)
         if self.meta is None:
-            messages.add_message(self.request, messages.ERROR, 'Process Error - No skillet could be loaded')
-            return '/'
+            return self.error_out('Process Error - No skillet could be loaded')
 
         if 'snippets' not in self.meta or 'type' not in self.meta:
-            messages.add_message(self.request, messages.ERROR, 'Malformed .meta-cnc')
-            return '/'
+            return self.error_out('Malformed Skillet!')
 
         if self.meta['type'] != 'workflow':
-            messages.add_message(self.request, messages.ERROR, 'Process Error - not a workflow skillet!')
-            return '/'
+            return self.error_out('Process Error - not a Workflow Skillet!')
 
         if len(self.meta['snippets']) <= current_step:
             print('All done here! Redirect to last captured page')
@@ -2065,8 +2080,7 @@ class WorkflowView(CNCBaseAuth, RedirectView):
             return last_page
 
         if 'name' not in self.meta['snippets'][current_step]:
-            messages.add_message(self.request, messages.ERROR, 'Malformed .meta-cnc workflow step')
-            return '/'
+            return self.error_out('Malformed .meta-cnc workflow step')
 
         # there is no guarantee this skillet will actually run due to when conditionals, set the value to None
         # and check later
@@ -2135,7 +2149,7 @@ class WorkflowView(CNCBaseAuth, RedirectView):
         elif current_skillet_type == 'pan_validation':
             # fixme - very ugly mixing of code here, this should be pushed up into panhandler
             # of the validate stuff should be pushed here
-            return f'/panhandler/validate/{snippet.name}'
+            return f'/panhandler/validate/{current_skillet_name}'
         else:
             return '/provision'
 

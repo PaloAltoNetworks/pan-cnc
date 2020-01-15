@@ -40,7 +40,9 @@
                 if (msg !== '') {
                     let current_height = r.height();
                     let current_scrollheight = r.get(0).scrollHeight;
-                    if (current_height < current_scrollheight) {
+                    // not sure where this extra 24 px comes from, but we only need to adjust when it's
+                    // greater than 25 or so
+                    if ((current_scrollheight - current_height) > 25) {
                         let r_height = r.get(0).scrollHeight + 10;
                         r.height(r_height);
                     }
