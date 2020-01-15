@@ -344,13 +344,13 @@ class CNCBaseAuth(LoginRequiredMixin, View):
         self.request.session.pop('next_url', None)
         self.pop_value_from_workflow('workflow_name', '')
 
-    def error_out(self, message: str) -> HttpResponseRedirect:
+    def error_out(self, message: str) -> str:
         messages.add_message(self.request, messages.ERROR, message)
         # clean up any workflow related items
         self.clean_up_workflow()
         # try to grab a sensible next page to redirect to
         next_url = self.request.session.pop('last_page', '/')
-        return HttpResponseRedirect(next_url)
+        return next_url
 
 
 class CNCView(CNCBaseAuth, TemplateView):
@@ -1409,7 +1409,6 @@ class EditTargetView(CNCBaseAuth, FormView):
         context['title'] = title
         return context
 
-
     def form_valid(self, form):
         """
         form_valid is always called on a blank / new form, so this is essentially going to get called on every POST
@@ -1422,12 +1421,12 @@ class EditTargetView(CNCBaseAuth, FormView):
         snippet_name = self.get_value_from_workflow('snippet_name', '')
 
         if snippet_name == '':
-            return self.error_out('No Skilet provided!')
+            return HttpResponseRedirect(self.error_out('No Skilet provided!'))
 
         meta = snippet_utils.load_snippet_with_name(snippet_name, self.app_dir)
 
         if meta is None:
-            return self.error_out('Could not load Skillet!')
+            return HttpResponseRedirect(self.error_out('Could not load Skillet!'))
 
         # Grab the values from the form, this is always hard-coded in this class
         target_ip = self.request.POST.get('TARGET_IP', None)
@@ -1541,7 +1540,7 @@ class EditTargetView(CNCBaseAuth, FormView):
             try:
                 p.backup_config()
             except PanoplyException as tce:
-                return self.error_out('Connected to Device but could not perform backup!')
+                return HttpResponseRedirect(self.error_out('Connected to Device but could not perform backup!'))
 
         try:
             panos_skillet = PanosSkillet(self.meta, p)
@@ -1554,7 +1553,7 @@ class EditTargetView(CNCBaseAuth, FormView):
 
             if result != 'success':
                 print(outputs)
-                return self.error_out('Could not execute Skillet on device!')
+                return HttpResponseRedirect(self.error_out('Could not execute Skillet on device!'))
 
             elif result == 'success' and perform_commit:
                 commit_result = p.commit(force_sync)
@@ -1574,7 +1573,7 @@ class EditTargetView(CNCBaseAuth, FormView):
                                      'Configuration added to Candidate Config successfully')
 
         except PanoplyException as pe:
-            return self.error_out(f'Error Executing Skillet on Device! {pe}')
+            return HttpResponseRedirect(self.error_out(f'Error Executing Skillet on Device! {pe}'))
 
         # fix for #72, in non-workflow case, revert to using our captured last_page visit
         # next_url = self.pop_value_from_workflow('next_url', None)
