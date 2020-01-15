@@ -204,6 +204,8 @@ class CNCBaseAuth(LoginRequiredMixin, View):
         if skillet is None:
             if hasattr(self, 'service'):
                 skillet = self.service
+            elif hasattr(self, 'meta'):
+                skillet = self.meta
             else:
                 return snippet_vars
 
@@ -1442,20 +1444,11 @@ class EditTargetView(CNCBaseAuth, FormView):
             self.save_value_to_workflow('perform_commit', saved_perform_commit)
             self.save_value_to_workflow('perform_backup', saved_perform_backup)
 
-        # Always grab all the default values, then update them based on user input in the workflow
-        jinja_context = dict()
-        if 'variables' in meta and type(meta['variables']) is list:
-            for snippet_var in meta['variables']:
-                jinja_context[snippet_var['name']] = snippet_var['default']
-
-        # let's grab the current workflow values (values saved from ALL forms in this app
-        jinja_context.update(self.get_workflow())
-
         if debug == 'True' or debug is True:
             context = dict()
             context['base_html'] = self.base_html
             try:
-                changes = pan_utils.debug_meta(meta, jinja_context)
+                changes = pan_utils.debug_meta(meta, self.get_snippet_variables_from_workflow())
             except CCFParserError as cpe:
                 label = meta['label']
                 messages.add_message(self.request, messages.ERROR, f'Could not debug Skillet: {label}')
@@ -1561,7 +1554,7 @@ class EditTargetView(CNCBaseAuth, FormView):
                 if force_sync:
                     messages.add_message(self.request, messages.SUCCESS, 'Configuration Pushed successfully')
                 else:
-                    messages.add_message(self.request, messages.SUCCESS, 'Configuration Push Queued successfully')
+                    # messages.add_message(self.request, messages.SUCCESS, 'Configuration Push Queued successfully')
                     jobid_match = re.match(r'.* with jobid (\d+)', commit_result)
                     if jobid_match is not None:
                         job_id = jobid_match.group(1)
