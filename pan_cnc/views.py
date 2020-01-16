@@ -147,6 +147,20 @@ class CNCBaseAuth(LoginRequiredMixin, View):
                     else:
                         if var_type in ['checkbox', 'list']:
                             current_workflow[var_name] = []
+                        elif var_type == 'text' and variable.get('source', False):
+                            # we have multiple fields here, let's grab all the values and store them in a dict
+                            source = current_workflow.get(variable.get('source', []))
+                            if source is None:
+                                current_workflow[var_name] = dict()
+                                continue
+
+                            user_inputs = dict()
+                            for item in source:
+                                item_name = f'{var_name}_{item}'
+                                if item_name in self.request.POST:
+                                    user_inputs[item] = self.request.POST.get(item_name)
+
+                            current_workflow[var_name] = user_inputs
 
             # ensure we always capture the current snippet if set on this class!
             if self.snippet != '':
@@ -913,13 +927,34 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
                                 variable['attributes']['max']
                             )
                         )
-                dynamic_form.fields[field_name] = forms.CharField(label=description,
-                                                                  initial=default,
-                                                                  required=required,
-                                                                  validators=validators,
-                                                                  help_text=help_text)
+                # implement multiple inputs as a dict from a source list
+                if 'source' in variable:
+                    source = self.get_value_from_workflow(variable['source'], [])
+                    if type(source) is not list:
+                        continue
+                    for item in source:
+                        if type(default) is dict and item in default:
+                            item_value = default[item]
+                        elif type(default) is dict:
+                            # item is not in dict here
+                            item_value = ''
+                        else:
+                            item_value = default
+                        item_description = f'{description} {item}'
+                        item_name = f'{field_name}_{item}'
+                        dynamic_form.fields[item_name] = forms.CharField(label=item_description,
+                                                                         initial=item_value,
+                                                                         required=required,
+                                                                         validators=validators,
+                                                                         help_text=help_text)
+                else:
+                    dynamic_form.fields[field_name] = forms.CharField(label=description,
+                                                                      initial=default,
+                                                                      required=required,
+                                                                      validators=validators,
+                                                                      help_text=help_text)
 
-            # fix for #118 - add ability to toggle visibility based on value of another field
+                # fix for #118 - add ability to toggle visibility based on value of another field
             toggle_hint = variable.get('toggle_hint', {})
 
             #     toggle_hint:
