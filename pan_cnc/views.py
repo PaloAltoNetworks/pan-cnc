@@ -2015,7 +2015,7 @@ class NextTaskView(CNCView):
         #
 
         elif task_next == 'python3_execute':
-            r = task_utils.python3_execute(skillet, self.get_snippet_variables_from_workflow())
+            r = task_utils.python3_execute(skillet, self.get_snippet_variables_from_workflow(skillet=skillet))
             new_next = ''
             title = f"Executing Script: {skillet['label']}"
 
