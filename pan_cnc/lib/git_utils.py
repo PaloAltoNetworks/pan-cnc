@@ -226,7 +226,6 @@ def get_repo_details(repo_name, repo_dir, app_name='cnc'):
 def update_repo(repo_dir: str, branch=None):
     """
     Pull the latest updates from a repository
-    :param app_name: current application name
     :param repo_dir: directory of repo to update
     :param branch: branch to switch to before update
     :return:
@@ -266,14 +265,14 @@ def update_repo(repo_dir: str, branch=None):
         return 'Could not update, Unknown error with git repository'
 
     if checkout:
-        return f"Updated to new Branch: {branch}"
+        return f"Checked out new Branch: {branch}"
 
     if len(f) > 0:
         flags = f[0].flags
         if flags == 4:
-            return "Already up to date"
+            return "This branch is already up to date"
         elif flags == 64:
-            return "Updated to Latest"
+            return "This branch has been updated to Latest"
         else:
             return "Error: Unknown flag returned"
 
@@ -313,7 +312,9 @@ def __get_repo_branches(repo: Repo) -> list:
     branches.append(branch)
 
     try:
-        repo.git.fetch('--all')
+        # fix for PH: #130 - deleted branches continue to show up in ph after upstream branch deleted
+        repo.git.fetch(all=True, prune=True)
+
         raw_branches = repo.git.branch('-r')
         # branches will be raw output from git command like:
         # '  origin/HEAD -> origin/master\n  origin/develop\n  origin/master\n'
