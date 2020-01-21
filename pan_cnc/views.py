@@ -1223,10 +1223,18 @@ class ProvisionSnippetView(CNCBaseFormView):
 
             if 'snippets' not in results:
                 print('Result from rest_utils is malformed')
+                messages.add_message(self.request, messages.ERROR, 'Could not successfully execute SKillet')
+                return self.form_invalid(form)
+
             else:
+                captured_outputs = False
                 if 'outputs' in results and type(results['outputs']) is dict:
+                    if len(results['outputs']) > 0:
+                        captured_outputs = True
                     for k, v in results['outputs'].items():
                         self.save_value_to_workflow(k, v)
+
+            context['captured_outputs'] = captured_outputs
 
             return render(self.request, 'pan_cnc/results.html', context)
 
@@ -1260,7 +1268,85 @@ class ProvisionSnippetView(CNCBaseFormView):
         elif self.service['type'] == 'terraform':
             self.request.session['next_url'] = self.next_url
             return HttpResponseRedirect('/terraform')
+        elif self.service['type'] == 'panos':
+
+            # init the panos_skillet type
+            panos_skillet = PanosSkillet(self.service)
+            # do we need to always how the target_ip, etc form?
+            require_ui = False
+            # check workflow first
+            workflow_name = self.get_value_from_workflow('workflow_name', None)
+
+            if workflow_name is None or workflow_name == '':
+                # if we are NOT in a workflow, then we will always show the UI
+                require_ui = True
+            else:
+                # we are in a workflow, so let's check if this is only going to do some op commands and sucn
+                # any set or edit type commands will require a commit or backup option
+
+                for snippet in panos_skillet.get_snippets():
+                    if snippet.metadata.get('cmd') not in ('op', 'get', 'show', 'parse'):
+                        # any other cmd types will require a commit or backup operation option shown to the user
+                        require_ui = True
+                        break
+
+            if not require_ui:
+                # verify we have what we need in the context
+                if not {'TARGET_IP', 'TARGET_USERNAME', 'TARGET_PASSWORD'}.issubset(self.get_workflow().keys()):
+                    require_ui = True
+
+            if require_ui:
+                # after all that, we need to ask the user some questions before we continue...
+                self.request.session['next_url'] = self.next_url
+                return HttpResponseRedirect('/editTarget')
+
+            # no need to ask for information again, just run the skillet and print the results...
+            try:
+                p = Panos(api_username=self.get_value_from_workflow('TARGET_USERNAME', 'admin'),
+                          api_password=self.get_value_from_workflow('TARGET_PASSWORD', 'admin'),
+                          api_port=self.get_value_from_workflow('TARGET_PORT', 443),
+                          hostname=self.get_value_from_workflow('TARGET_IP', ''),
+                          )
+            except TargetConnectionException:
+                return HttpResponseRedirect(self.error_out('Connection Refused Error, check the IP and try again'))
+
+            except LoginException:
+                return HttpResponseRedirect(self.error_out(
+                    'Invalid Credentials, ensure your username and password are correct'))
+
+            except TargetGenericException as tge:
+                return HttpResponseRedirect(self.error_out(f'Unknown Connection Error: {tge}'))
+
+            except Exception as e:
+                return HttpResponseRedirect(self.error_out(f'Unknown Connection Error: {e}'))
+
+            panos_skillet.panoply = p
+            panos_skillet.initialize_context(dict())
+
+            outputs = panos_skillet.execute(self.get_snippet_variables_from_workflow())
+            result = outputs.get('result', 'failure')
+            if result != 'success':
+                messages.add_message(self.request, messages.ERROR, 'Skillet did not execute successfully!')
+                return self.form_invalid(form)
+
+            # save outputs wherever possible
+            captured_outputs = False
+            if 'outputs' in outputs and type(outputs['outputs']) is dict:
+                captured_outputs = True
+                for k, v in outputs['outputs'].items():
+                    self.save_value_to_workflow(k, v)
+
+            context = dict()
+            context['base_html'] = self.base_html
+            context['results'] = json.dumps(outputs, indent=2)
+            context['view'] = self
+            context['title'] = 'Successfully Executed Skillet'
+            context['captured_outputs'] = captured_outputs
+
+            return render(self.request, 'pan_cnc/results.html', context)
+
         else:
+
             # CNC apps may create custom hard coded workflows by setting a 'next_url' attribute
             # in the .pan_cnc.yaml file. Let's make sure to capture this before redirecting to editTargetView
             self.request.session['next_url'] = self.next_url
@@ -1458,7 +1544,7 @@ class EditTargetView(CNCBaseAuth, FormView):
         snippet_name = self.get_value_from_workflow('snippet_name', '')
 
         if snippet_name == '':
-            return HttpResponseRedirect(self.error_out('No Skilet provided!'))
+            return HttpResponseRedirect(self.error_out('No Skillet provided!'))
 
         meta = snippet_utils.load_snippet_with_name(snippet_name, self.app_dir)
 

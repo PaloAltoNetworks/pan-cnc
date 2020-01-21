@@ -15,6 +15,12 @@
                 }
             });
         });
+        function show_captured_values() {
+            let m = $('#capture_msg');
+            m.toggle();
+            let r = $('#results');
+            r.toggle();
+        }
     </script>
 {% endblock %}
 {% block content %}
@@ -31,11 +37,23 @@
             {% endif %}
         </h4>
         <p class="card-text">
+            {% if captured_outputs  %}
+            <div id="capture_msg">
+                Successfully captured Skillet output. Click 'Show Captured Values' to view raw output.
+            </div>
+            <pre class="pb-4"
+                 id="results"
+                 style="display: none; white-space: pre; overflow-x: scroll">{{ results | safe | linebreaksbr }}</pre>
+            {%  else %}
             <pre class="pb-4" style="white-space: pre; overflow-x: scroll">{{ results | safe | linebreaksbr }}</pre>
+            {% endif %}
         </p>
     </div>
     <div class="card-footer text-right">
         <p class="card-text">
+        {% if captured_outputs  %}
+        <a href="#" onclick="show_captured_values()" class="btn btn-success">Show Captured Values</a>
+        {% endif %}
             {%  if request.session.next_step %}
                 {%  if request.session.last_step %}
                     <a href="/workflow/{{ request.session.next_step }}" class="btn btn-primary">Complete</a>
