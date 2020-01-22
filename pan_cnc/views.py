@@ -347,14 +347,16 @@ class CNCBaseAuth(LoginRequiredMixin, View):
 
         return default
 
-    def get_header(self):
+    def get_header(self) -> str:
         next_step = self.request.session.get('next_step', None)
+
         if next_step is None:
             return self.header
+
         else:
             return f"Step {next_step}: {self.header}"
 
-    def clean_up_workflow(self):
+    def clean_up_workflow(self) -> None:
         self.request.session.pop('next_step', None)
         self.request.session.pop('last_step', None)
         self.request.session.pop('next_url', None)
@@ -1811,6 +1813,17 @@ class EditTerraformView(CNCBaseAuth, FormView):
         return render(self.request, 'pan_cnc/results_async.html', context)
 
 
+class ErrorView(CNCBaseAuth, RedirectView):
+    """
+    Cleans up after an error condition
+    """
+
+    def get_redirect_url(self, *args, **kwargs):
+        self.clean_up_workflow()
+        next_url = self.request.session.pop('last_page', '/')
+        return next_url
+
+
 class CancelTaskView(CNCBaseAuth, RedirectView):
     """
     Cancels the currently running Task
@@ -1818,8 +1831,8 @@ class CancelTaskView(CNCBaseAuth, RedirectView):
 
     def get_redirect_url(self, *args, **kwargs):
 
-        # set last_page to something other than this one for the continue button
-        # self.request.session['last_page'] = '/'
+        # clean up the workflow if any is found...
+        self.clean_up_workflow()
         if 'task_id' in self.request.session:
             task_id = self.request.session['task_id']
             task = AsyncResult(task_id)
