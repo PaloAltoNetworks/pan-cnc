@@ -611,6 +611,32 @@ def _normalize_snippet_structure(skillet: dict) -> dict:
     if 'type' not in skillet:
         skillet['type'] = 'template'
 
+    if 'depends' not in skillet:
+        skillet['depends'] = list()
+
+    elif not isinstance(skillet['depends'], list):
+        skillet['depends'] = list()
+
+    elif isinstance(skillet['depends'], list):
+        for depends in skillet['depends']:
+            if not isinstance(depends, dict):
+                print('Removing Invalid Depends Definition')
+                print(type(depends))
+                skillet['depends'].remove(depends)
+
+            else:
+                if not {'url', 'name'}.issubset(depends):
+                    print('Removing Invalid Depends Definition - incorrect attributes')
+                    print('Required "url" and "name" to be present. "branch" is optional')
+                    print(depends)
+
+                else:
+                    if depends['url'] is None or depends['url'] == '' \
+                            or depends['name'] is None or depends['name'] == '':
+                        print('Removing Invalid Depends Definition - incorrect attribute values')
+                        print('Required "url" and "name" to be not be blank or None')
+                        print(depends)
+
     # first verify the variables stanza is present and is a list
     if 'variables' not in skillet:
         skillet['variables'] = list()
@@ -627,11 +653,14 @@ def _normalize_snippet_structure(skillet: dict) -> dict:
                 print('Removing Invalid Variable Definition')
                 print(type(variable))
                 skillet['variables'].remove(variable)
+
             else:
                 if 'name' not in variable:
                     variable['name'] = 'Unknown variable'
+
                 if 'type_hint' not in variable:
                     variable['type_hint'] = 'text'
+
                 if 'default' not in variable:
                     variable['default'] = ''
 
