@@ -23,6 +23,12 @@
                         {{ view.help_link_title }}
                     </a>
                 </p>
+                {% elif 'help_link' in view.service.labels %}
+                <p class="mt-5">
+                    <a target="_blank" href="{{ view.service.labels.help_link }}">
+                        {{ view.service.labels.help_link_title|default:'More Information' }}
+                    </a>
+                </p>
                 {% endif %}
             </div>
             <div class="modal-footer bg-light text-right">
