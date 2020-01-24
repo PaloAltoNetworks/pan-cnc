@@ -85,6 +85,7 @@ class CNCBaseAuth(LoginRequiredMixin, View):
     def dispatch(self, request, *args, **kwargs):
         if self.app_dir != '':
             self.request.session['current_app_dir'] = self.app_dir
+
         else:
             self.app_dir = self.request.session.get('current_app_dir', '')
 
@@ -103,58 +104,74 @@ class CNCBaseAuth(LoginRequiredMixin, View):
         if self.app_dir in self.request.session:
             print('updating workflow')
             current_workflow = self.request.session[self.app_dir]
+
         elif 'current_app_dir' in self.request.session:
             if self.request.session['current_app_dir'] in self.request.session:
                 current_workflow = self.request.session[self.app_dir]
+
             else:
                 current_workflow = dict()
+
         else:
             print('saving new workflow')
             current_workflow = dict()
 
         if hasattr(self, 'service') and self.service is not None:
+
             if 'variables' in self.service and self.service['variables'] is not None and \
                     type(self.service['variables']) is list:
 
                 for variable in self.service['variables']:
                     var_name = variable['name']
                     var_type = variable['type_hint']
+
                     if var_type == 'file':
                         try:
+
                             if var_name in self.request.FILES:
                                 f = self.request.FILES[var_name]
                                 tmp_fd, tmp_file = tempfile.mkstemp(prefix='cnc_')
+
                                 with open(tmp_file, 'wb+') as destination:
                                     for chunk in f.chunks():
                                         destination.write(chunk)
 
                                 os.close(tmp_fd)
                                 current_workflow[var_name] = tmp_file
+
                         except OSError as ose:
                             print('Could not save file!')
                             print(ose)
                             raise RuntimeError('Could not save file')
 
                         continue
+
                     if var_name in self.request.POST:
                         # fix for #64 handle checkbox as list
+
                         if var_type == 'list' or var_type == 'checkbox':
                             var_as_list = self.request.POST.getlist(var_name, list())
                             var_as_list.sort()
                             current_workflow[var_name] = var_as_list
+
                         else:
                             current_workflow[var_name] = self.request.POST.get(var_name)
+
                     else:
                         if var_type in ['checkbox', 'list']:
                             current_workflow[var_name] = []
+
                         elif var_type == 'text' and variable.get('source', False):
                             # we have multiple fields here, let's grab all the values and store them in a dict
                             source = current_workflow.get(variable.get('source', []))
+
                             if source is None:
                                 current_workflow[var_name] = dict()
                                 continue
 
                             user_inputs = dict()
+                            source.sort()
+
                             for item in source:
                                 item_name = f'{var_name}_{item}'
                                 if item_name in self.request.POST:
@@ -521,6 +538,7 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
 
         elif self.app_dir in self.request.session:
             session_cache = self.request.session[self.app_dir]
+
             if 'snippet_name' in session_cache:
                 print('found snippet defined in the session')
                 self.snippet = session_cache['snippet_name']
@@ -537,9 +555,11 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
         """
 
         context = dict()
+
         if 'form' in kwargs:
             # this is being called from a validation error!
             form = kwargs['form']
+
         else:
             # Generate the dynamic form based on the snippet name found and returned from get_snippet
             form = self.generate_dynamic_form()
@@ -564,6 +584,7 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
         # call chain in the child classes
         try:
             snippet: str = self.get_snippet()
+
             if snippet != '':
                 self.service: dict = snippet_utils.load_snippet_with_name(snippet, self.app_dir)
 
@@ -571,6 +592,7 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
                     messages.add_message(self.request, messages.ERROR,
                                          f'Process Error - Snippet with name: {snippet} not found')
                     return HttpResponseRedirect('/')
+
                 # always render the form for pan_validation as this type will dynamically add fields
                 if self.service.get('type', '') == 'pan_validation':
                     return self.render_to_response(self.get_context_data())
@@ -586,10 +608,12 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
             else:
                 messages.add_message(self.request, messages.ERROR, 'Process Error - Snippet not found')
                 return HttpResponseRedirect('/')
+
         except SnippetRequiredException:
             print('Snippet was not defined here!')
             messages.add_message(self.request, messages.ERROR, 'Process Error - Snippet not found')
             return HttpResponseRedirect('/')
+
         except CCFParserError as cpe:
             print('Could not load CCF Metadata!')
             messages.add_message(self.request, messages.ERROR, 'Process Error - Could not load CCF')
@@ -605,6 +629,7 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
         form = self.generate_dynamic_form(self.request.POST)
 
         try:
+
             if form.is_valid():
                 # load the snippet into the class attribute here so it's available to all other methods throughout the
                 # call chain in the child classes
@@ -612,9 +637,11 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
                 self.save_workflow_to_session()
 
                 return self.form_valid(form)
+
             else:
                 print('This form is not valid!')
                 return self.form_invalid(form)
+
         except (TypeError, KeyError) as te:
             print('Caught error checking Form input values')
             print(te)
@@ -631,6 +658,7 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
         if 'variables' not in self.service:
             print('Service not loaded on this class!')
             return ''
+
         template = snippet_utils.render_snippet_template(self.service, self.app_dir, self.get_workflow())
         return template
 
@@ -674,6 +702,7 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
         # Get all of the variables defined in the self.service
         for variable in self.service['variables']:
             if type(variable) is not OrderedDict:
+
                 if type(variable) is not dict:
                     print('Variable configuration is incorrect')
                     print(type(variable))
@@ -690,6 +719,7 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
                     continue
 
             required_keys = {'name', 'description'}
+
             if not required_keys.issubset(variable.keys()):
                 print('Variable does not contain required keys: name, description')
                 continue
@@ -712,6 +742,7 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
             if force_default:
                 print('Using variable as default')
                 default = variable_default
+
             else:
                 # if the user has entered this before, let's grab it from the session
                 default = self.get_value_from_workflow(field_name, variable_default)
@@ -721,15 +752,17 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
             if type_hint == 'dropdown' and 'dd_list' in variable:
                 dd_list = variable['dd_list']
                 choices_list = list()
+
                 for item in dd_list:
                     if 'key' in item and 'value' in item:
-                        # print(item)
+
                         if default == item['key'] and default != item['value']:
                             # user set the key as the default and not the value, just fix it for them here
                             default = item['value']
 
                         choice = (item['value'], item['key'])
                         choices_list.append(choice)
+
                 dynamic_form.fields[field_name] = forms.ChoiceField(choices=tuple(choices_list), label=description,
                                                                     initial=default, required=required,
                                                                     help_text=help_text)
@@ -737,23 +770,36 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
             # FR #85 - Add dynamic dropdown / radio / checkbox
             elif type_hint == 'dropdown' and 'source' in variable:
                 source = variable.get('source', None)
-                source_list = self.get_value_from_workflow(source, [])
-                choices_list = list()
-                if type(source_list) is list:
-                    for item in source_list:
+                source_list = self.get_value_from_workflow(source, None)
+
+                if source_list is not None:
+                    choices_list = list()
+
+                    if type(source_list) is list:
+                        source_list.sort()
+
+                        for item in source_list:
+                            choice = (item, item)
+                            choices_list.append(choice)
+                    else:
+                        item = source_list
                         choice = (item, item)
                         choices_list.append(choice)
-                else:
-                    item = source_list
-                    choice = (item, item)
-                    choices_list.append(choice)
 
-                dynamic_form.fields[field_name] = forms.ChoiceField(choices=tuple(choices_list), label=description,
-                                                                    initial=default, required=required,
-                                                                    help_text=help_text)
+                    dynamic_form.fields[field_name] = forms.ChoiceField(choices=tuple(choices_list), label=description,
+                                                                        initial=default, required=required,
+                                                                        help_text=help_text)
+
+                else:
+                    # if source is empty, then render a text input only...
+                    dynamic_form.fields[field_name] = forms.CharField(label=description,
+                                                                      initial=default,
+                                                                      required=required,
+                                                                      help_text=help_text)
             elif type_hint == "text_area":
                 # Fix for FR: #97 - add rows / cols to text_area
                 attrs = dict()
+
                 if 'attributes' in variable and type(variable['attributes']) is dict:
                     attrs['rows'] = variable['attributes'].get('rows', 10)
                     attrs['cols'] = variable['attributes'].get('cols', 40)
@@ -780,6 +826,7 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
                                                                               help_text=help_text)
             elif type_hint == "number":
                 attrs = dict()
+
                 if 'attributes' in variable:
                     if 'min' in variable['attributes'] and 'max' in variable['attributes']:
                         attrs['min'] = variable['attributes']['min']
@@ -799,6 +846,7 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
             # add support for float per #103
             elif type_hint == "float":
                 attrs = dict()
+
                 if 'attributes' in variable:
                     if 'min' in variable['attributes'] and 'max' in variable['attributes']:
                         attrs['min'] = variable['attributes']['min']
@@ -835,9 +883,11 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
             elif type_hint == "radio" and "rad_list" in variable:
                 rad_list = variable['rad_list']
                 choices_list = list()
+
                 for item in rad_list:
                     choice = (item['value'], item['key'])
                     choices_list.append(choice)
+
                 dynamic_form.fields[field_name] = forms.ChoiceField(widget=forms.RadioSelect, choices=choices_list,
                                                                     label=description, initial=default,
                                                                     required=required,
@@ -846,11 +896,14 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
             elif type_hint == "radio" and "source" in variable:
                 source = variable.get('source', None)
                 source_list = self.get_value_from_workflow(source, [])
+                source_list.sort()
                 choices_list = list()
+
                 if type(source_list) is list:
                     for item in source_list:
                         choice = (item, item)
                         choices_list.append(choice)
+
                 else:
                     item = source_list
                     choice = (item, item)
@@ -862,6 +915,7 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
             elif type_hint == "checkbox" and "cbx_list" in variable:
                 cbx_list = variable['cbx_list']
                 choices_list = list()
+
                 for item in cbx_list:
                     choice = (item['value'], item['key'])
                     choices_list.append(choice)
@@ -874,11 +928,14 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
             elif type_hint == 'checkbox' and 'source' in variable:
                 source = variable.get('source', None)
                 source_list = self.get_value_from_workflow(source, [])
+                source_list.sort()
                 choices_list = list()
+
                 if type(source_list) is list:
                     for item in source_list:
                         choice = (item, item)
                         choices_list.append(choice)
+
                 else:
                     item = source_list
                     choice = (item, item)
@@ -939,8 +996,12 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
                 # implement multiple inputs as a dict from a source list
                 if 'source' in variable:
                     source = self.get_value_from_workflow(variable['source'], [])
+
                     if type(source) is not list:
                         continue
+
+                    source.sort()
+
                     for item in source:
                         if type(default) is dict and item in default:
                             item_value = default[item]
