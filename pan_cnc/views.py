@@ -348,19 +348,26 @@ class CNCBaseAuth(LoginRequiredMixin, View):
         return default
 
     def get_header(self) -> str:
-        next_step = self.request.session.get('next_step', None)
+        workflow_name = self.request.session.get('workflow_name', None)
+        next_step = self.request.session.get('workflow_ui_step', None)
+
+        header = self.header
+        if workflow_name is not None:
+            workflow_skillet_dict = snippet_utils.load_snippet_with_name(workflow_name, self.app_dir)
+            if workflow_skillet_dict is not None:
+                header = workflow_skillet_dict.get('label', self.header)
 
         if next_step is None:
-            return self.header
-
+            return header
         else:
-            return f"Step {next_step}: {self.header}"
+            return f"Step {next_step}: {header}"
 
     def clean_up_workflow(self) -> None:
         self.request.session.pop('next_step', None)
         self.request.session.pop('last_step', None)
         self.request.session.pop('next_url', None)
-        self.pop_value_from_workflow('workflow_name', '')
+        self.request.session.pop('workflow_ui_step', None)
+        self.request.session.pop('workflow_name', None)
 
     def error_out(self, message: str) -> str:
         messages.add_message(self.request, messages.ERROR, message)
@@ -1215,6 +1222,8 @@ class ProvisionSnippetView(CNCBaseFormView):
             # fix for #65 - show nicer output for rest type skillet
             context['results'] = json.dumps(results, indent=2)
             context['view'] = self
+            skillet_label = self.service.get('label', 'Skillet')
+            context['title'] = f'Successfully Executed {skillet_label}'
 
             # Most REST actions will only have a single action/path taken. If so, we can simplify the results
             # shown to the user by default
@@ -1277,8 +1286,7 @@ class ProvisionSnippetView(CNCBaseFormView):
             # do we need to always how the target_ip, etc form?
             require_ui = False
             # check workflow first
-            workflow_name = self.get_value_from_workflow('workflow_name', None)
-
+            workflow_name = self.request.session.get('workflow_name', None)
             if workflow_name is None or workflow_name == '':
                 # if we are NOT in a workflow, then we will always show the UI
                 require_ui = True
@@ -1342,7 +1350,7 @@ class ProvisionSnippetView(CNCBaseFormView):
             context['base_html'] = self.base_html
             context['results'] = json.dumps(outputs, indent=2)
             context['view'] = self
-            context['title'] = 'Successfully Executed Skillet'
+            context['title'] = f'Successfully Executed {self.service.get("label")}'
             context['captured_outputs'] = captured_outputs
 
             return render(self.request, 'pan_cnc/results.html', context)
@@ -2175,15 +2183,21 @@ class WorkflowView(CNCBaseAuth, RedirectView):
             return self.error_out('Could not find current workflow state')
 
         if current_step == 0:
+            self.request.session['workflow_ui_step'] = 1
             # get the actual workflow skillet that was selected
             skillet_name = self.get_value_from_workflow('snippet_name', '')
             # let's save this for later when we are on step #2 or later
-            self.save_value_to_workflow('workflow_name', skillet_name)
+            self.request.session['workflow_name'] = skillet_name
         else:
+            previous_ui_step = self.request.session.get('workflow_ui_step', 1)
+            ui_step = previous_ui_step + 1
+            self.request.session['workflow_ui_step'] = ui_step
             # no longer on step 0, so the saved snippet name will not point us back to the origin
             # workflow we need
             print(f"Getting our original workflow name out of the session")
-            skillet_name = self.get_value_from_workflow('workflow_name', '')
+            skillet_name = self.request.session.get('workflow_name', None)
+            if skillet_name is None:
+                return self.error_out('Process Error - No Workflow found!')
 
         print(f"found workflow skillet name {skillet_name}")
         self.meta = snippet_utils.load_snippet_with_name(skillet_name, self.app_dir)
@@ -2201,7 +2215,8 @@ class WorkflowView(CNCBaseAuth, RedirectView):
             self.request.session.pop('next_step', '')
             self.request.session.pop('last_step', '')
             self.request.session.pop('next_url', '')
-            self.pop_value_from_workflow('workflow_name', '')
+            self.request.session.pop('workflow_ui_step', '')
+            self.request.session.pop('workflow_name', '')
             last_page = self.request.session.pop('last_page', '/')
             return last_page
 
@@ -2239,8 +2254,9 @@ class WorkflowView(CNCBaseAuth, RedirectView):
             messages.add_message(self.request, messages.INFO, 'Workflow Completed Successfully')
             self.request.session['next_step'] = None
             self.request.session['last_step'] = None
-            self.request.session.pop('next_step')
-            self.request.session.pop('last_step')
+            self.request.session.pop('next_step', None)
+            self.request.session.pop('last_step', None)
+            self.request.session.pop('workflow_ui_step', None)
             return self.request.session.get('last_page', '/')
 
         print(f"Current skillet name is {current_skillet_name}")
@@ -2574,7 +2590,7 @@ class LoadEnvironmentView(EnvironmentBase, RedirectView):
     """
 
     def get_redirect_url(self, *args, **kwargs):
-
+        self.clean_up_workflow()
         env_name = self.kwargs.get('env_name')
 
         if env_name in self.e:
@@ -2711,7 +2727,7 @@ class ClearCacheView(CNCBaseAuth, RedirectView):
 
     def get_redirect_url(self, *args, **kwargs):
         print('Clearing Cache')
-
+        self.clean_up_workflow()
         # clear everything except our cached imported git repositories
         repos = cnc_utils.get_long_term_cached_value(self.app_dir, 'imported_repositories')
         cnc_utils.clear_long_term_cache(self.app_dir)
@@ -2741,6 +2757,7 @@ class DebugContextView(CNCView):
         pass
 
     def get_context_data(self, **kwargs):
+        self.clean_up_workflow()
         workflow = self.get_workflow()
         w = dict(sorted(workflow.items()))
         context = super().get_context_data()
@@ -2761,6 +2778,7 @@ class ReinitPythonVenv(CNCView):
         pass
 
     def get_context_data(self, **kwargs):
+        self.clean_up_workflow()
         app_dir = self.kwargs.get('app_dir', '')
         if app_dir != '':
             self.app_dir = app_dir
