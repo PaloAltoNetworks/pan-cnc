@@ -170,12 +170,15 @@ class CNCBaseAuth(LoginRequiredMixin, View):
                                 continue
 
                             user_inputs = dict()
-                            source.sort()
+                            if isinstance(source, list):
+                                source.sort()
 
-                            for item in source:
-                                item_name = f'{var_name}_{item}'
-                                if item_name in self.request.POST:
-                                    user_inputs[item] = self.request.POST.get(item_name)
+                                for item in source:
+                                    item_name = f'{var_name}_{item}'
+                                    if item_name in self.request.POST:
+                                        user_inputs[item] = self.request.POST.get(item_name)
+                            else:
+                                user_inputs[source] = self.request.POST.get(f'{var_name}_{source}', '')
 
                             current_workflow[var_name] = user_inputs
 
@@ -896,10 +899,12 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
             elif type_hint == "radio" and "source" in variable:
                 source = variable.get('source', None)
                 source_list = self.get_value_from_workflow(source, [])
-                source_list.sort()
+
                 choices_list = list()
 
-                if type(source_list) is list:
+                if isinstance(source_list, list):
+                    source_list.sort()
+
                     for item in source_list:
                         choice = (item, item)
                         choices_list.append(choice)
@@ -928,10 +933,10 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
             elif type_hint == 'checkbox' and 'source' in variable:
                 source = variable.get('source', None)
                 source_list = self.get_value_from_workflow(source, [])
-                source_list.sort()
                 choices_list = list()
 
-                if type(source_list) is list:
+                if isinstance(source_list, list):
+                    source_list.sort()
                     for item in source_list:
                         choice = (item, item)
                         choices_list.append(choice)
@@ -997,8 +1002,11 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
                 if 'source' in variable:
                     source = self.get_value_from_workflow(variable['source'], [])
 
+                    # it's possible to have a single element list
                     if type(source) is not list:
-                        continue
+                        item = source
+                        source = list()
+                        source.append(item)
 
                     source.sort()
 
