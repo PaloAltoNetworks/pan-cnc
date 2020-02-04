@@ -127,6 +127,20 @@ def python3_init_complete(resource_def) -> bool:
         return False
 
 
+def python3_reset_init(script_roots: str) -> None:
+    """
+    Remove the touch file that indicates the virtualenv is already set up. This forces an update
+    to the virtualenv. This gets called whenever a repository is updated by the user
+    :param script_roots: the directory in which to search for the touch files
+    :return: None
+    """
+    path = Path(script_roots)
+    touch_files = path.rglob('.python3_init_done')
+    for tf in touch_files:
+        print(f'Resetting python init touch file in dir: {tf}')
+        tf.unlink()
+
+
 def _normalize_python_script_path(resource_def: dict) -> tuple:
     if 'snippet_path' not in resource_def:
         raise CCFParserError('Malformed .meta-cnc file for python3 execution')
