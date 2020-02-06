@@ -1675,7 +1675,7 @@ class EditTargetView(CNCBaseAuth, FormView):
             context['results'] = changes
             context['meta'] = meta
             context['target_ip'] = target_ip
-            self.request.session['last_page'] = '/editTarget'
+            self.request.session['last_page'] = f'/{self.app_dir}/skillet/{panos_skillet.name}'
             return render(self.request, 'pan_cnc/debug_panos_skillet.html', context=context)
 
         # workflow = self.get_workflow()
@@ -1781,7 +1781,6 @@ class EditTargetView(CNCBaseAuth, FormView):
                 else:
                     messages.add_message(self.request, messages.SUCCESS,
                                          'Skillet Executed Successfully with no changes')
-
 
         except PanoplyException as pe:
             return HttpResponseRedirect(self.error_out(f'Error Executing Skillet on Device! {pe}'))
