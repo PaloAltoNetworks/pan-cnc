@@ -331,7 +331,15 @@ def debug_meta(meta: dict, context: dict) -> dict:
     else:
         return rendered_snippets
 
+    environment = Environment(loader=BaseLoader())
+    for f in jinja_filters.defined_filters:
+        if hasattr(jinja_filters, f):
+            environment.filters[f] = getattr(jinja_filters, f)
+
     for snippet in meta['snippets']:
+        if 'cmd' in snippet and 'cmd' != 'set':
+            continue
+
         if 'xpath' not in snippet or 'file' not in snippet:
             print('Malformed meta-cnc error')
             raise CCFParserError
@@ -341,14 +349,10 @@ def debug_meta(meta: dict, context: dict) -> dict:
         snippet_name = snippet['name']
 
         try:
+
             xml_full_path = os.path.abspath(os.path.join(snippets_dir, xml_file_name))
             with open(xml_full_path, 'r') as xml_file:
                 xml_string = xml_file.read()
-                environment = Environment(loader=BaseLoader())
-
-                for f in jinja_filters.defined_filters:
-                    if hasattr(jinja_filters, f):
-                        environment.filters[f] = getattr(jinja_filters, f)
 
                 xml_template = environment.from_string(xml_string)
                 xpath_template = environment.from_string(xpath)

@@ -1644,11 +1644,28 @@ class EditTargetView(CNCBaseAuth, FormView):
             self.save_value_to_workflow('perform_commit', saved_perform_commit)
             self.save_value_to_workflow('perform_backup', saved_perform_backup)
 
+        self.save_value_to_workflow('TARGET_IP', target_ip)
+        self.save_value_to_workflow('TARGET_PORT', target_port)
+        self.save_value_to_workflow('TARGET_USERNAME', target_username)
+
         if debug == 'True' or debug is True:
             context = dict()
             context['base_html'] = self.base_html
+            changes = dict()
             try:
-                changes = pan_utils.debug_meta(meta, self.get_snippet_variables_from_workflow())
+                skillet_context = self.get_snippet_variables_from_workflow()
+                # changes = pan_utils.debug_meta(meta, self.get_snippet_variables_from_workflow())
+                panos_skillet = PanosSkillet(self.meta)
+                for snippet in panos_skillet.get_snippets():
+                    snippet.render_metadata(skillet_context)
+                    if snippet.cmd == 'set':
+                        xpath = snippet.metadata['xpath']
+                        element = snippet.render(snippet.metadata['element'], skillet_context)
+                        change = dict()
+                        change['xml'] = element
+                        change['xpath'] = xpath
+                        change['when'] = snippet.metadata.get('when', None)
+                        changes[snippet.name] = change
             except CCFParserError as cpe:
                 label = meta['label']
                 messages.add_message(self.request, messages.ERROR, f'Could not debug Skillet: {label}')
@@ -1661,12 +1678,8 @@ class EditTargetView(CNCBaseAuth, FormView):
             self.request.session['last_page'] = '/editTarget'
             return render(self.request, 'pan_cnc/debug_panos_skillet.html', context=context)
 
-        self.save_value_to_workflow('TARGET_IP', target_ip)
-        self.save_value_to_workflow('TARGET_PORT', target_port)
-        self.save_value_to_workflow('TARGET_USERNAME', target_username)
-
-        workflow = self.get_workflow()
-        self.request.session[self.app_dir] = workflow
+        # workflow = self.get_workflow()
+        # self.request.session[self.app_dir] = workflow
 
         err_condition = False
         if target_ip is None or target_ip == '':
@@ -1762,8 +1775,13 @@ class EditTargetView(CNCBaseAuth, FormView):
                             messages.add_message(self.request, messages.SUCCESS,
                                                  f'Configuration Push Queued successfully with Job ID: {job_id}')
             else:
-                messages.add_message(self.request, messages.SUCCESS,
-                                     'Configuration added to Candidate Config successfully')
+                if 'changed' in outputs and outputs['changed']:
+                    messages.add_message(self.request, messages.SUCCESS,
+                                         'Configuration added to Candidate Config successfully')
+                else:
+                    messages.add_message(self.request, messages.SUCCESS,
+                                         'Skillet Executed Successfully with no changes')
+
 
         except PanoplyException as pe:
             return HttpResponseRedirect(self.error_out(f'Error Executing Skillet on Device! {pe}'))
