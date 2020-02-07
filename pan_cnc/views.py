@@ -819,7 +819,10 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
                                                                   validators=[JSONValidator],
                                                                   help_text=help_text)
             elif type_hint == "list":
-                dynamic_form.fields[field_name] = forms.CharField(widget=widgets.ListInput, label=description,
+                attrs = dict()
+                attrs['data-widget_type'] = 'list'
+                dynamic_form.fields[field_name] = forms.CharField(widget=widgets.ListInput(attrs=attrs),
+                                                                  label=description,
                                                                   initial=default, required=required,
                                                                   help_text=help_text)
             elif type_hint == "email":
