@@ -252,6 +252,9 @@ class CNCBaseAuth(LoginRequiredMixin, View):
                 var_name = variable['name']
                 if var_name in combined_workflow:
                     snippet_vars[var_name] = combined_workflow[var_name]
+                else:
+                    # always grab all variables even if hidden
+                    snippet_vars[var_name] = variable['default']
 
         return snippet_vars
 
