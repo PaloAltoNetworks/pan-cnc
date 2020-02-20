@@ -85,6 +85,7 @@ class CNCBaseAuth(LoginRequiredMixin, View):
     def dispatch(self, request, *args, **kwargs):
         if self.app_dir != '':
             self.request.session['current_app_dir'] = self.app_dir
+
         else:
             self.app_dir = self.request.session.get('current_app_dir', '')
 
@@ -103,62 +104,81 @@ class CNCBaseAuth(LoginRequiredMixin, View):
         if self.app_dir in self.request.session:
             print('updating workflow')
             current_workflow = self.request.session[self.app_dir]
+
         elif 'current_app_dir' in self.request.session:
             if self.request.session['current_app_dir'] in self.request.session:
                 current_workflow = self.request.session[self.app_dir]
+
             else:
                 current_workflow = dict()
+
         else:
             print('saving new workflow')
             current_workflow = dict()
 
         if hasattr(self, 'service') and self.service is not None:
+
             if 'variables' in self.service and self.service['variables'] is not None and \
                     type(self.service['variables']) is list:
 
                 for variable in self.service['variables']:
                     var_name = variable['name']
                     var_type = variable['type_hint']
+
                     if var_type == 'file':
                         try:
+
                             if var_name in self.request.FILES:
                                 f = self.request.FILES[var_name]
                                 tmp_fd, tmp_file = tempfile.mkstemp(prefix='cnc_')
+
                                 with open(tmp_file, 'wb+') as destination:
                                     for chunk in f.chunks():
                                         destination.write(chunk)
 
                                 os.close(tmp_fd)
                                 current_workflow[var_name] = tmp_file
+
                         except OSError as ose:
                             print('Could not save file!')
                             print(ose)
                             raise RuntimeError('Could not save file')
 
                         continue
+
                     if var_name in self.request.POST:
                         # fix for #64 handle checkbox as list
+
                         if var_type == 'list' or var_type == 'checkbox':
                             var_as_list = self.request.POST.getlist(var_name, list())
                             var_as_list.sort()
                             current_workflow[var_name] = var_as_list
+
                         else:
                             current_workflow[var_name] = self.request.POST.get(var_name)
+
                     else:
                         if var_type in ['checkbox', 'list']:
                             current_workflow[var_name] = []
+
                         elif var_type == 'text' and variable.get('source', False):
                             # we have multiple fields here, let's grab all the values and store them in a dict
                             source = current_workflow.get(variable.get('source', []))
+
                             if source is None:
                                 current_workflow[var_name] = dict()
                                 continue
 
                             user_inputs = dict()
-                            for item in source:
-                                item_name = f'{var_name}_{item}'
-                                if item_name in self.request.POST:
-                                    user_inputs[item] = self.request.POST.get(item_name)
+                            if isinstance(source, list):
+                                source.sort()
+
+                                for item in source:
+                                    item_name = f'{var_name}_{item}'
+                                    if item_name in self.request.POST:
+                                        user_inputs[item] = self.request.POST.get(item_name)
+                            else:
+                                user_inputs[source] = self.request.POST.get(f'{var_name}_{source}', '')
 
                             current_workflow[var_name] = user_inputs
 
@@ -232,6 +252,9 @@ class CNCBaseAuth(LoginRequiredMixin, View):
                 var_name = variable['name']
                 if var_name in combined_workflow:
                     snippet_vars[var_name] = combined_workflow[var_name]
+                else:
+                    # always grab all variables even if hidden
+                    snippet_vars[var_name] = variable['default']
 
         return snippet_vars
 
@@ -347,18 +370,27 @@ class CNCBaseAuth(LoginRequiredMixin, View):
 
         return default
 
-    def get_header(self):
-        next_step = self.request.session.get('next_step', None)
-        if next_step is None:
-            return self.header
-        else:
-            return f"Step {next_step}: {self.header}"
+    def get_header(self) -> str:
+        workflow_name = self.request.session.get('workflow_name', None)
+        next_step = self.request.session.get('workflow_ui_step', None)
 
-    def clean_up_workflow(self):
+        header = self.header
+        if workflow_name is not None:
+            workflow_skillet_dict = snippet_utils.load_snippet_with_name(workflow_name, self.app_dir)
+            if workflow_skillet_dict is not None:
+                header = workflow_skillet_dict.get('label', self.header)
+
+        if next_step is None:
+            return header
+        else:
+            return f"Step {next_step}: {header}"
+
+    def clean_up_workflow(self) -> None:
         self.request.session.pop('next_step', None)
         self.request.session.pop('last_step', None)
         self.request.session.pop('next_url', None)
-        self.pop_value_from_workflow('workflow_name', '')
+        self.request.session.pop('workflow_ui_step', None)
+        self.request.session.pop('workflow_name', None)
 
     def error_out(self, message: str) -> str:
         messages.add_message(self.request, messages.ERROR, message)
@@ -512,6 +544,7 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
 
         elif self.app_dir in self.request.session:
             session_cache = self.request.session[self.app_dir]
+
             if 'snippet_name' in session_cache:
                 print('found snippet defined in the session')
                 self.snippet = session_cache['snippet_name']
@@ -528,9 +561,11 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
         """
 
         context = dict()
+
         if 'form' in kwargs:
             # this is being called from a validation error!
             form = kwargs['form']
+
         else:
             # Generate the dynamic form based on the snippet name found and returned from get_snippet
             form = self.generate_dynamic_form()
@@ -555,6 +590,7 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
         # call chain in the child classes
         try:
             snippet: str = self.get_snippet()
+
             if snippet != '':
                 self.service: dict = snippet_utils.load_snippet_with_name(snippet, self.app_dir)
 
@@ -562,6 +598,7 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
                     messages.add_message(self.request, messages.ERROR,
                                          f'Process Error - Snippet with name: {snippet} not found')
                     return HttpResponseRedirect('/')
+
                 # always render the form for pan_validation as this type will dynamically add fields
                 if self.service.get('type', '') == 'pan_validation':
                     return self.render_to_response(self.get_context_data())
@@ -577,10 +614,12 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
             else:
                 messages.add_message(self.request, messages.ERROR, 'Process Error - Snippet not found')
                 return HttpResponseRedirect('/')
+
         except SnippetRequiredException:
             print('Snippet was not defined here!')
             messages.add_message(self.request, messages.ERROR, 'Process Error - Snippet not found')
             return HttpResponseRedirect('/')
+
         except CCFParserError as cpe:
             print('Could not load CCF Metadata!')
             messages.add_message(self.request, messages.ERROR, 'Process Error - Could not load CCF')
@@ -596,6 +635,7 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
         form = self.generate_dynamic_form(self.request.POST)
 
         try:
+
             if form.is_valid():
                 # load the snippet into the class attribute here so it's available to all other methods throughout the
                 # call chain in the child classes
@@ -603,9 +643,11 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
                 self.save_workflow_to_session()
 
                 return self.form_valid(form)
+
             else:
                 print('This form is not valid!')
                 return self.form_invalid(form)
+
         except (TypeError, KeyError) as te:
             print('Caught error checking Form input values')
             print(te)
@@ -622,6 +664,7 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
         if 'variables' not in self.service:
             print('Service not loaded on this class!')
             return ''
+
         template = snippet_utils.render_snippet_template(self.service, self.app_dir, self.get_workflow())
         return template
 
@@ -665,6 +708,7 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
         # Get all of the variables defined in the self.service
         for variable in self.service['variables']:
             if type(variable) is not OrderedDict:
+
                 if type(variable) is not dict:
                     print('Variable configuration is incorrect')
                     print(type(variable))
@@ -681,6 +725,7 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
                     continue
 
             required_keys = {'name', 'description'}
+
             if not required_keys.issubset(variable.keys()):
                 print('Variable does not contain required keys: name, description')
                 continue
@@ -703,6 +748,7 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
             if force_default:
                 print('Using variable as default')
                 default = variable_default
+
             else:
                 # if the user has entered this before, let's grab it from the session
                 default = self.get_value_from_workflow(field_name, variable_default)
@@ -712,15 +758,17 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
             if type_hint == 'dropdown' and 'dd_list' in variable:
                 dd_list = variable['dd_list']
                 choices_list = list()
+
                 for item in dd_list:
                     if 'key' in item and 'value' in item:
-                        # print(item)
+
                         if default == item['key'] and default != item['value']:
                             # user set the key as the default and not the value, just fix it for them here
                             default = item['value']
 
                         choice = (item['value'], item['key'])
                         choices_list.append(choice)
+
                 dynamic_form.fields[field_name] = forms.ChoiceField(choices=tuple(choices_list), label=description,
                                                                     initial=default, required=required,
                                                                     help_text=help_text)
@@ -728,23 +776,36 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
             # FR #85 - Add dynamic dropdown / radio / checkbox
             elif type_hint == 'dropdown' and 'source' in variable:
                 source = variable.get('source', None)
-                source_list = self.get_value_from_workflow(source, [])
-                choices_list = list()
-                if type(source_list) is list:
-                    for item in source_list:
+                source_list = self.get_value_from_workflow(source, None)
+
+                if source_list is not None:
+                    choices_list = list()
+
+                    if type(source_list) is list:
+                        source_list.sort()
+
+                        for item in source_list:
+                            choice = (item, item)
+                            choices_list.append(choice)
+                    else:
+                        item = source_list
                         choice = (item, item)
                         choices_list.append(choice)
-                else:
-                    item = source_list
-                    choice = (item, item)
-                    choices_list.append(choice)
 
-                dynamic_form.fields[field_name] = forms.ChoiceField(choices=tuple(choices_list), label=description,
-                                                                    initial=default, required=required,
-                                                                    help_text=help_text)
+                    dynamic_form.fields[field_name] = forms.ChoiceField(choices=tuple(choices_list), label=description,
+                                                                        initial=default, required=required,
+                                                                        help_text=help_text)
+
+                else:
+                    # if source is empty, then render a text input only...
+                    dynamic_form.fields[field_name] = forms.CharField(label=description,
+                                                                      initial=default,
+                                                                      required=required,
+                                                                      help_text=help_text)
             elif type_hint == "text_area":
                 # Fix for FR: #97 - add rows / cols to text_area
                 attrs = dict()
+
                 if 'attributes' in variable and type(variable['attributes']) is dict:
                     attrs['rows'] = variable['attributes'].get('rows', 10)
                     attrs['cols'] = variable['attributes'].get('cols', 40)
@@ -758,7 +819,10 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
                                                                   validators=[JSONValidator],
                                                                   help_text=help_text)
             elif type_hint == "list":
-                dynamic_form.fields[field_name] = forms.CharField(widget=widgets.ListInput, label=description,
+                attrs = dict()
+                attrs['data-widget_type'] = 'list'
+                dynamic_form.fields[field_name] = forms.CharField(widget=widgets.ListInput(attrs=attrs),
+                                                                  label=description,
                                                                   initial=default, required=required,
                                                                   help_text=help_text)
             elif type_hint == "email":
@@ -771,6 +835,7 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
                                                                               help_text=help_text)
             elif type_hint == "number":
                 attrs = dict()
+
                 if 'attributes' in variable:
                     if 'min' in variable['attributes'] and 'max' in variable['attributes']:
                         attrs['min'] = variable['attributes']['min']
@@ -790,6 +855,7 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
             # add support for float per #103
             elif type_hint == "float":
                 attrs = dict()
+
                 if 'attributes' in variable:
                     if 'min' in variable['attributes'] and 'max' in variable['attributes']:
                         attrs['min'] = variable['attributes']['min']
@@ -826,9 +892,11 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
             elif type_hint == "radio" and "rad_list" in variable:
                 rad_list = variable['rad_list']
                 choices_list = list()
+
                 for item in rad_list:
                     choice = (item['value'], item['key'])
                     choices_list.append(choice)
+
                 dynamic_form.fields[field_name] = forms.ChoiceField(widget=forms.RadioSelect, choices=choices_list,
                                                                     label=description, initial=default,
                                                                     required=required,
@@ -837,11 +905,16 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
             elif type_hint == "radio" and "source" in variable:
                 source = variable.get('source', None)
                 source_list = self.get_value_from_workflow(source, [])
+
                 choices_list = list()
-                if type(source_list) is list:
+
+                if isinstance(source_list, list):
+                    source_list.sort()
+
                     for item in source_list:
                         choice = (item, item)
                         choices_list.append(choice)
+
                 else:
                     item = source_list
                     choice = (item, item)
@@ -853,6 +926,7 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
             elif type_hint == "checkbox" and "cbx_list" in variable:
                 cbx_list = variable['cbx_list']
                 choices_list = list()
+
                 for item in cbx_list:
                     choice = (item['value'], item['key'])
                     choices_list.append(choice)
@@ -866,10 +940,13 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
                 source = variable.get('source', None)
                 source_list = self.get_value_from_workflow(source, [])
                 choices_list = list()
-                if type(source_list) is list:
+
+                if isinstance(source_list, list):
+                    source_list.sort()
                     for item in source_list:
                         choice = (item, item)
                         choices_list.append(choice)
+
                 else:
                     item = source_list
                     choice = (item, item)
@@ -930,8 +1007,15 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
                 # implement multiple inputs as a dict from a source list
                 if 'source' in variable:
                     source = self.get_value_from_workflow(variable['source'], [])
+
+                    # it's possible to have a single element list
                     if type(source) is not list:
-                        continue
+                        item = source
+                        source = list()
+                        source.append(item)
+
+                    source.sort()
+
                     for item in source:
                         if type(default) is dict and item in default:
                             item_value = default[item]
@@ -1213,6 +1297,8 @@ class ProvisionSnippetView(CNCBaseFormView):
             # fix for #65 - show nicer output for rest type skillet
             context['results'] = json.dumps(results, indent=2)
             context['view'] = self
+            skillet_label = self.service.get('label', 'Skillet')
+            context['title'] = f'Successfully Executed {skillet_label}'
 
             # Most REST actions will only have a single action/path taken. If so, we can simplify the results
             # shown to the user by default
@@ -1275,8 +1361,7 @@ class ProvisionSnippetView(CNCBaseFormView):
             # do we need to always how the target_ip, etc form?
             require_ui = False
             # check workflow first
-            workflow_name = self.get_value_from_workflow('workflow_name', None)
-
+            workflow_name = self.request.session.get('workflow_name', None)
             if workflow_name is None or workflow_name == '':
                 # if we are NOT in a workflow, then we will always show the UI
                 require_ui = True
@@ -1340,7 +1425,7 @@ class ProvisionSnippetView(CNCBaseFormView):
             context['base_html'] = self.base_html
             context['results'] = json.dumps(outputs, indent=2)
             context['view'] = self
-            context['title'] = 'Successfully Executed Skillet'
+            context['title'] = f'Successfully Executed {self.service.get("label")}'
             context['captured_outputs'] = captured_outputs
 
             return render(self.request, 'pan_cnc/results.html', context)
@@ -1565,11 +1650,28 @@ class EditTargetView(CNCBaseAuth, FormView):
             self.save_value_to_workflow('perform_commit', saved_perform_commit)
             self.save_value_to_workflow('perform_backup', saved_perform_backup)
 
+        self.save_value_to_workflow('TARGET_IP', target_ip)
+        self.save_value_to_workflow('TARGET_PORT', target_port)
+        self.save_value_to_workflow('TARGET_USERNAME', target_username)
+
         if debug == 'True' or debug is True:
             context = dict()
             context['base_html'] = self.base_html
+            changes = dict()
             try:
-                changes = pan_utils.debug_meta(meta, self.get_snippet_variables_from_workflow())
+                skillet_context = self.get_snippet_variables_from_workflow()
+                # changes = pan_utils.debug_meta(meta, self.get_snippet_variables_from_workflow())
+                panos_skillet = PanosSkillet(self.meta)
+                for snippet in panos_skillet.get_snippets():
+                    snippet.render_metadata(skillet_context)
+                    if snippet.cmd == 'set':
+                        xpath = snippet.metadata['xpath']
+                        element = snippet.render(snippet.metadata['element'], skillet_context)
+                        change = dict()
+                        change['xml'] = element
+                        change['xpath'] = xpath
+                        change['when'] = snippet.metadata.get('when', None)
+                        changes[snippet.name] = change
             except CCFParserError as cpe:
                 label = meta['label']
                 messages.add_message(self.request, messages.ERROR, f'Could not debug Skillet: {label}')
@@ -1579,15 +1681,11 @@ class EditTargetView(CNCBaseAuth, FormView):
             context['results'] = changes
             context['meta'] = meta
             context['target_ip'] = target_ip
-            self.request.session['last_page'] = '/editTarget'
+            self.request.session['last_page'] = f'/{self.app_dir}/skillet/{panos_skillet.name}'
             return render(self.request, 'pan_cnc/debug_panos_skillet.html', context=context)
 
-        self.save_value_to_workflow('TARGET_IP', target_ip)
-        self.save_value_to_workflow('TARGET_PORT', target_port)
-        self.save_value_to_workflow('TARGET_USERNAME', target_username)
-
-        workflow = self.get_workflow()
-        self.request.session[self.app_dir] = workflow
+        # workflow = self.get_workflow()
+        # self.request.session[self.app_dir] = workflow
 
         err_condition = False
         if target_ip is None or target_ip == '':
@@ -1683,8 +1781,12 @@ class EditTargetView(CNCBaseAuth, FormView):
                             messages.add_message(self.request, messages.SUCCESS,
                                                  f'Configuration Push Queued successfully with Job ID: {job_id}')
             else:
-                messages.add_message(self.request, messages.SUCCESS,
-                                     'Configuration added to Candidate Config successfully')
+                if 'changed' in outputs and outputs['changed']:
+                    messages.add_message(self.request, messages.SUCCESS,
+                                         'Configuration added to Candidate Config successfully')
+                else:
+                    messages.add_message(self.request, messages.SUCCESS,
+                                         'Skillet Executed Successfully with no changes')
 
         except PanoplyException as pe:
             return HttpResponseRedirect(self.error_out(f'Error Executing Skillet on Device! {pe}'))
@@ -1811,6 +1913,17 @@ class EditTerraformView(CNCBaseAuth, FormView):
         return render(self.request, 'pan_cnc/results_async.html', context)
 
 
+class ErrorView(CNCBaseAuth, RedirectView):
+    """
+    Cleans up after an error condition
+    """
+
+    def get_redirect_url(self, *args, **kwargs):
+        self.clean_up_workflow()
+        next_url = self.request.session.pop('last_page', '/')
+        return next_url
+
+
 class CancelTaskView(CNCBaseAuth, RedirectView):
     """
     Cancels the currently running Task
@@ -1818,8 +1931,8 @@ class CancelTaskView(CNCBaseAuth, RedirectView):
 
     def get_redirect_url(self, *args, **kwargs):
 
-        # set last_page to something other than this one for the continue button
-        # self.request.session['last_page'] = '/'
+        # clean up the workflow if any is found...
+        self.clean_up_workflow()
         if 'task_id' in self.request.session:
             task_id = self.request.session['task_id']
             task = AsyncResult(task_id)
@@ -2162,15 +2275,21 @@ class WorkflowView(CNCBaseAuth, RedirectView):
             return self.error_out('Could not find current workflow state')
 
         if current_step == 0:
+            self.request.session['workflow_ui_step'] = 1
             # get the actual workflow skillet that was selected
             skillet_name = self.get_value_from_workflow('snippet_name', '')
             # let's save this for later when we are on step #2 or later
-            self.save_value_to_workflow('workflow_name', skillet_name)
+            self.request.session['workflow_name'] = skillet_name
         else:
+            previous_ui_step = self.request.session.get('workflow_ui_step', 1)
+            ui_step = previous_ui_step + 1
+            self.request.session['workflow_ui_step'] = ui_step
             # no longer on step 0, so the saved snippet name will not point us back to the origin
             # workflow we need
             print(f"Getting our original workflow name out of the session")
-            skillet_name = self.get_value_from_workflow('workflow_name', '')
+            skillet_name = self.request.session.get('workflow_name', None)
+            if skillet_name is None:
+                return self.error_out('Process Error - No Workflow found!')
 
         print(f"found workflow skillet name {skillet_name}")
         self.meta = snippet_utils.load_snippet_with_name(skillet_name, self.app_dir)
@@ -2188,7 +2307,8 @@ class WorkflowView(CNCBaseAuth, RedirectView):
             self.request.session.pop('next_step', '')
             self.request.session.pop('last_step', '')
             self.request.session.pop('next_url', '')
-            self.pop_value_from_workflow('workflow_name', '')
+            self.request.session.pop('workflow_ui_step', '')
+            self.request.session.pop('workflow_name', '')
             last_page = self.request.session.pop('last_page', '/')
             return last_page
 
@@ -2226,8 +2346,9 @@ class WorkflowView(CNCBaseAuth, RedirectView):
             messages.add_message(self.request, messages.INFO, 'Workflow Completed Successfully')
             self.request.session['next_step'] = None
             self.request.session['last_step'] = None
-            self.request.session.pop('next_step')
-            self.request.session.pop('last_step')
+            self.request.session.pop('next_step', None)
+            self.request.session.pop('last_step', None)
+            self.request.session.pop('workflow_ui_step', None)
             return self.request.session.get('last_page', '/')
 
         print(f"Current skillet name is {current_skillet_name}")
@@ -2561,7 +2682,7 @@ class LoadEnvironmentView(EnvironmentBase, RedirectView):
     """
 
     def get_redirect_url(self, *args, **kwargs):
-
+        self.clean_up_workflow()
         env_name = self.kwargs.get('env_name')
 
         if env_name in self.e:
@@ -2698,7 +2819,7 @@ class ClearCacheView(CNCBaseAuth, RedirectView):
 
     def get_redirect_url(self, *args, **kwargs):
         print('Clearing Cache')
-
+        self.clean_up_workflow()
         # clear everything except our cached imported git repositories
         repos = cnc_utils.get_long_term_cached_value(self.app_dir, 'imported_repositories')
         cnc_utils.clear_long_term_cache(self.app_dir)
@@ -2728,6 +2849,7 @@ class DebugContextView(CNCView):
         pass
 
     def get_context_data(self, **kwargs):
+        self.clean_up_workflow()
         workflow = self.get_workflow()
         w = dict(sorted(workflow.items()))
         context = super().get_context_data()
@@ -2748,6 +2870,7 @@ class ReinitPythonVenv(CNCView):
         pass
 
     def get_context_data(self, **kwargs):
+        self.clean_up_workflow()
         app_dir = self.kwargs.get('app_dir', '')
         if app_dir != '':
             self.app_dir = app_dir

@@ -251,18 +251,22 @@ def update_repo(repo_dir: str, branch=None):
                 repo.git.checkout(branch)
 
         f = repo.remotes.origin.pull()
+
     except GitCommandError as gce:
         print(gce)
-        return 'Could not update! Ensure there are no local changes before updating'
+        return 'Error: Could not update! Ensure there are no local changes before updating'
+
     except InvalidGitRepositoryError as igre:
         print(igre)
-        return 'Could not update! Invalid git repository directory'
+        return 'Error: Could not update! Invalid git repository directory'
+
     except NoSuchPathError as nspe:
         print(nspe)
-        return 'Could not update, repository directory could not be found'
+        return 'Error: Could not update, repository directory could not be found'
+
     except GitError as ge:
         print(ge)
-        return 'Could not update, Unknown error with git repository'
+        return 'Error: Could not update, Unknown error with git repository'
 
     if checkout:
         return f"Checked out new Branch: {branch}"

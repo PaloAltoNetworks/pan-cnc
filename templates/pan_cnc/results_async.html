@@ -82,7 +82,7 @@
                         {% endif %}
                     } else {
                         f.empty();
-                        next_link.attr('href', '{{ request.session.last_page|urlencode }}');
+                        next_link.attr('href', '/cancel');
                         next_link.html('Continue');
                         next_link.addClass('btn').addClass('btn-danger');
                         if (output !== '') {
@@ -111,7 +111,7 @@
                     c.empty();
                     cancel_countdown = true;
                     let next_link = $('<a/>');
-                    next_link.attr('href', '{{ request.session.last_page|urlencode }}');
+                    next_link.attr('href', '/cancel');
                     next_link.html('Continue');
                     next_link.addClass('btn').addClass('btn-danger');
                     c.append('Error Executing Task');

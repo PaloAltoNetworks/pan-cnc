@@ -44,10 +44,32 @@
                 parent.toggle();
                 console.log('hiding');
             }
+        });
 
+        $('[data-widget_type="list"]').each(function(i, e) {
+            let input_object = $(e);
+            console.log('initializing list type form control');
+            console.log(input_object.attr('name'));
+            let p = input_object.parent().parent();
+            try {
+                let initial_str = input_object.val();
+                // this is a hack, need to ensure this comes in as valid json to begin with...
+                initial_str = initial_str.replace(/\'/g, '"');
+                let initial_val = JSON.parse(initial_str);
+                if (typeof(initial_val) !== "string") {
+                    for (let j = 1; j < initial_val.length; j++) {
+                        let new_input = $('<input type="text" class="form-control mt-3"/>');
+                        new_input.attr('name', input_object.attr('name'));
+                        new_input.val(initial_val[j]);
+                        p.append(new_input);
+                    }
+                    input_object.val(initial_val[0]);
+                }
+            } catch {
+                console.log('Could not parse json data from list!');
+            }
         });
     });
-
 </script>
 
 {%  block before_form %}
@@ -85,6 +107,7 @@
     </div>
     <div class="card-footer text-right">
         {% block form_buttons %}{%  endblock %}
+        <a href="/cancel" class="btn btn-danger">Cancel</a>
         <button type="submit" class="btn btn-primary" id="submit_button" onclick="set_cursor()">Submit</button>
     </div>
 </div>

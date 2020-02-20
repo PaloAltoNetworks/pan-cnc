@@ -1,5 +1,6 @@
 function add_list_item(widget_id, widget_name) {
     // construct a new input and attach it to the element identified by widget_id with name = widget_name
+    event.preventDefault();
     let w = $('#' + widget_id);
     let new_input = $('<input type="text" class="form-control mt-3"/>');
     new_input.attr('name', widget_name);
@@ -7,6 +8,17 @@ function add_list_item(widget_id, widget_name) {
     let incremented = simple_increment(current_value);
     new_input.val(incremented);
     w.append(new_input);
+}
+
+function remove_list_item(widget_id, widget_name) {
+    /*
+        Allows removing a 'list' type item from the dynamic form. Finds the last element with the given widget_name
+        and removes it.
+     */
+    event.preventDefault();
+    let last_child = $('[name="' + widget_name + '"]').last();
+    console.log('Removing last child of ' + widget_name);
+    last_child.remove();
 }
 
 
