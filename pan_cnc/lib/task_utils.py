@@ -18,6 +18,9 @@ from pan_cnc.tasks import terraform_output
 from pan_cnc.tasks import terraform_plan
 from pan_cnc.tasks import terraform_refresh
 from pan_cnc.tasks import terraform_validate
+from pan_cnc.tasks import execute_docker_skillet
+
+from skilletlib.skillet.docker import DockerSkillet
 
 
 def __build_cmd_seq_vars(resource_def, snippet_context):
@@ -125,6 +128,11 @@ def python3_init_complete(resource_def) -> bool:
         return True
     else:
         return False
+
+
+def skillet_execute(skillet_def: dict, args: dict) -> AsyncResult:
+    print(f'Performing skillet execute')
+    return execute_docker_skillet.delay(skillet_def, args)
 
 
 def python3_reset_init(script_roots: str) -> None:

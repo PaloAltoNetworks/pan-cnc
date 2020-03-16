@@ -16,18 +16,21 @@
 
 import io
 import json
+import logging
 import os
 import pickle
 import re
 from pathlib import Path
+from time import time
 
 import pyAesCrypt
 from django.conf import settings
 from django.core.cache import cache
 
 from pan_cnc.lib import git_utils
-from time import time
 from pan_cnc.lib import snippet_utils
+
+logger = logging.getLogger()
 
 
 def check_user_secret(user_id):
@@ -272,7 +275,6 @@ def save_long_term_cache(app_name: str, contents: dict) -> None:
 
 
 def get_long_term_cached_value(app_name: str, key: str) -> any:
-
     cache_key = f'{app_name}_cache'
 
     if cache_key not in cache:
@@ -313,7 +315,6 @@ def get_long_term_cached_value(app_name: str, key: str) -> any:
 
 
 def set_long_term_cached_value(app_name: str, key: str, value: any, life=3600, cache_type='snippet') -> None:
-
     cache_key = f'{app_name}_cache'
 
     if cache_key not in cache:
@@ -389,7 +390,6 @@ def evict_cache_items_of_type(app_name, cache_type):
 
 
 def init_app(app_cnc_config):
-
     if 'name' not in app_cnc_config:
         print('No name found in app_cnc_config!')
         return None
@@ -470,3 +470,4 @@ def is_testing() -> bool:
         return True
     else:
         return False
+

@@ -28,12 +28,20 @@ Use at your own risk.
 import asyncio
 import json
 import os
+import logging
 import subprocess
 from asyncio import LimitOverrunError
 from subprocess import Popen
 
 from celery import current_task
 from celery import shared_task
+from skilletlib import SkilletLoader
+from skilletlib.exceptions import SkilletLoaderException
+
+from pan_cnc.tasklibs.docker_utils import DockerHelper
+from pan_cnc.tasklibs.docker_utils import DockerHelperException
+
+logger = logging.getLogger(__name__)
 
 
 class OutputHolder(object):
@@ -320,3 +328,79 @@ def python3_execute_bare_script(working_dir, script, input_type, args):
             cmd_seq.append(f'--{k}={val}')
 
     return exec_local_task(cmd_seq, working_dir, env)
+
+
+@shared_task
+def execute_docker_skillet(skillet_def: dict, args: dict) -> dict:
+    """
+    Execute a skillet of type 'docker'. This requires the calling application have access to the
+    docker socket
+    :param skillet_def: the skillet as loaded from the YAML file (dict)
+    :param args: context arguments required for the given skillets. These will overwrite the 'variables' in the
+    skillet
+    :return: dict containing the following keys: {'returncode', 'out', 'err'}
+    """
+    state = dict()
+    out = ''
+    err = ''
+    rc = 0
+
+    if skillet_def['type'] != 'docker':
+        rc = 255
+        err = 'Not a docker skillet!'
+
+    else:
+
+        try:
+            docker_helper = DockerHelper()
+            persistent_volume = docker_helper.get_cnc_volume()
+
+            if 'app_data' not in skillet_def:
+                skillet_def['app_data'] = dict()
+
+            # always overwrite any volumes that may have snuck in here
+            if persistent_volume:
+                skillet_def['app_data']['volumes'] = persistent_volume
+
+            else:
+                # only this app should be setting app_data/volumes here, remove anything else
+                if 'volumes' in skillet_def['app_data']:
+                    skillet_def['app_data'].pop('volumes')
+
+            sl = SkilletLoader()
+            skillet = sl.create_skillet(skillet_def)
+            r = skillet.execute(args)
+
+            if isinstance(r, dict) and 'snippets' in r:
+                for k, v in r['snippets'].items():
+                    result = v.get('results', 'error')
+
+                    if result == 'success':
+                        out = v.get('raw', '')
+                    elif result == 'error':
+                        err = v.get('raw', 'error')
+                        rc = 2
+                    else:
+                        out = v.get('raw', '')
+                        err = f'Unknown return value type {result}'
+            else:
+                out = r
+
+        except DockerHelperException as dee:
+            logger.error(dee)
+            rc = 1
+            err = str(dee)
+
+        except SkilletLoaderException as sle:
+            logger.error(sle)
+            rc = 1
+            err = str(sle)
+
+    state['returncode'] = rc
+    state['out'] = out
+    state['err'] = err
+
+    return json.dumps(state)
+
+
+

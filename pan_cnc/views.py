@@ -58,6 +58,7 @@ from skilletlib.exceptions import TargetGenericException
 from skilletlib.panoply import Panos
 from skilletlib.skillet.panos import PanosSkillet
 from skilletlib.skillet.rest import RestSkillet
+from skilletlib.skillet.docker import DockerSkillet
 from skilletlib.snippet.workflow import WorkflowSnippet
 
 from pan_cnc.lib import cnc_utils
@@ -1354,6 +1355,21 @@ class ProvisionSnippetView(CNCBaseFormView):
         elif self.service['type'] == 'terraform':
             self.request.session['next_url'] = self.next_url
             return HttpResponseRedirect('/terraform')
+
+        elif self.service['type'] == 'docker':
+            print('Launching Docker Skillet')
+            context = super().get_context_data()
+            context['base_html'] = self.base_html
+
+            context['title'] = f"Executing Skillet: {self.service['label']}"
+            r = task_utils.skillet_execute(self.service, self.get_snippet_variables_from_workflow())
+
+            self.request.session['task_next'] = ''
+            self.request.session['task_id'] = r.id
+            self.request.session['task_app_dir'] = self.app_dir
+            self.request.session['task_base_html'] = self.base_html
+            return render(self.request, 'pan_cnc/results_async.html', context)
+
         elif self.service['type'] == 'panos':
 
             # init the panos_skillet type
