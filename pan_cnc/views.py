@@ -1796,6 +1796,18 @@ class EditTargetView(CNCBaseAuth, FormView):
                         if job_id is not None:
                             messages.add_message(self.request, messages.SUCCESS,
                                                  f'Configuration Push Queued successfully with Job ID: {job_id}')
+
+                # check for gpcs skillet type and perform the appropriate commit option
+                if 'gpcs' in self.meta['type']:
+                    gpcs_commit_result = p.commit_gpcs(force_sync)
+                    print(gpcs_commit_result)
+                    if force_sync:
+                        messages.add_message(self.request, messages.SUCCESS,
+                                             'Prisma-Access Configuration Pushed successfully')
+                    else:
+                        messages.add_message(self.request, messages.SUCCESS,
+                                             'Prisma-Access Configuration Queued successfully')
+
             else:
                 if 'changed' in outputs and outputs['changed']:
                     messages.add_message(self.request, messages.SUCCESS,
