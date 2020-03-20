@@ -369,7 +369,15 @@ def execute_docker_skillet(skillet_def: dict, args: dict) -> dict:
 
             sl = SkilletLoader()
             skillet = sl.create_skillet(skillet_def)
-            r = skillet.execute(args)
+
+            full_output = ''
+            output_generator = skillet.execute_async(args)
+
+            for out in output_generator:
+                full_output += out
+                current_task.update_state(state='PROGRESS', meta=full_output)
+
+            r = skillet.get_results()
 
             if isinstance(r, dict) and 'snippets' in r:
                 for k, v in r['snippets'].items():
@@ -397,7 +405,7 @@ def execute_docker_skillet(skillet_def: dict, args: dict) -> dict:
             err = str(sle)
 
     state['returncode'] = rc
-    state['out'] = out
+    state['out'] = full_output
     state['err'] = err
 
     return json.dumps(state)
