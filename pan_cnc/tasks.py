@@ -341,13 +341,13 @@ def execute_docker_skillet(skillet_def: dict, args: dict) -> dict:
     :return: dict containing the following keys: {'returncode', 'out', 'err'}
     """
     state = dict()
-    out = ''
+    full_output = ''
     err = ''
     rc = 0
 
     if skillet_def['type'] != 'docker':
         rc = 255
-        err = 'Not a docker skillet!'
+        err = f'Not a valid skillet type {skillet_def["type"]}!'
 
     else:
 
@@ -370,7 +370,6 @@ def execute_docker_skillet(skillet_def: dict, args: dict) -> dict:
             sl = SkilletLoader()
             skillet = sl.create_skillet(skillet_def)
 
-            full_output = ''
             output_generator = skillet.execute_async(args)
 
             for out in output_generator:
@@ -392,7 +391,8 @@ def execute_docker_skillet(skillet_def: dict, args: dict) -> dict:
                         out = v.get('raw', '')
                         err = f'Unknown return value type {result}'
             else:
-                out = r
+                full_output = r
+                err = 'unknown output from skillet'
 
         except DockerHelperException as dee:
             logger.error(dee)
