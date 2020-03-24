@@ -353,7 +353,18 @@ def execute_docker_skillet(skillet_def: dict, args: dict) -> dict:
 
         try:
             docker_helper = DockerHelper()
-            persistent_volume = docker_helper.get_cnc_volume()
+
+            persistent_volume = None
+            persistent_volume_ret = docker_helper.get_cnc_volume()
+
+            if isinstance(persistent_volume_ret, str):
+                parts = persistent_volume_ret.split(':')
+                p = {
+                    parts[0]: {
+                        'bind': parts[1], 'mode': 'rw'
+                    }
+                }
+                persistent_volume = p
 
             if 'app_data' not in skillet_def:
                 skillet_def['app_data'] = dict()
@@ -383,12 +394,12 @@ def execute_docker_skillet(skillet_def: dict, args: dict) -> dict:
                     result = v.get('results', 'error')
 
                     if result == 'success':
-                        out = v.get('raw', '')
+                        full_output = v.get('raw', '')
                     elif result == 'error':
                         err = v.get('raw', 'error')
                         rc = 2
                     else:
-                        out = v.get('raw', '')
+                        full_output = v.get('raw', '')
                         err = f'Unknown return value type {result}'
             else:
                 full_output = r

@@ -33,13 +33,16 @@ class DockerHelper:
             container_dict: dict = self.client.inspect_container(container_id)
             return container_dict['HostConfig']['Binds']
 
-        except KeyError:
+        except KeyError as ke:
+            logger.error(ke)
             raise DockerHelperException('Could not find attached volumes on container')
 
-        except docker.errors.NotFound:
+        except docker.errors.NotFound as dne:
+            logger.error(dne)
             raise DockerHelperException('Container Not Found')
 
-        except docker.errors.APIError:
+        except docker.errors.APIError as ae:
+            logger.error(ae)
             raise DockerHelperException('Could not contact Docker daemon')
 
     def get_cnc_volume(self) -> (str, None):
@@ -92,11 +95,12 @@ class DockerHelper:
             with open(path, 'r') as cgroup:
                 for line in cgroup:
                     if ':/docker/' in line:
-                        container_id = line.split('/')[-1]
+                        container_id = line.split('/')[-1].strip()
 
         except OSError as ose:
             logger.error('Could not find container id')
             logger.error(ose)
 
         finally:
+            logger.debug(f'Found container_id :{container_id}:')
             return container_id

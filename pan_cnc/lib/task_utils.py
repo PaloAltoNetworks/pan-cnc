@@ -8,6 +8,8 @@ from django.conf import settings
 
 from pan_cnc.celery import app as cnc_celery_app
 from pan_cnc.lib.exceptions import CCFParserError
+from pan_cnc.tasklibs.docker_utils import DockerHelper
+from pan_cnc.tasks import execute_docker_skillet
 from pan_cnc.tasks import python3_execute_bare_script
 from pan_cnc.tasks import python3_execute_script
 from pan_cnc.tasks import python3_init_with_deps
@@ -18,9 +20,6 @@ from pan_cnc.tasks import terraform_output
 from pan_cnc.tasks import terraform_plan
 from pan_cnc.tasks import terraform_refresh
 from pan_cnc.tasks import terraform_validate
-from pan_cnc.tasks import execute_docker_skillet
-
-from skilletlib.skillet.docker import DockerSkillet
 
 
 def __build_cmd_seq_vars(resource_def, snippet_context):
