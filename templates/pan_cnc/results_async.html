@@ -36,7 +36,10 @@
                         r.height(40);
                     }
                 }
-                r.html(msg);
+                if (r.html() !== msg) {
+                    console.log('FOUND DIFFERENT CONTENT');
+                    r.html(msg);
+                }
                 if (msg !== '') {
                     let current_height = r.height();
                     let current_scrollheight = r.get(0).scrollHeight;
@@ -135,7 +138,6 @@
             }
             c.html('Checking again in ' + time_left);
             time_left = time_left - 1;
-            console.log(time_left);
             if (time_left > 0) {
                 setTimeout(countdown, 1000);
             }
