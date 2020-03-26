@@ -45,7 +45,7 @@
                  id="results"
                  style="display: none; white-space: pre; overflow-x: scroll">{{ results | safe | linebreaksbr }}</pre>
             {%  else %}
-                    {% if '<?xml version="1.0"?>' in results %}
+                    {% if '<?xml version="1.0"?>' in results or '<config urldb' in results %}
                         <pre class="pb-4" style="white-space: pre; overflow-x: scroll">{{ results }}</pre>
                     {% else %}
                         <pre class="pb-4" style="white-space: pre; overflow-x: scroll">{{ results | safe | linebreaksbr }}</pre>
