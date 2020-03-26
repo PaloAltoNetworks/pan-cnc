@@ -12,10 +12,10 @@ DOCKER_GROUP=$(grep "${DOCKER_GID}" /etc/group | cut -f1 -d':')
 if [ "${DOCKER_GROUP}" != "" ]; then
   if ! groups cnc_user | grep -q "${DOCKER_GROUP}"; then
     echo "Adding user to existing group"
-    groupadd cnc_user "${DOCKER_GROUP}"
+    addgroup cnc_user "${DOCKER_GROUP}"
   fi
 else
   echo "Creating new group and adding user"
-  groupadd -g "${DOCKER_GID}" cnc_docker
-  groupadd cnc_user cnc_docker
+  addgroup -g "${DOCKER_GID}" cnc_docker
+  addgroup cnc_user cnc_docker
 fi
