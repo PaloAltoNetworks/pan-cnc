@@ -1600,11 +1600,20 @@ class EditTargetView(CNCBaseAuth, FormView):
             choices_list.append(('sync_commit', 'Commit and wait to finish'))
 
             choices_set = tuple(choices_list)
-            perform_commit = forms.ChoiceField(choices=choices_set, label='Commit Options',
-                                               initial=saved_perform_commit)
+
+            # fix for #156 - only sync_commit for gpcs type skillets
+            if 'gpcs' in meta['type']:
+                perform_commit = forms.CharField(initial='sync_commit', widget=forms.HiddenInput())
+
+            else:
+                perform_commit = forms.ChoiceField(choices=choices_set, label='Commit Options',
+                                                   initial=saved_perform_commit)
+
             form.fields['perform_commit'] = perform_commit
+
             perform_backup = forms.BooleanField(label='Perform Backup', initial=saved_perform_backup,
                                                 label_suffix='', required=False)
+
             form.fields['perform_backup'] = perform_backup
 
         return form
