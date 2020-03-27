@@ -1,6 +1,7 @@
 GitPython
 PyYAML
 celery
+docker
 django
 django-widget-tweaks
 jinja2
@@ -15,4 +16,4 @@ requests-toolbelt
 urllib3
 xmldiff
 xmltodict
-git+git://github.com/paloaltonetworks/skilletlib.git@develop#egg=skilletlib
+skilletlib
