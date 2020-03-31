@@ -345,15 +345,19 @@ def execute_docker_skillet(skillet_def: dict, args: dict) -> dict:
     err = ''
     rc = 0
 
+    docker_helper = DockerHelper()
+
     if skillet_def['type'] != 'docker':
         rc = 255
         err = f'Not a valid skillet type {skillet_def["type"]}!'
 
+    elif not docker_helper.check_docker_server():
+        rc = 240
+        err = 'Could not connect to Docker daemon, verify permissions on the docker socket! \n\n' \
+              'See the documentation for details: https://panhandler.readthedocs.io/en/master/debugging.html'
+
     else:
-
         try:
-            docker_helper = DockerHelper()
-
             persistent_volume = None
             persistent_volume_ret = docker_helper.get_cnc_volume()
 
