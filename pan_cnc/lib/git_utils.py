@@ -465,10 +465,15 @@ def update_repo_in_cache(repo_name: str, repo_dir: str, app_dir: str) -> None:
 
     # now, find and remove the old details
     repos = cnc_utils.get_long_term_cached_value(app_dir, 'imported_repositories')
-    for r in repos:
-        if r.get('name', '') == repo_name:
-            repos.remove(r)
-            break
+
+    # fix for crash when long term cached values may be blank or None
+    if repos is not None:
+        for r in repos:
+            if r.get('name', '') == repo_name:
+                repos.remove(r)
+                break
+    else:
+        repos = list()
 
     # add our new repo details and re-cache
     repos.append(updated_repo_details)
