@@ -3,6 +3,8 @@ import os
 
 import docker
 from docker.errors import ContainerError
+from docker.errors import APIError
+from requests.exceptions import ConnectionError
 
 
 logger = logging.getLogger(__name__)
@@ -21,6 +23,33 @@ class DockerHelper:
 
         # assume docker.sock is available
         self.client = docker.APIClient()
+
+    def check_docker_server(self) -> bool:
+        """
+        Verifies communication with the docker server
+        :return: boolean true on success
+        """
+
+        try:
+            self.client.ping()
+
+        except APIError as ae:
+            logger.error(ae)
+            return False
+
+        except ConnectionError as ce:
+            logger.error(
+                'This is a connection error'
+            )
+            logger.error(ce)
+            return False
+
+        except Exception as e:
+            logger.error(' Basic exception here')
+            logger.error(e)
+            return False
+
+        return True
 
     def get_volumes_for_container(self, container_id: str) -> list:
         """
@@ -52,6 +81,9 @@ class DockerHelper:
         """
 
         if not self.is_docker():
+            return None
+
+        if not self.check_docker_server():
             return None
 
         this_container = self.get_container_id()
