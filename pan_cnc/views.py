@@ -1864,6 +1864,9 @@ class EditTerraformView(CNCBaseAuth, FormView):
     # help text - inline documentation text
     help_text = 'Choose which action you would like to perform on the selected Terraform template.'
 
+    # keep current skillet metadata around
+    meta = dict()
+
     def get(self, request, *args, **kwargs) -> Any:
         """
             Handle GET requests
@@ -1874,6 +1877,7 @@ class EditTerraformView(CNCBaseAuth, FormView):
         # call chain in the child classes
         snippet_name = self.get_value_from_workflow('snippet_name', '')
         if snippet_name != '':
+            self.meta = snippet_utils.load_snippet_with_name(snippet_name, self.app_dir)
             return self.render_to_response(self.get_context_data())
         else:
             messages.add_message(self.request, messages.ERROR, 'Process Error - Meta not found')
@@ -1884,13 +1888,22 @@ class EditTerraformView(CNCBaseAuth, FormView):
         env_name = self.kwargs.get('env_name')
         form = forms.Form()
 
+        default_choice = 'validate'
         choices_list = list()
         choices_list.append(('validate', 'Validate, Init, and Apply'))
         choices_list.append(('refresh', 'Refresh Current Status'))
         choices_list.append(('destroy', 'Destroy'))
 
+        if task_utils.terraform_state_exists(self.meta):
+
+            messages.add_message(self.request, messages.INFO,
+                                 'Found existing Terraform State! Choose Manual Override to backup state and create a '
+                                 'new Terraform State')
+            choices_list.append(('override', 'Manual Override'))
+            default_choice = 'override'
+
         choices_set = tuple(choices_list)
-        terraform_action_list = forms.ChoiceField(choices=choices_set, label='Template Name')
+        terraform_action_list = forms.ChoiceField(choices=choices_set, label='Template Name', initial=default_choice)
         form.fields['terraform_action'] = terraform_action_list
         context['form'] = form
         context['base_html'] = self.base_html
@@ -1912,7 +1925,17 @@ class EditTerraformView(CNCBaseAuth, FormView):
         context = super().get_context_data()
         context['header'] = 'Terraform Template'
 
-        if terraform_action == 'validate':
+        if terraform_action == 'override':
+            print('Overriding existing terraform state')
+            context['title'] = 'Executing Task: Terraform Init with Override'
+            new_name = task_utils.override_tfstate(meta)
+            messages.add_message(self.request, messages.INFO,
+                                 f'Existing Terraform state backed up to {new_name}')
+
+            r = task_utils.perform_init(meta, self.get_snippet_variables_from_workflow())
+            self.request.session['task_next'] = 'terraform_validate'
+
+        elif terraform_action == 'validate':
             print('Launching terraform init')
             context['title'] = 'Executing Task: Terraform Init'
             r = task_utils.perform_init(meta, self.get_snippet_variables_from_workflow())

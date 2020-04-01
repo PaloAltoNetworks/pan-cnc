@@ -1,5 +1,6 @@
 import json
 import os
+from datetime import datetime
 from pathlib import Path
 
 from celery.result import AsyncResult
@@ -8,7 +9,6 @@ from django.conf import settings
 
 from pan_cnc.celery import app as cnc_celery_app
 from pan_cnc.lib.exceptions import CCFParserError
-from pan_cnc.tasklibs.docker_utils import DockerHelper
 from pan_cnc.tasks import execute_docker_skillet
 from pan_cnc.tasks import python3_execute_bare_script
 from pan_cnc.tasks import python3_execute_script
@@ -208,28 +208,92 @@ def get_python_input_options(resource_def: dict) -> str:
         raise CCFParserError('Malformed .meta-cnc file for python3 execution - Malformed snippet')
 
 
-def verify_clean_state(resource_def) -> bool:
-    # Verify the tfstate file does NOT exist or contain resources if it does exist
+def __get_state_file_from_path(resource_def: dict) -> (Path, None):
+    """
+    Find and return the terraform state file for the given skillet resource_def
+    :param resource_def: Skill definition file
+    :return: pathlib.Path object of the found state file or None
+    """
     resource_dir = resource_def['snippet_path']
     rd = Path(resource_dir)
     state_file = rd.joinpath('terraform.tfstate')
     print(f'checking {state_file}')
-    if state_file.exists() and state_file.is_file():
-        print('It exists, so lets check it out')
-        # we have had a state at some point in the past
-        with state_file.open(mode='r') as state_object:
-            state_data = json.loads(state_object.read())
-            print(state_data)
-            modules = state_data.get('modules', [])
-            for module in modules:
-                if 'resources' in module:
-                    print('We have resources')
-                    if len(module['resources']) > 0:
-                        return False
-                    else:
-                        return True
 
+    if state_file.exists() and state_file.is_file():
+        return state_file
+    else:
+        return None
+
+
+def terraform_state_exists(resource_def: dict) -> bool:
+    """
+    Used by View class to determine if we need to present options to the user about overwriting or backing up
+    a state file. This will locate the state file and determine if it contains resources
+    :param resource_def: Skillet definition file
+    :return:
+    """
+    state_file = __get_state_file_from_path(resource_def)
+
+    if not state_file:
+        return False
+
+    if verify_empty_tf_state(state_file):
+        # reverse the logic from the verify_empty_tf_state call
+        # if the state exists and it is empty, then return False
+        return False
+
+    # exists but is not empty
     return True
+
+
+def verify_empty_tf_state(state_file: (Path, None)) -> bool:
+    """
+
+    Verifies that if a terraform.tfstate file exists for the given skillet that it is empty
+    or that no state file exists.
+
+    :param state_file: Terraform state path object
+    :return: bool True if state does not exist or no resources found in state
+    """
+
+    if state_file is None:
+        return True
+
+    # we have had a state at some point in the past
+    with state_file.open(mode='r') as state_object:
+        state_data = json.loads(state_object.read())
+        print(state_data)
+        modules = state_data.get('modules', [])
+        for module in modules:
+            if 'resources' in module:
+                print('We have resources')
+                if len(module['resources']) > 0:
+                    return False
+                else:
+                    return True
+    return True
+
+
+def override_tfstate(resource_def: dict) -> str:
+    """
+    Will create a new terraform state file and back up the existing one if necessary
+    Will only create a new terraform state file if there are found to be existing resources in the file
+    This is dangerous!
+    :param resource_def: Skillet Definition dictionary
+    :return: Name of the terraform.tfstate file
+    """
+
+    # check if there are resources defined in the state file
+    state_file = __get_state_file_from_path(resource_def)
+    new_name = state_file.absolute()
+    if not verify_empty_tf_state(state_file):
+        current_name = state_file.absolute()
+        current_modtime_stamp = state_file.stat().st_mtime
+        current_modtime = datetime.fromtimestamp(current_modtime_stamp).strftime("%b-%d-%y-%H_%M_%S")
+        new_name = f'{current_name}-{current_modtime}'
+        state_file.rename(new_name)
+
+    return new_name
 
 
 def purge_all_tasks() -> None:

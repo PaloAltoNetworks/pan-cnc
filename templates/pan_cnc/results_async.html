@@ -37,7 +37,6 @@
                     }
                 }
                 if (r.html() !== msg) {
-                    console.log('FOUND DIFFERENT CONTENT');
                     r.html(msg);
                 }
                 if (msg !== '') {
@@ -142,13 +141,23 @@
                 setTimeout(countdown, 1000);
             }
         }
-        {%  if not error %}
-            {%  if not completed %}
+        {% if not error %}
+            {% if not completed %}
                 $(document).ready(function () {
                     setTimeout(updateOutput, 1000);
                 });
-            {%  endif %}
-        {%  endif %}
+            {% else %}
+                $(document).ready(function() {
+                    let r = $('#results');
+                    let current_height = r.height();
+                    let current_scrollheight = r.get(0).scrollHeight;
+                    if ((current_scrollheight - current_height) > 25) {
+                        let r_height = r.get(0).scrollHeight + 10;
+                        r.height(r_height);
+                    }
+                });
+            {% endif %}
+        {% endif %}
 
     </script>
     <div class="card border-primary mb-5 shadow-lg">
