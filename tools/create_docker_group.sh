@@ -8,7 +8,7 @@
 DOCKER_SOCKET=/var/run/docker.sock
 
 # Check if the socket is mounted at all
-if [ ! -f $DOCKER_SOCKET ]; then
+if [ ! -S $DOCKER_SOCKET ]; then
   echo "Docker is unavailable"
   exit 0
 fi
