@@ -282,23 +282,14 @@ def python3_execute_script(working_dir, script, input_type, args):
     env = dict()
     env['PYTHONUNBUFFERED'] = "1"
 
-    for k, v in args.items():
-        if type(v) is list:
-            # do not try to serialize lists of data objects other than str
-            str_list = []
-            for list_item in v:
-                if type(list_item) is str:
-                    str_list.append(list_item)
+    sanitized_args = __santize_args(args)
 
-            val = ",".join(str_list)
-        else:
-            val = v
+    for k, v in sanitized_args.items():
         if input_type == 'env':
-            env[k] = val
+            env[k] = v
         else:
-            cmd_seq.append(f'--{k}={val}')
+            cmd_seq.append(f'--{k}={v}')
 
-    print(cmd_seq)
     return exec_local_task(cmd_seq, working_dir, env)
 
 
@@ -310,24 +301,49 @@ def python3_execute_bare_script(working_dir, script, input_type, args):
     env = dict()
     env['PYTHONUNBUFFERED'] = "1"
 
-    for k, v in args.items():
-        if type(v) is list:
-            if type(v) is list:
-                # do not try to serialize lists of data objects other than str
-                str_list = []
-                for list_item in v:
-                    if type(list_item) is str:
-                        str_list.append(list_item)
+    sanitized_args = __santize_args(args)
 
-                val = ",".join(str_list)
-        else:
-            val = v
+    for k, v in sanitized_args.items():
         if input_type == 'env':
-            env[k] = val
+            env[k] = v
         else:
-            cmd_seq.append(f'--{k}={val}')
+            cmd_seq.append(f'--{k}={v}')
 
     return exec_local_task(cmd_seq, working_dir, env)
+
+
+def __santize_args(args: dict) -> dict:
+    """
+    Attempt to sanitize input arguments for things like improper types and Null values. Lists are converted
+    to comma separated lists and None type values are converted to ''
+    :param args: dictionary of variables from the skillet with values from the user, default values from the skillet
+    or values from env secrets
+    :return: dictionary on with values sanitized
+    """
+
+    sanitized_args = dict()
+
+    for k, v in args.items():
+        if type(v) is list:
+            # do not try to serialize lists of data objects other than str
+            str_list = []
+
+            for list_item in v:
+                if type(list_item) is str:
+                    str_list.append(list_item)
+
+            val = ",".join(str_list)
+
+        else:
+            # Fix of PH#163 - do not allow None types to slip in here
+            if v is None:
+                val = ''
+            else:
+                val = v
+
+        sanitized_args[k] = val
+
+    return sanitized_args
 
 
 @shared_task
