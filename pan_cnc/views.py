@@ -1919,6 +1919,9 @@ class EditTerraformView(CNCBaseAuth, FormView):
 
         if snippet_name != '':
             meta = snippet_utils.load_snippet_with_name(snippet_name, self.app_dir)
+            # fix for panhandler #170 - self.meta not being set prevents vars from being set in context
+            # for terrraform destroy
+            self.meta = meta
         else:
             raise SnippetRequiredException
 
