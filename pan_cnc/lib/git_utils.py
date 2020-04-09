@@ -124,6 +124,7 @@ def clone_repository(repo_dir, repo_name, repo_url, branch='master'):
 def get_repo_details(repo_name, repo_dir, app_name='cnc'):
     """
     Fetch the details for a given repo name and directory
+
     :param repo_name:
     :param repo_dir:
     :param app_name: name of the CNC application
@@ -134,6 +135,9 @@ def get_repo_details(repo_name, repo_dir, app_name='cnc'):
     if repo_detail:
         return repo_detail
 
+    repo_detail = dict()
+    repo_detail['name'] = repo_name
+
     try:
 
         repo = Repo(repo_dir)
@@ -141,13 +145,16 @@ def get_repo_details(repo_name, repo_dir, app_name='cnc'):
     except NoSuchPathError as nspe:
         print(f'Repository directory {repo_dir} does not actually exist!')
         print(nspe)
-        repo_detail = dict()
-        repo_detail['name'] = 'Repository directory could not be found!'
+        repo_detail['error'] = 'Repository directory could not be found!'
         return repo_detail
     except GitError as ge:
         print(ge)
-        repo_detail = dict()
-        repo_detail['name'] = 'Git Repository Error!'
+        repo_detail['error'] = 'Git Repository Error!'
+        return repo_detail
+
+    # Fix for PH #172
+    if not hasattr(repo.remotes, 'origin'):
+        repo_detail['error'] = 'Git Repository Error! No origin set!'
         return repo_detail
 
     url = str(repo.remotes.origin.url)
@@ -170,6 +177,15 @@ def get_repo_details(repo_name, repo_dir, app_name='cnc'):
     last_updated = 0
     last_updated_str = ''
 
+    repo_detail['label'] = url_details['repo']
+    repo_detail['link'] = link
+    repo_detail['dir'] = repo_name
+    repo_detail['url'] = url
+    repo_detail['branch'] = branch
+    repo_detail['commits_url'] = get_repo_commits_url(url)
+
+    repo_detail['is_github'] = is_github
+
     try:
         branch = repo.active_branch.name
         commits = repo.iter_commits(branch, max_count=5)
@@ -190,25 +206,22 @@ def get_repo_details(repo_name, repo_dir, app_name='cnc'):
     except GitCommandError as gce:
         print('Could not get commits from repo')
         print(gce)
+        # partial fix for PH #171 - bail out when issues getting git details here to avoid hang
+        repo_detail['error'] = 'Could not fetch commit history for repo!'
+        return repo_detail
+
     except GitError as ge:
         print('Unknown GitError')
         print(ge)
+        repo_detail['error'] = 'Unknown Git error getting history for repo!'
+        return repo_detail
 
     branches = __get_repo_branches(repo)
 
-    repo_detail = dict()
-    repo_detail['name'] = repo_name
-    repo_detail['label'] = url_details['repo']
-    repo_detail['link'] = link
-    repo_detail['dir'] = repo_name
-    repo_detail['url'] = url
-    repo_detail['branch'] = branch
     repo_detail['branches'] = branches
     repo_detail['commits'] = commit_log
-    repo_detail['commits_url'] = get_repo_commits_url(url)
     repo_detail['last_updated'] = last_updated_str
     repo_detail['last_updated_time'] = last_updated
-    repo_detail['is_github'] = is_github
 
     upstream_details = get_repo_upstream_details(repo_name, url, app_name)
     if 'description' in upstream_details:

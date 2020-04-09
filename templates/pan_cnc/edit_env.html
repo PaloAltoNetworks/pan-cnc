@@ -1,13 +1,13 @@
 {% extends base_html|default:'pan_cnc/base.html' %}
 {% load static %}
 {% block head %}
-        <script type="text/javascript">
+    <script type="text/javascript">
         var e_c = {};
         var e_a = '';
 
         function load_env_secret(k, indx) {
 
-            $("[id ^= 'secret_e_']").each(function(i, e){
+            $("[id ^= 'secret_e_']").each(function (i, e) {
                 $(e).empty();
                 $(e).html('****************');
             });
@@ -72,7 +72,7 @@
 {% block content %}
     <div class="card border-primary mb-5 shadow-lg">
         <div class="card-header">Environment: {{ env_name }}
-        <div class="float-right">
+            <div class="float-right">
                 {% if view.help_text != '' %}
                     <a href="#" data-toggle="modal" data-target="#helpTextModal" title="Help">
                         <i class="fas fa-question-circle text-primary mr-1"></i>
@@ -101,7 +101,7 @@
                         <td id="secret_e_{{ forloop.counter }}">****************</td>
                         <td>
                             <input type="button" class="btn btn-primary"
-                                   onclick="load_env_secret('{{ k }}', {{  forloop.counter }})" value="Show"/>
+                                   onclick="load_env_secret('{{ k }}', {{ forloop.counter }})" value="Show"/>
                             <input type="button" class="btn btn-danger"
                                    onclick="delete_secret('{{ k |urlencode }}')"
                                    value="Delete"/>
@@ -130,20 +130,21 @@
         </div>
     </div>
 
-        <div class="card border-primary mb-5 shadow-lg rounded">
-        <div class="card-header">Add Secret fron Context</div>
-        <div class="card-body">
-            <p class="card-text">
-            <form action="{{ action }}" method="post">
-                {% csrf_token %}
-                {% include 'pan_cnc/bootstrap_form.html' with form=form %}
-                <button type="submit" class="btn btn-primary">Submit</button>
-            </form>
-            </p>
-        </div>
-    </div>
-        <!-- Modal -->
-    <div class="modal fade border-top border-primary" id="helpTextModal" tabindex="-1" role="dialog" aria-labelledby="helpTextModalLabel"
+    {#        <div class="card border-primary mb-5 shadow-lg rounded">#}
+    {#        <div class="card-header">Add Secret fron Context</div>#}
+    {#        <div class="card-body">#}
+    {#            <p class="card-text">#}
+    {#            <form action="{{ action }}" method="post">#}
+    {#                {% csrf_token %}#}
+    {#                {% include 'pan_cnc/bootstrap_form.html' with form=form %}#}
+    {#                <button type="submit" class="btn btn-primary">Submit</button>#}
+    {#            </form>#}
+    {#            </p>#}
+    {#        </div>#}
+    {#    </div>#}
+    <!-- Modal -->
+    <div class="modal fade border-top border-primary" id="helpTextModal" tabindex="-1" role="dialog"
+         aria-labelledby="helpTextModalLabel"
          aria-hidden="true">
         <div class="modal-dialog" role="document">
             <div class="modal-content">
@@ -155,20 +156,22 @@
                 </div>
                 <div class="modal-body">
                     <p class="mb-3">
-                    This screen allows you to configure secrets to be kept in this environment. These secrets can
-                    be accessed by clicking on the environment name in the navigation bar at the top of the page and
-                    clicking 'Show'.
+                        This screen allows you to configure secrets to be kept in this environment. These secrets can
+                        be accessed by clicking on the environment name in the navigation bar at the top of the page and
+                        clicking 'Show'.
                     </p>
                     <p class="mb-3">
-                    Alternately, any variables defined in a Skillet that has a 'name' attribute
-                    that matches a 'key' will have it's value auto-populated with the value of the secret. You can find
-                    the name of the various skillet variables (form fields) by clicking on the
-                    <i class="fas fa-cog text-muted" title="Debug Skillet"></i> icon and viewing the .meta-cnc.yaml file
-                    for that skillet.
+                        Alternately, any variables defined in a Skillet that has a 'name' attribute
+                        that matches a 'key' will have it's value auto-populated with the value of the secret. You can
+                        find
+                        the name of the various skillet variables (form fields) by clicking on the
+                        <i class="fas fa-cog text-muted" title="Debug Skillet"></i> icon and viewing the .meta-cnc.yaml
+                        file
+                        for that skillet.
                     </p>
                     <p class="mb-3">
-                    For more details, visit the panhandler documentation
-                    <a href="https://panhandler.readthedocs.io/en/latest/environments.html">here.</a>
+                        For more details, visit the panhandler documentation
+                        <a href="https://panhandler.readthedocs.io/en/latest/environments.html">here.</a>
                     </p>
                 </div>
                 <div class="modal-footer bg-light text-right">
