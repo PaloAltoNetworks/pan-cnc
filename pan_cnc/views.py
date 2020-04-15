@@ -815,7 +815,15 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
                                                                   initial=default, required=required,
                                                                   help_text=help_text)
             elif type_hint == 'json':
-                dynamic_form.fields[field_name] = forms.CharField(widget=forms.Textarea, label=description,
+
+                # Fix for #176 - add rows / cols to json
+                attrs = dict()
+
+                if 'attributes' in variable and type(variable['attributes']) is dict:
+                    attrs['rows'] = variable['attributes'].get('rows', 10)
+                    attrs['cols'] = variable['attributes'].get('cols', 40)
+
+                dynamic_form.fields[field_name] = forms.CharField(widget=forms.Textarea(attrs=attrs), label=description,
                                                                   initial=default, required=required,
                                                                   validators=[JSONValidator],
                                                                   help_text=help_text)
