@@ -401,7 +401,10 @@ def execute_docker_skillet(skillet_def: dict, args: dict) -> dict:
             sl = SkilletLoader()
             skillet = sl.create_skillet(skillet_def)
 
-            output_generator = skillet.execute_async(args)
+            # FIX for #181
+            sanitized_args = __santize_args(args)
+
+            output_generator = skillet.execute_async(sanitized_args)
 
             for out in output_generator:
                 full_output += out
