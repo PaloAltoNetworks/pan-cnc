@@ -1,9 +1,10 @@
 GitPython
 PyYAML
 celery
-docker
 django
 django-widget-tweaks
+docker
+cryptography
 jinja2
 jsonpath-ng
 netaddr
@@ -14,6 +15,7 @@ pyAesCrypt
 requests
 requests-toolbelt
 urllib3
+virtualenv
 xmldiff
 xmltodict
 skilletlib
