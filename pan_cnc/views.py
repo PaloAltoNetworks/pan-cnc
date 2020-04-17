@@ -2240,7 +2240,8 @@ class TaskLogsView(CNCBaseAuth, View):
                     rc = res.get('returncode', '250')
 
                     outputs = dict()
-                    if task_next == '':
+                    # fix for panhandler #168 - do not attempt output capture with no returned output
+                    if task_next == '' and out != '':
                         print('Last task, checking for output')
                         # The task is complete, now check if we need to do any output capturing from this task
                         # first, load the correct skillet from the session, check for 'snippets' stanza and
