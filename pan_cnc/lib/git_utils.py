@@ -190,6 +190,9 @@ def get_repo_details(repo_name, repo_dir, app_name='cnc'):
         branch = repo.active_branch.name
         commits = repo.iter_commits(branch, max_count=5)
 
+        # fix for #182 - do not lose track of current branch
+        repo_detail['branch'] = branch
+
         for c in commits:
             commit_detail = dict()
             timestamp = datetime.datetime.fromtimestamp(c.committed_date)
