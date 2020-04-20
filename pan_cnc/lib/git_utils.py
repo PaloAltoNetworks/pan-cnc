@@ -348,6 +348,11 @@ def __get_repo_branches(repo: Repo) -> list:
             if parsed_branch not in branches:
                 branches.append(parsed_branch)
 
+        local_branches = repo.git.branch("--format=%(refname:short)")
+        for local_branch in local_branches.split('\n'):
+            if local_branch not in branches:
+                branches.append(local_branch)
+
     except GitCommandError as gce:
         print('Could not get branches from repo')
         print(gce)
