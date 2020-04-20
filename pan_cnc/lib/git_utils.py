@@ -266,6 +266,13 @@ def update_repo(repo_dir: str, branch=None):
                 checkout = True
                 repo.git.checkout(branch)
 
+        remote_branches = __get_remote_repo_branches(repo)
+        if repo.active_branch.name not in remote_branches:
+            if checkout:
+                return f"Checked out new Branch: {branch}"
+            else:
+                return 'Local branch is up to date'
+
         f = repo.remotes.origin.pull()
 
     except GitCommandError as gce:
@@ -317,6 +324,48 @@ def get_repo_branches_from_dir(repo_dir: str) -> list:
     return __get_repo_branches(repo)
 
 
+def checkout_local_branch(repo_dir: str, branch_name: str) -> bool:
+    """
+    Creates a local branch and returns True on success. Checks out local branch
+    if it already exists
+
+    :param repo_dir: repo directory in which to create a local branch
+    :param branch_name: name of the new branch to create
+    :return: boolean
+    """
+
+    try:
+        repo = Repo(repo_dir)
+        g = repo.git
+
+        local_branches = repo.git.branch("--format=%(refname:short)")
+        if branch_name in local_branches:
+            g.checkout(branch_name)
+            print(f'Switched to branch {branch_name}')
+        else:
+            new_branch = g.checkout('HEAD', b=branch_name)
+            print(f'checked out new branch {new_branch}')
+
+    except GitCommandError as gce:
+        print(gce)
+    except GitError as ge:
+        print(ge)
+
+
+def commit_local_changes(repo_dir: str, message: str, file_path: str) -> None:
+    try:
+        repo = Repo(repo_dir)
+        index = repo.index
+        index.add([file_path])
+
+        index.commit(message=message)
+
+    except GitCommandError as gce:
+        print(gce)
+    except GitError as ge:
+        print(ge)
+
+
 def __get_repo_branches(repo: Repo) -> list:
     """
     Returns a list of branches for the given Git Repo object
@@ -330,6 +379,35 @@ def __get_repo_branches(repo: Repo) -> list:
     # always keep at least the current active branch
     branch = repo.active_branch.name
     branches.append(branch)
+
+    try:
+        remote_branches = __get_remote_repo_branches(repo)
+        branches.extend(remote_branches)
+
+        local_branches = repo.git.branch("--format=%(refname:short)")
+        for local_branch in local_branches.split('\n'):
+            if local_branch not in branches:
+                branches.append(local_branch)
+
+    except GitCommandError as gce:
+        print('Could not get branches from repo')
+        print(gce)
+    except GitError as ge:
+        print('Unknown GitError')
+        print(ge)
+    finally:
+        return branches
+
+
+def __get_remote_repo_branches(repo: Repo) -> list:
+    """
+    Returns a list of remote branches for the given Git Repo object
+    :param repo: Git Repo object
+    :return: list of branch names available
+    """
+
+    # keep a list of branches
+    branches = list()
 
     try:
         # fix for PH: #130 - deleted branches continue to show up in ph after upstream branch deleted
@@ -347,11 +425,6 @@ def __get_repo_branches(repo: Repo) -> list:
             parsed_branch = b.replace(remote_name + '/', '').strip()
             if parsed_branch not in branches:
                 branches.append(parsed_branch)
-
-        local_branches = repo.git.branch("--format=%(refname:short)")
-        for local_branch in local_branches.split('\n'):
-            if local_branch not in branches:
-                branches.append(local_branch)
 
     except GitCommandError as gce:
         print('Could not get branches from repo')
