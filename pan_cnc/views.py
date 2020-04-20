@@ -131,7 +131,8 @@ class CNCBaseAuth(LoginRequiredMixin, View):
 
                             if var_name in self.request.FILES:
                                 f = self.request.FILES[var_name]
-                                tmp_fd, tmp_file = tempfile.mkstemp(prefix='cnc_')
+                                d = self.service.get('snippet_path', None)
+                                tmp_fd, tmp_file = tempfile.mkstemp(prefix='.cnc_tmp_', dir=d)
 
                                 with open(tmp_file, 'wb+') as destination:
                                     for chunk in f.chunks():
@@ -139,6 +140,12 @@ class CNCBaseAuth(LoginRequiredMixin, View):
 
                                 os.close(tmp_fd)
                                 current_workflow[var_name] = tmp_file
+
+                                # keep track of uploaded files and attempt to delete them on logout
+                                uploaded_files = self.request.session.get('uploads', list())
+                                uploaded_files.append(tmp_file)
+
+                                self.request.session['uploads'] = uploaded_files
 
                         except OSError as ose:
                             print('Could not save file!')
