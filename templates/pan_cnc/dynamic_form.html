@@ -15,13 +15,13 @@
         let source_value = $('#id_' + object_id).val();
         $('[data-source="'+ object_id + '"]').each(function(i, e) {
             let this_object = $(e);
-            let parent = $(e).parent();
+            let parent = $(e).closest('.form-group');
             let data_value = this_object.attr('data-value');
             if (data_value !== source_value) {
                 console.log(' need to hide this guy');
                 parent.hide();
             } else{
-                console.log(' need to show this guys');
+                console.log(' need to show this guy');
                 parent.show();
             }
         });
@@ -40,7 +40,7 @@
             });
 
             if (source_object.val() !== test_value) {
-                let parent = input_object.parent();
+                let parent = input_object.closest('.form-group');
                 parent.toggle();
                 console.log('hiding');
             }
