@@ -72,11 +72,11 @@
                         {% elif request.session.next_step %}
                             next_link.attr('href', '/workflow/{{ request.session.next_step }}');
                             next_link.addClass('btn').addClass('btn-primary');
-                               {% if request.session.last_step %}
-                                   next_link.html('Complete');
-                               {% else %}
-                                   next_link.html('Next');
-                               {% endif %}
+                            {% if request.session.last_step %}
+                                next_link.html('Complete');
+                            {% else %}
+                                next_link.html('Next');
+                            {% endif %}
                         {% else %}
                             next_link.attr('href', '{{ request.session.last_page|urlencode }}');
                             next_link.html('Continue');
@@ -120,8 +120,10 @@
                     c.append('<br>');
                     let f = $('#footer');
                     f.empty();
-                    f.append(next_link);});
+                    f.append(next_link);
+                });
         }
+
         function show_captured_values() {
             let r = $('#results');
             r.html(captured_output);
@@ -129,6 +131,7 @@
             let r_height = r.get(0).scrollHeight + 10;
             r.height(r_height);
         }
+
         function countdown() {
             let c = $('#countdown');
             if (cancel_countdown === true) {
@@ -147,7 +150,7 @@
                     setTimeout(updateOutput, 1000);
                 });
             {% else %}
-                $(document).ready(function() {
+                $(document).ready(function () {
                     let r = $('#results');
                     let current_height = r.height();
                     let current_scrollheight = r.get(0).scrollHeight;
@@ -183,7 +186,8 @@
             </h4>
             <div class="card-text">
                 <p>{{ view_message }}</p>
-                <textarea id="results" class="text-monospace small pb-4 border-0" style="width: 100%; overflow: scroll">{{ results }}</textarea>
+                <textarea id="results" class="text-monospace small pb-4 border-0"
+                          style="width: 100%; overflow: scroll">{{ results }}</textarea>
                 <pre id="countdown"></pre>
             </div>
 

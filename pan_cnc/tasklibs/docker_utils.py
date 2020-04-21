@@ -2,10 +2,8 @@ import logging
 import os
 
 import docker
-from docker.errors import ContainerError
 from docker.errors import APIError
 from requests.exceptions import ConnectionError
-
 
 logger = logging.getLogger(__name__)
 
@@ -74,10 +72,13 @@ class DockerHelper:
             logger.error(ae)
             raise DockerHelperException('Could not contact Docker daemon')
 
-    def get_cnc_volume(self) -> (str, None):
+    def get_cnc_volumes(self) -> (dict, None):
         """
-        Returns the bind / mount that contains the '.pan_cnc' directory (if any)
-        :return: string of the bind configuration or None if not found
+        Returns volume mounts from the HOST application container that contains the HOME
+        directory of the cnc_user and also the .pan_cnc folder if found. In some cases, these may be
+        the same mount (only mount $HOME) in other cases, they may be two different mounts
+
+        :return: dict containing volume mounts to pass to
         """
 
         if not self.is_docker():
@@ -90,12 +91,25 @@ class DockerHelper:
         volumes = self.get_volumes_for_container(this_container)
 
         home_dir = os.environ.get('HOME', '/home/cnc_user')
-        persistent_dir = os.path.join(home_dir, '.pan_cnc')
+        persistent_dir = '.pan_cnc'
+
+        persistent_volumes = dict()
 
         for v in volumes:
-            if persistent_dir in v:
-                logger.info('Found CNC persistent mount')
-                return v
+            print(f'Checking {v}')
+            parts = v.split(':')
+            source_vol: str = parts[0]
+            dest_dir: str = parts[1]
+
+            # match destinations like 'pan_cnc_volume:/home/cnc_user/.pan_cnc'
+            # or 'panhandler_volume:/home/cnc_user'
+
+            if dest_dir == home_dir or dest_dir.endswith(persistent_dir):
+                persistent_volumes[source_vol] = {
+                    'bind': dest_dir, 'mode': 'rw'
+                }
+
+        return persistent_volumes
 
     @staticmethod
     def is_docker() -> bool:

@@ -307,11 +307,10 @@ def update_repo(repo_dir: str, branch=None):
 
 
 def get_repo_branches_from_dir(repo_dir: str) -> list:
-
     repo = Repo(repo_dir)
     try:
         g = repo.git
-        fc = g.config(['--get',  'remote.origin.fetch'])
+        fc = g.config(['--get', 'remote.origin.fetch'])
         if fc != '+refs/heads/*:refs/remotes/origin/*':
             print('updating from shallow repo')
             g.config(['remote.origin.fetch', '+refs/heads/*:refs/remotes/origin/*'])

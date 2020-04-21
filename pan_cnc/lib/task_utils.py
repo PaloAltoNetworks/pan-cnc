@@ -4,7 +4,6 @@ from datetime import datetime
 from pathlib import Path
 
 from celery.result import AsyncResult
-from celery.result import EagerResult
 from django.conf import settings
 
 from pan_cnc.celery import app as cnc_celery_app
@@ -13,13 +12,6 @@ from pan_cnc.tasks import execute_docker_skillet
 from pan_cnc.tasks import python3_execute_bare_script
 from pan_cnc.tasks import python3_execute_script
 from pan_cnc.tasks import python3_init_with_deps
-from pan_cnc.tasks import terraform_apply
-from pan_cnc.tasks import terraform_destroy
-from pan_cnc.tasks import terraform_init
-from pan_cnc.tasks import terraform_output
-from pan_cnc.tasks import terraform_plan
-from pan_cnc.tasks import terraform_refresh
-from pan_cnc.tasks import terraform_validate
 
 
 def __build_cmd_seq_vars(resource_def, snippet_context):
@@ -47,51 +39,105 @@ def __build_cmd_seq_vars(resource_def, snippet_context):
     return sanity_checked_vars
 
 
-def perform_init(resource_def, snippet_context) -> AsyncResult:
-    resource_dir = resource_def['snippet_path']
+def perform_terraform_cmd(resource_def: dict, cmd: str, snippet_context: dict) -> AsyncResult:
+    """
+    Performs various terraform related tasks such as 'init', 'plan', 'validate' etc.
+    This function will determine the correct image to use and configure the resource_def
+    as appropriate before sending to skilletlib for execution
+
+    :param resource_def: Skillet metadata
+    :param cmd: terraform command to execute
+    :param snippet_context: context to send to skilletlib
+    :return: AsyncResult from Celery
+    """
     tf_vars = __build_cmd_seq_vars(resource_def, snippet_context)
-    return terraform_init.delay(resource_dir, tf_vars)
+
+    env = dict()
+    for k, v in tf_vars.items():
+        env[f'TF_VAR_{k}'] = v
+
+    # FIXME - skilletlib should have terraform type just extend docker where possible
+    resource_def['type'] = 'docker'
+
+    # terraform skillets do not use snippets attribute, so overwrite here
+    resource_def['snippets'] = list()
+
+    snippet = dict()
+    snippet['name'] = 'terraform_cmd'
+    snippet['image'] = __get_terraform_image(resource_def)
+    snippet['cmd'] = cmd
+    snippet['async'] = True
+
+    resource_def['snippets'].append(snippet)
+
+    print(f'Performing skillet execute')
+    return execute_docker_skillet.delay(resource_def, tf_vars)
+
+
+def __get_terraform_image(resource_def: dict) -> str:
+    """
+    Check the skillet metadata (resource_def) for a label with key
+    'terraform_image', and if found use that docker image to execute
+    our terraform commands
+
+    :param resource_def: Skillet metadata as loaded from the .meta-cnc file
+    :return: str containing the value of the 'terraform_image' if found, otherwise
+        a default value
+    """
+    for label, value in resource_def.get('labels', dict()).items():
+        if label == 'terraform_image':
+            return value
+
+    # FIXME - update with new default image as it gets built
+    return 'registry.gitlab.com/panw-gse/as/terraform_tools:0.11'
+
+
+def perform_init(resource_def, snippet_context) -> AsyncResult:
+    print('Executing task terraform init')
+    cmd = 'init -no-color'
+    return perform_terraform_cmd(resource_def, cmd, snippet_context)
 
 
 def perform_validate(resource_def, snippet_context) -> AsyncResult:
-    resource_dir = resource_def['snippet_path']
-    tf_vars = __build_cmd_seq_vars(resource_def, snippet_context)
-    return terraform_validate.delay(resource_dir, tf_vars)
+    print('Executing task terraform validate')
+    cmd = 'validate -no-color'
+    return perform_terraform_cmd(resource_def, cmd, snippet_context)
 
 
 def perform_plan(resource_def, snippet_context) -> AsyncResult:
-    resource_dir = resource_def['snippet_path']
-    tf_vars = __build_cmd_seq_vars(resource_def, snippet_context)
-    return terraform_plan.delay(resource_dir, tf_vars)
+    print('Executing task terraform plan')
+    cmd = 'plan -no-color -out=".cnc_plan"'
+    return perform_terraform_cmd(resource_def, cmd, snippet_context)
 
 
 def perform_apply(resource_def, snippet_context) -> AsyncResult:
-    resource_dir = resource_def['snippet_path']
-    tf_vars = __build_cmd_seq_vars(resource_def, snippet_context)
-    return terraform_apply.delay(resource_dir, tf_vars)
+    print('Executing task terraform apply')
+    cmd = 'apply -no-color -auto-approve ./.cnc_plan'
+    return perform_terraform_cmd(resource_def, cmd, snippet_context)
 
 
-def perform_output(resource_def, snippet_context) -> EagerResult:
-    resource_dir = resource_def['snippet_path']
-    tf_vars = __build_cmd_seq_vars(resource_def, snippet_context)
-    return terraform_output.apply(args=[resource_dir, tf_vars])
+def perform_output(resource_def, snippet_context) -> AsyncResult:
+    print('Executing task terraform output')
+    cmd = 'output -no-color -json'
+    return perform_terraform_cmd(resource_def, cmd, snippet_context)
 
 
 def perform_refresh(resource_def, snippet_context) -> AsyncResult:
-    resource_dir = resource_def['snippet_path']
-    tf_vars = __build_cmd_seq_vars(resource_def, snippet_context)
-    return terraform_refresh.delay(resource_dir, tf_vars)
+    print('Executing task terraform refresh')
+    cmd = 'refresh -no-color'
+    return perform_terraform_cmd(resource_def, cmd, snippet_context)
 
 
 def perform_destroy(resource_def, snippet_context) -> AsyncResult:
-    resource_dir = resource_def['snippet_path']
-    tf_vars = __build_cmd_seq_vars(resource_def, snippet_context)
-    return terraform_destroy.delay(resource_dir, tf_vars)
+    print('Executing task terraform destroy')
+    cmd = 'destroy -no-color -auto-approve'
+    return perform_terraform_cmd(resource_def, cmd, snippet_context)
 
 
 def python3_check_no_requirements(resource_def) -> bool:
     (resource_dir, script_name) = _normalize_python_script_path(resource_def)
     req_file = os.path.join(resource_dir, 'requirements.txt')
+
     if os.path.exists(req_file):
         print('requirements.txt exists')
         return False
@@ -138,6 +184,7 @@ def python3_reset_init(script_roots: str) -> None:
     """
     Remove the touch file that indicates the virtualenv is already set up. This forces an update
     to the virtualenv. This gets called whenever a repository is updated by the user
+
     :param script_roots: the directory in which to search for the touch files
     :return: None
     """
@@ -211,6 +258,7 @@ def get_python_input_options(resource_def: dict) -> str:
 def __get_state_file_from_path(resource_def: dict) -> (Path, None):
     """
     Find and return the terraform state file for the given skillet resource_def
+
     :param resource_def: Skill definition file
     :return: pathlib.Path object of the found state file or None
     """
@@ -229,6 +277,7 @@ def terraform_state_exists(resource_def: dict) -> bool:
     """
     Used by View class to determine if we need to present options to the user about overwriting or backing up
     a state file. This will locate the state file and determine if it contains resources
+
     :param resource_def: Skillet definition file
     :return:
     """
@@ -279,6 +328,7 @@ def override_tfstate(resource_def: dict) -> str:
     Will create a new terraform state file and back up the existing one if necessary
     Will only create a new terraform state file if there are found to be existing resources in the file
     This is dangerous!
+
     :param resource_def: Skillet Definition dictionary
     :return: Name of the terraform.tfstate file
     """
@@ -308,6 +358,7 @@ def clean_task_output(output: str) -> str:
     The only available route to do this is by injecting metadata into the text output from the task. This is done by
     simply prefixing out metadata with 'CNC:'. This function will remove any metadata from the task output in order
     to present it to the user
+
     :param output: str of output with metadata possibly present
     :return: str of output with no metadata present
     """

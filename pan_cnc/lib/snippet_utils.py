@@ -23,14 +23,15 @@ from django.conf import settings
 from jinja2 import Environment
 from jinja2.loaders import BaseLoader
 from yaml.constructor import ConstructorError
-from yaml.parser import ParserError
-from yaml.scanner import ScannerError
-from yaml.reader import ReaderError
 from yaml.error import YAMLError
+from yaml.parser import ParserError
+from yaml.reader import ReaderError
+from yaml.scanner import ScannerError
 
 from . import cnc_utils
 from . import jinja_filters
-from .exceptions import CCFParserError, SnippetNotFoundException
+from .exceptions import CCFParserError
+from .exceptions import SnippetNotFoundException
 
 
 def load_service_snippets() -> list:

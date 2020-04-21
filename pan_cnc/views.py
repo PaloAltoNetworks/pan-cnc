@@ -58,12 +58,10 @@ from skilletlib.exceptions import TargetGenericException
 from skilletlib.panoply import Panos
 from skilletlib.skillet.panos import PanosSkillet
 from skilletlib.skillet.rest import RestSkillet
-from skilletlib.skillet.docker import DockerSkillet
 from skilletlib.snippet.workflow import WorkflowSnippet
 
 from pan_cnc.lib import cnc_utils
 from pan_cnc.lib import output_utils
-from pan_cnc.lib import pan_utils
 from pan_cnc.lib import snippet_utils
 from pan_cnc.lib import task_utils
 from pan_cnc.lib import widgets
@@ -1910,7 +1908,6 @@ class EditTerraformView(CNCBaseAuth, FormView):
         choices_list.append(('destroy', 'Destroy'))
 
         if task_utils.terraform_state_exists(self.meta):
-
             messages.add_message(self.request, messages.INFO,
                                  'Found existing Terraform State! Choose Manual Override to backup state and create a '
                                  'new Terraform State')
@@ -2160,10 +2157,9 @@ class NextTaskView(CNCView):
             title = 'Executing Task: Apply'
         elif task_next == 'terraform_output':
             r = task_utils.perform_output(skillet, {})
-            # output is run synch so we have the results here
+            # output is run sync so we have the results here
             # capture outputs before returning to the results_async page
-
-            result = r.result
+            result = r.get(timeout=10.0, interval=1.0)
             output = 'Captured output from terraform'
             err = ''
             try:

@@ -15,6 +15,7 @@
                 }
             });
         });
+
         function show_captured_values() {
             let m = $('#capture_msg');
             m.toggle();
@@ -24,50 +25,51 @@
     </script>
 {% endblock %}
 {% block content %}
-<div class="card border-primary mb-5 shadow-lg">
-    <div class="card-header">
-        {{ view.get_header }}
-    </div>
-    <div class="card-body">
-        <h4 class="card-title">
-            {% if title %}
-            {{ title }}
-            {% else %}
-            output
-            {% endif %}
-        </h4>
-        <p class="card-text">
-            {% if captured_outputs  %}
-            <div id="capture_msg">
-                Successfully captured Skillet output. Click 'Show Captured Values' to view raw output.
-            </div>
-            <pre class="pb-4"
-                 id="results"
-                 style="display: none; white-space: pre; overflow-x: scroll">{{ results | safe | linebreaksbr }}</pre>
-            {%  else %}
+    <div class="card border-primary mb-5 shadow-lg">
+        <div class="card-header">
+            {{ view.get_header }}
+        </div>
+        <div class="card-body">
+            <h4 class="card-title">
+                {% if title %}
+                    {{ title }}
+                {% else %}
+                    output
+                {% endif %}
+            </h4>
+            <p class="card-text">
+                {% if captured_outputs %}
+                    <div id="capture_msg">
+                        Successfully captured Skillet output. Click 'Show Captured Values' to view raw output.
+                    </div>
+                    <pre class="pb-4"
+                         id="results"
+                         style="display: none; white-space: pre; overflow-x: scroll">{{ results | safe | linebreaksbr }}</pre>
+                {% else %}
                     {% if '<?xml version="1.0"?>' in results or '<config urldb' in results %}
                         <pre class="pb-4" style="white-space: pre; overflow-x: scroll">{{ results }}</pre>
                     {% else %}
-                        <pre class="pb-4" style="white-space: pre; overflow-x: scroll">{{ results | safe | linebreaksbr }}</pre>
+                        <pre class="pb-4"
+                             style="white-space: pre; overflow-x: scroll">{{ results | safe | linebreaksbr }}</pre>
                     {% endif %}
-            {% endif %}
-        </p>
-    </div>
-    <div class="card-footer text-right">
-        <p class="card-text">
-        {% if captured_outputs  %}
-        <a href="#" onclick="show_captured_values()" class="btn btn-success">Show Captured Values</a>
-        {% endif %}
-            {%  if request.session.next_step %}
-                {%  if request.session.last_step %}
-                    <a href="/workflow/{{ request.session.next_step }}" class="btn btn-primary">Complete</a>
-                    {% else %}
-                    <a href="/workflow/{{ request.session.next_step }}" class="btn btn-primary">Continue</a>
                 {% endif %}
-                {%  else %}
-                <a href="{{ request.session.last_page|urlencode }}" class="btn btn-primary">Continue</a>
-            {% endif %}
-        </p>
+            </p>
+        </div>
+        <div class="card-footer text-right">
+            <p class="card-text">
+                {% if captured_outputs %}
+                    <a href="#" onclick="show_captured_values()" class="btn btn-success">Show Captured Values</a>
+                {% endif %}
+                {% if request.session.next_step %}
+                    {% if request.session.last_step %}
+                        <a href="/workflow/{{ request.session.next_step }}" class="btn btn-primary">Complete</a>
+                    {% else %}
+                        <a href="/workflow/{{ request.session.next_step }}" class="btn btn-primary">Continue</a>
+                    {% endif %}
+                {% else %}
+                    <a href="{{ request.session.last_page|urlencode }}" class="btn btn-primary">Continue</a>
+                {% endif %}
+            </p>
+        </div>
     </div>
-</div>
-{%  endblock %}
+{% endblock %}

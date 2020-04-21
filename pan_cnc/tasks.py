@@ -27,11 +27,9 @@ Use at your own risk.
 
 import asyncio
 import json
-import os
 import logging
-import subprocess
+import os
 from asyncio import LimitOverrunError
-from subprocess import Popen
 
 from celery import current_task
 from celery import shared_task
@@ -152,122 +150,10 @@ def exec_local_task(cmd_seq: list, cwd: str, env=None) -> str:
         return '{{"returncode": 666, "out": "Error Returning Task Output", "err": "TypeError"}}'
 
 
-def exec_sync_local_task(cmd_seq: list, cwd: str, env=None) -> str:
-    """
-    Execute local Task in a subprocess thread. Capture stdout and stderr together
-    and update the task after the task is done. This should only be used for things we know will happen very fast
-    :param cmd_seq: Command to run and all it's arguments
-    :param cwd: working directory in which to start the command
-    :param env: dict of env variables where k,v == env var name, env var value
-    :return: JSON encoded string - dict containing the following keys: returncode, out, err
-    """
-    print(f'Executing new task  with id: {current_task.request.id}')
-
-    process_env = os.environ.copy()
-    if env is not None and type(env) is dict:
-        process_env.update(env)
-
-    p = Popen(cmd_seq, cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, bufsize=1, universal_newlines=True,
-              env=process_env, shell=False)
-    stdout, stderr = p.communicate()
-    rc = p.returncode
-    print(f'Task {current_task.request.id} return code is {rc}')
-    state = dict()
-    state['returncode'] = rc
-    state['out'] = stdout
-    state['err'] = stderr
-    return json.dumps(state)
-
-
-@shared_task
-def terraform_validate(terraform_dir, tf_vars):
-    print('Executing task terraform validate')
-    cmd_seq = ['terraform', 'validate', '-no-color']
-
-    env = dict()
-    for k, v in tf_vars.items():
-        env[f'TF_VAR_{k}'] = v
-
-    return exec_local_task(cmd_seq, terraform_dir, env)
-
-
-@shared_task
-def terraform_init(terraform_dir, tf_vars):
-    print('Executing task terraform init')
-    cmd_seq = ['terraform', 'init', '-no-color']
-
-    return exec_local_task(cmd_seq, terraform_dir)
-
-
-@shared_task
-def terraform_plan(terraform_dir, tf_vars):
-    print('Executing task terraform plan')
-    cmd_seq = ['terraform', 'plan', '-no-color', '-out=.cnc_plan']
-    env = dict()
-    for k, v in tf_vars.items():
-        env[f'TF_VAR_{k}'] = v
-
-    return exec_local_task(cmd_seq, terraform_dir, env)
-
-
-@shared_task
-def terraform_apply(terraform_dir, tf_vars):
-    print('Executing task terraform apply')
-    cmd_seq = ['terraform', 'apply', '-no-color', '-auto-approve', './.cnc_plan']
-    return exec_local_task(cmd_seq, terraform_dir)
-
-
-@shared_task
-def terraform_output(terraform_dir, tf_vars):
-    print('Executing task terraform output')
-    cmd_seq = ['terraform', 'output', '-no-color', '-json']
-    return exec_sync_local_task(cmd_seq, terraform_dir)
-
-
-@shared_task
-def terraform_destroy(terraform_dir, tf_vars):
-    print('Executing task terraform destroy')
-    cmd_seq = ['terraform', 'destroy', '-no-color', '-auto-approve']
-    env = dict()
-    for k, v in tf_vars.items():
-        env[f'TF_VAR_{k}'] = v
-
-    return exec_local_task(cmd_seq, terraform_dir, env)
-
-
-@shared_task
-def terraform_refresh(terraform_dir, tf_vars):
-    print('Executing task terraform status')
-    cmd_seq = ['terraform', 'refresh', '-no-color']
-    env = dict()
-    for k, v in tf_vars.items():
-        env[f'TF_VAR_{k}'] = v
-
-    return exec_local_task(cmd_seq, terraform_dir, env)
-
-
-@shared_task
-def python3_init_env(working_dir):
-    print('Executing task Python3 init')
-    cmd_seq = ['python3', '-m', 'virtualenv', f'{working_dir}/.venv']
-    env = dict()
-    env['PYTHONUNBUFFERED'] = "1"
-    return exec_local_task(cmd_seq, working_dir, env)
-
-
 @shared_task
 def python3_init_with_deps(working_dir, tools_dir):
     print('Executing task Python3 init with Dependencies')
     cmd_seq = [f'{tools_dir}/init_virtual_env.sh', working_dir]
-    env = dict()
-    env['PYTHONUNBUFFERED'] = "1"
-    return exec_local_task(cmd_seq, working_dir, env)
-
-
-@shared_task
-def python3_init_existing(working_dir):
-    print('Executing task Python3 init with Dependencies')
-    cmd_seq = [f'{working_dir}/.venv/bin/pip3', 'install', '--upgrade', '-r', 'requirements.txt']
     env = dict()
     env['PYTHONUNBUFFERED'] = "1"
     return exec_local_task(cmd_seq, working_dir, env)
@@ -316,6 +202,7 @@ def __santize_args(args: dict) -> dict:
     """
     Attempt to sanitize input arguments for things like improper types and Null values. Lists are converted
     to comma separated lists and None type values are converted to ''
+
     :param args: dictionary of variables from the skillet with values from the user, default values from the skillet
     or values from env secrets
     :return: dictionary on with values sanitized
@@ -347,14 +234,15 @@ def __santize_args(args: dict) -> dict:
 
 
 @shared_task
-def execute_docker_skillet(skillet_def: dict, args: dict) -> dict:
+def execute_docker_skillet(skillet_def: dict, args: dict) -> str:
     """
     Execute a skillet of type 'docker'. This requires the calling application have access to the
     docker socket
+
     :param skillet_def: the skillet as loaded from the YAML file (dict)
     :param args: context arguments required for the given skillets. These will overwrite the 'variables' in the
     skillet
-    :return: dict containing the following keys: {'returncode', 'out', 'err'}
+    :return: JSON encoded string with dict containing the following keys: {'returncode', 'out', 'err'}
     """
     state = dict()
     full_output = ''
@@ -363,9 +251,9 @@ def execute_docker_skillet(skillet_def: dict, args: dict) -> dict:
 
     docker_helper = DockerHelper()
 
-    if skillet_def['type'] != 'docker':
+    if skillet_def['type'] != 'docker' and skillet_def['type'] != 'terraform':
         rc = 255
-        err = f'Not a valid skillet type {skillet_def["type"]}!'
+        err = f'Not a valid skillet type: {skillet_def["type"]}!'
 
     elif not docker_helper.check_docker_server():
         rc = 240
@@ -374,24 +262,14 @@ def execute_docker_skillet(skillet_def: dict, args: dict) -> dict:
 
     else:
         try:
-            persistent_volume = None
-            persistent_volume_ret = docker_helper.get_cnc_volume()
-
-            if isinstance(persistent_volume_ret, str):
-                parts = persistent_volume_ret.split(':')
-                p = {
-                    parts[0]: {
-                        'bind': parts[1], 'mode': 'rw'
-                    }
-                }
-                persistent_volume = p
+            persistent_volumes = docker_helper.get_cnc_volumes()
 
             if 'app_data' not in skillet_def:
                 skillet_def['app_data'] = dict()
 
             # always overwrite any volumes that may have snuck in here
-            if persistent_volume:
-                skillet_def['app_data']['volumes'] = persistent_volume
+            if persistent_volumes:
+                skillet_def['app_data']['volumes'] = persistent_volumes
 
             else:
                 # only this app should be setting app_data/volumes here, remove anything else
@@ -443,6 +321,3 @@ def execute_docker_skillet(skillet_def: dict, args: dict) -> dict:
     state['err'] = err
 
     return json.dumps(state)
-
-
-

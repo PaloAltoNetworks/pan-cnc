@@ -470,4 +470,3 @@ def is_testing() -> bool:
         return True
     else:
         return False
-
