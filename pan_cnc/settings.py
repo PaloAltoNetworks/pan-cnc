@@ -32,6 +32,9 @@ import yaml
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
+USER_HOME = os.environ.get('HOME', '/home/cnc_user')
+USER_PAN_CNC_DIR = os.path.join(USER_HOME, '.pan_cnc')
+
 SITE_PATH = os.path.abspath(os.path.dirname(__file__))
 PROJECT_PATH = os.path.normpath(os.path.join(SITE_PATH, '..', '..'))
 SRC_PATH = os.path.join(PROJECT_PATH, 'src')
@@ -66,29 +69,6 @@ INSTALLED_APPS = [
     #   'django.contrib.admin',
 ]
 
-INSTALLED_APPS_CONFIG = dict()
-
-# find and install any loaded apps here:
-for app in os.listdir(SRC_PATH):
-    if os.path.isdir(os.path.join(SRC_PATH, app)):
-        if app not in INSTALLED_APPS:
-            INSTALLED_APPS += [app]
-            app_dir = os.path.join(SRC_PATH, app)
-            if os.path.exists(os.path.join(app_dir, '.pan-cnc.yaml')):
-                try:
-                    with open(os.path.join(app_dir, '.pan-cnc.yaml')) as app_conf_file:
-                        app_conf = yaml.safe_load(app_conf_file.read())
-                        app_conf['app_dir'] = app_dir
-                        print('Adding app config for app: %s' % app)
-                        # print(app_conf)
-                        INSTALLED_APPS_CONFIG[app] = app_conf
-
-                except OSError as ose:
-                    print('Could not open .pan-cnc.yaml for app: %s' % app)
-                    pass
-                except ValueError as ve:
-                    print('Could not load .pan-cnc.yaml for app: %s' % app)
-                    pass
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -182,3 +162,34 @@ CACHES = {
 }
 
 LOGIN_REDIRECT_URL = '/'
+
+INSTALLED_APPS_CONFIG = dict()
+
+# find and install any loaded apps here:
+for app in os.listdir(SRC_PATH):
+    if os.path.isdir(os.path.join(SRC_PATH, app)):
+        if app not in INSTALLED_APPS:
+            INSTALLED_APPS += [app]
+            app_dir = os.path.join(SRC_PATH, app)
+            app_persistent_dir = os.path.join(USER_PAN_CNC_DIR, app)
+
+            if os.path.exists(os.path.join(app_dir, '.pan-cnc.yaml')):
+                try:
+                    with open(os.path.join(app_dir, '.pan-cnc.yaml')) as app_conf_file:
+                        app_conf = yaml.safe_load(app_conf_file.read())
+                        app_conf['app_dir'] = app_dir
+                        print('Adding app config for app: %s' % app)
+                        # print(app_conf)
+                        INSTALLED_APPS_CONFIG[app] = app_conf
+
+                        DATABASES[app] = {
+                            'ENGINE': 'django.db.backends.sqlite3',
+                            'NAME': os.path.join(app_persistent_dir, 'db.sqlite3'),
+                        }
+
+                except OSError as ose:
+                    print('Could not open .pan-cnc.yaml for app: %s' % app)
+                    pass
+                except ValueError as ve:
+                    print('Could not load .pan-cnc.yaml for app: %s' % app)
+                    pass
