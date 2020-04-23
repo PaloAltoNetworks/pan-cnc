@@ -34,7 +34,6 @@ from collections import OrderedDict
 from typing import Any
 
 from celery.result import AsyncResult
-from django import forms
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.validators import MaxLengthValidator
@@ -43,6 +42,15 @@ from django.core.validators import MinLengthValidator
 from django.core.validators import MinValueValidator
 from django.core.validators import RegexValidator
 from django.core.validators import URLValidator
+from django.forms import Form
+from django.forms import fields
+from django.forms.widgets import CheckboxSelectMultiple
+from django.forms.widgets import EmailInput
+from django.forms.widgets import HiddenInput
+from django.forms.widgets import NumberInput
+from django.forms.widgets import PasswordInput
+from django.forms.widgets import RadioSelect
+from django.forms.widgets import Textarea
 from django.http import JsonResponse
 from django.shortcuts import HttpResponse
 from django.shortcuts import HttpResponseRedirect
@@ -461,7 +469,7 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
 
     """
     # base form class, you should not need to override this
-    form_class = forms.Form
+    form_class = Form
     # form to render, override if you need a specific html fragment to render the form
     template_name = 'pan_cnc/dynamic_form.html'
     # Head to show on the rendered dynamic form - Main header
@@ -674,7 +682,7 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
         template = snippet_utils.render_snippet_template(self.service, self.app_dir, self.get_workflow())
         return template
 
-    def generate_dynamic_form(self, data=None) -> forms.Form:
+    def generate_dynamic_form(self, data=None) -> Form:
         """
         The heart of this class. This will generate a Form object based on the value of the self.snippet
         All variables defined in a snippet .meta-cnc.yaml file will be converted into a form field depending on it's
@@ -683,7 +691,7 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
 
         :return: Form object
         """
-        dynamic_form = forms.Form(data=data)
+        dynamic_form = Form(data=data)
 
         if self.service is None:
             # A GET call will find and load a snippet, then use the snippet_utils library to load that snippet
@@ -775,9 +783,9 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
                         choice = (item['value'], item['key'])
                         choices_list.append(choice)
 
-                dynamic_form.fields[field_name] = forms.ChoiceField(choices=tuple(choices_list), label=description,
-                                                                    initial=default, required=required,
-                                                                    help_text=help_text)
+                dynamic_form.fields[field_name] = fields.ChoiceField(choices=tuple(choices_list), label=description,
+                                                                     initial=default, required=required,
+                                                                     help_text=help_text)
 
             # FR #85 - Add dynamic dropdown / radio / checkbox
             elif type_hint == 'dropdown' and 'source' in variable:
@@ -798,16 +806,16 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
                         choice = (item, item)
                         choices_list.append(choice)
 
-                    dynamic_form.fields[field_name] = forms.ChoiceField(choices=tuple(choices_list), label=description,
-                                                                        initial=default, required=required,
-                                                                        help_text=help_text)
+                    dynamic_form.fields[field_name] = fields.ChoiceField(choices=tuple(choices_list), label=description,
+                                                                         initial=default, required=required,
+                                                                         help_text=help_text)
 
                 else:
                     # if source is empty, then render a text input only...
-                    dynamic_form.fields[field_name] = forms.CharField(label=description,
-                                                                      initial=default,
-                                                                      required=required,
-                                                                      help_text=help_text)
+                    dynamic_form.fields[field_name] = fields.CharField(label=description,
+                                                                       initial=default,
+                                                                       required=required,
+                                                                       help_text=help_text)
             elif type_hint == "text_area":
                 # Fix for FR: #97 - add rows / cols to text_area
                 attrs = dict()
@@ -816,9 +824,9 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
                     attrs['rows'] = variable['attributes'].get('rows', 10)
                     attrs['cols'] = variable['attributes'].get('cols', 40)
 
-                dynamic_form.fields[field_name] = forms.CharField(widget=forms.Textarea(attrs=attrs), label=description,
-                                                                  initial=default, required=required,
-                                                                  help_text=help_text)
+                dynamic_form.fields[field_name] = fields.CharField(widget=Textarea(attrs=attrs), label=description,
+                                                                   initial=default, required=required,
+                                                                   help_text=help_text)
             elif type_hint == 'json':
 
                 # Fix for #176 - add rows / cols to json
@@ -828,25 +836,25 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
                     attrs['rows'] = variable['attributes'].get('rows', 10)
                     attrs['cols'] = variable['attributes'].get('cols', 40)
 
-                dynamic_form.fields[field_name] = forms.CharField(widget=forms.Textarea(attrs=attrs), label=description,
-                                                                  initial=default, required=required,
-                                                                  validators=[JSONValidator],
-                                                                  help_text=help_text)
+                dynamic_form.fields[field_name] = fields.CharField(widget=Textarea(attrs=attrs), label=description,
+                                                                   initial=default, required=required,
+                                                                   validators=[JSONValidator],
+                                                                   help_text=help_text)
             elif type_hint == "list":
                 attrs = dict()
                 attrs['data-widget_type'] = 'list'
-                dynamic_form.fields[field_name] = forms.CharField(widget=widgets.ListInput(attrs=attrs),
-                                                                  label=description,
-                                                                  initial=default, required=required,
-                                                                  help_text=help_text)
+                dynamic_form.fields[field_name] = fields.CharField(widget=widgets.ListInput(attrs=attrs),
+                                                                   label=description,
+                                                                   initial=default, required=required,
+                                                                   help_text=help_text)
             elif type_hint == "email":
-                dynamic_form.fields[field_name] = forms.CharField(widget=forms.EmailInput, label=description,
-                                                                  initial=default, required=required,
-                                                                  help_text=help_text)
+                dynamic_form.fields[field_name] = fields.CharField(widget=EmailInput, label=description,
+                                                                   initial=default, required=required,
+                                                                   help_text=help_text)
             elif type_hint == "ip_address":
-                dynamic_form.fields[field_name] = forms.GenericIPAddressField(label=description,
-                                                                              initial=default, required=required,
-                                                                              help_text=help_text)
+                dynamic_form.fields[field_name] = fields.GenericIPAddressField(label=description,
+                                                                               initial=default, required=required,
+                                                                               help_text=help_text)
             elif type_hint == "number":
                 attrs = dict()
 
@@ -854,18 +862,18 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
                     if 'min' in variable['attributes'] and 'max' in variable['attributes']:
                         attrs['min'] = variable['attributes']['min']
                         attrs['max'] = variable['attributes']['max']
-                        dynamic_form.fields[field_name] = forms.IntegerField(widget=forms.NumberInput(attrs=attrs),
-                                                                             label=description,
-                                                                             initial=default, required=required,
-                                                                             validators=[
-                                                                                 MaxValueValidator(attrs['max']),
-                                                                                 MinValueValidator(attrs['min'])],
-                                                                             help_text=help_text)
+                        dynamic_form.fields[field_name] = fields.IntegerField(widget=NumberInput(attrs=attrs),
+                                                                              label=description,
+                                                                              initial=default, required=required,
+                                                                              validators=[
+                                                                                  MaxValueValidator(attrs['max']),
+                                                                                  MinValueValidator(attrs['min'])],
+                                                                              help_text=help_text)
                 else:
-                    dynamic_form.fields[field_name] = forms.IntegerField(widget=forms.NumberInput(),
-                                                                         label=description,
-                                                                         initial=default, required=required,
-                                                                         help_text=help_text)
+                    dynamic_form.fields[field_name] = fields.IntegerField(widget=fields.NumberInput(),
+                                                                          label=description,
+                                                                          initial=default, required=required,
+                                                                          help_text=help_text)
             # add support for float per #103
             elif type_hint == "float":
                 attrs = dict()
@@ -874,35 +882,35 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
                     if 'min' in variable['attributes'] and 'max' in variable['attributes']:
                         attrs['min'] = variable['attributes']['min']
                         attrs['max'] = variable['attributes']['max']
-                        dynamic_form.fields[field_name] = forms.FloatField(widget=forms.NumberInput(attrs=attrs),
-                                                                           label=description,
-                                                                           initial=default, required=required,
-                                                                           validators=[
-                                                                               MaxValueValidator(attrs['max']),
-                                                                               MinValueValidator(attrs['min'])],
-                                                                           help_text=help_text)
+                        dynamic_form.fields[field_name] = fields.FloatField(widget=fields.NumberInput(attrs=attrs),
+                                                                            label=description,
+                                                                            initial=default, required=required,
+                                                                            validators=[
+                                                                                MaxValueValidator(attrs['max']),
+                                                                                MinValueValidator(attrs['min'])],
+                                                                            help_text=help_text)
                 else:
-                    dynamic_form.fields[field_name] = forms.FloatField(widget=forms.NumberInput(),
-                                                                       label=description,
-                                                                       initial=default, required=required,
-                                                                       help_text=help_text)
+                    dynamic_form.fields[field_name] = fields.FloatField(widget=fields.NumberInput(),
+                                                                        label=description,
+                                                                        initial=default, required=required,
+                                                                        help_text=help_text)
 
             elif type_hint == "fqdn_or_ip":
-                dynamic_form.fields[field_name] = forms.CharField(label=description,
-                                                                  initial=default,
-                                                                  validators=[FqdnOrIp], required=required,
-                                                                  help_text=help_text)
+                dynamic_form.fields[field_name] = fields.CharField(label=description,
+                                                                   initial=default,
+                                                                   validators=[FqdnOrIp], required=required,
+                                                                   help_text=help_text)
 
             elif type_hint == "cidr":
-                dynamic_form.fields[field_name] = forms.CharField(label=description,
-                                                                  initial=default,
-                                                                  validators=[Cidr], required=required,
-                                                                  help_text=help_text)
+                dynamic_form.fields[field_name] = fields.CharField(label=description,
+                                                                   initial=default,
+                                                                   validators=[Cidr], required=required,
+                                                                   help_text=help_text)
             elif type_hint == "password":
-                dynamic_form.fields[field_name] = forms.CharField(widget=forms.PasswordInput(render_value=True),
-                                                                  initial=default,
-                                                                  label=description, required=required,
-                                                                  help_text=help_text)
+                dynamic_form.fields[field_name] = fields.CharField(widget=PasswordInput(render_value=True),
+                                                                   initial=default,
+                                                                   label=description, required=required,
+                                                                   help_text=help_text)
             elif type_hint == "radio" and "rad_list" in variable:
                 rad_list = variable['rad_list']
                 choices_list = list()
@@ -911,10 +919,10 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
                     choice = (item['value'], item['key'])
                     choices_list.append(choice)
 
-                dynamic_form.fields[field_name] = forms.ChoiceField(widget=forms.RadioSelect, choices=choices_list,
-                                                                    label=description, initial=default,
-                                                                    required=required,
-                                                                    help_text=help_text)
+                dynamic_form.fields[field_name] = fields.ChoiceField(widget=RadioSelect, choices=choices_list,
+                                                                     label=description, initial=default,
+                                                                     required=required,
+                                                                     help_text=help_text)
             # FR #85 - Add dynamic dropdown / radio / checkbox
             elif type_hint == "radio" and "source" in variable:
                 source = variable.get('source', None)
@@ -933,10 +941,10 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
                     item = source_list
                     choice = (item, item)
                     choices_list.append(choice)
-                dynamic_form.fields[field_name] = forms.ChoiceField(widget=forms.RadioSelect, choices=choices_list,
-                                                                    label=description, initial=default,
-                                                                    required=required,
-                                                                    help_text=help_text)
+                dynamic_form.fields[field_name] = fields.ChoiceField(widget=RadioSelect, choices=choices_list,
+                                                                     label=description, initial=default,
+                                                                     required=required,
+                                                                     help_text=help_text)
             elif type_hint == "checkbox" and "cbx_list" in variable:
                 cbx_list = variable['cbx_list']
                 choices_list = list()
@@ -944,11 +952,11 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
                 for item in cbx_list:
                     choice = (item['value'], item['key'])
                     choices_list.append(choice)
-                dynamic_form.fields[field_name] = forms.MultipleChoiceField(widget=forms.CheckboxSelectMultiple,
-                                                                            choices=choices_list,
-                                                                            label=description, initial=default,
-                                                                            required=required,
-                                                                            help_text=help_text)
+                dynamic_form.fields[field_name] = fields.MultipleChoiceField(widget=CheckboxSelectMultiple,
+                                                                             choices=choices_list,
+                                                                             label=description, initial=default,
+                                                                             required=required,
+                                                                             help_text=help_text)
             # FR #85 - Add dynamic dropdown / radio / checkbox
             elif type_hint == 'checkbox' and 'source' in variable:
                 source = variable.get('source', None)
@@ -966,30 +974,30 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
                     choice = (item, item)
                     choices_list.append(choice)
 
-                dynamic_form.fields[field_name] = forms.MultipleChoiceField(widget=forms.CheckboxSelectMultiple,
-                                                                            choices=choices_list,
-                                                                            label=description, initial=default,
-                                                                            required=required,
-                                                                            help_text=help_text)
+                dynamic_form.fields[field_name] = fields.MultipleChoiceField(widget=CheckboxSelectMultiple,
+                                                                             choices=choices_list,
+                                                                             label=description, initial=default,
+                                                                             required=required,
+                                                                             help_text=help_text)
             elif type_hint == 'disabled':
-                dynamic_form.fields[field_name] = forms.CharField(label=description, initial=default,
-                                                                  disabled=True, required=required,
-                                                                  help_text=help_text)
+                dynamic_form.fields[field_name] = fields.CharField(label=description, initial=default,
+                                                                   disabled=True, required=required,
+                                                                   help_text=help_text)
 
             elif type_hint == 'file':
-                dynamic_form.fields[field_name] = forms.FileField(label=description, required=required,
-                                                                  help_text=help_text)
+                dynamic_form.fields[field_name] = fields.FileField(label=description, required=required,
+                                                                   help_text=help_text)
 
             elif type_hint == 'url':
-                dynamic_form.fields[field_name] = forms.CharField(label=description,
-                                                                  initial=default,
-                                                                  required=required,
-                                                                  validators=[
-                                                                      URLValidator(message='Entry must be '
-                                                                                           'a valid URL',
-                                                                                   code='invalid_format')
-                                                                  ],
-                                                                  help_text=help_text)
+                dynamic_form.fields[field_name] = fields.CharField(label=description,
+                                                                   initial=default,
+                                                                   required=required,
+                                                                   validators=[
+                                                                       URLValidator(message='Entry must be '
+                                                                                            'a valid URL',
+                                                                                    code='invalid_format')
+                                                                   ],
+                                                                   help_text=help_text)
             elif type_hint == 'hidden':
                 # hidden does not get rendered to the screen
                 continue
@@ -1040,17 +1048,17 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
                             item_value = default
                         item_description = f'{description} {item}'
                         item_name = f'{field_name}_{item}'
-                        dynamic_form.fields[item_name] = forms.CharField(label=item_description,
-                                                                         initial=item_value,
-                                                                         required=required,
-                                                                         validators=validators,
-                                                                         help_text=help_text)
+                        dynamic_form.fields[item_name] = fields.CharField(label=item_description,
+                                                                          initial=item_value,
+                                                                          required=required,
+                                                                          validators=validators,
+                                                                          help_text=help_text)
                 else:
-                    dynamic_form.fields[field_name] = forms.CharField(label=description,
-                                                                      initial=default,
-                                                                      required=required,
-                                                                      validators=validators,
-                                                                      help_text=help_text)
+                    dynamic_form.fields[field_name] = fields.CharField(label=description,
+                                                                       initial=default,
+                                                                       required=required,
+                                                                       validators=validators,
+                                                                       help_text=help_text)
 
                 # fix for #118 - add ability to toggle visibility based on value of another field
             toggle_hint = variable.get('toggle_hint', {})
@@ -1103,7 +1111,7 @@ class ChooseSnippetByLabelView(CNCBaseFormView):
         :return: Form Object
         """
 
-        form = forms.Form(data=data)
+        form = Form(data=data)
         if self.label_name == '' or self.label_value == '':
             print('No Labels to use to filter!')
             return form
@@ -1111,7 +1119,7 @@ class ChooseSnippetByLabelView(CNCBaseFormView):
         services = snippet_utils.load_snippets_by_label(self.label_name, self.label_value, self.app_dir)
 
         # we need to construct a new ChoiceField with the following basic format
-        # snippet_name = forms.ChoiceField(choices=(('gold', 'Gold'), ('silver', 'Silver'), ('bronze', 'Bronze')))
+        # snippet_name = fields.ChoiceField(choices=(('gold', 'Gold'), ('silver', 'Silver'), ('bronze', 'Bronze')))
         choices_list = list()
         # grab each service and construct a simple tuple with name and label, append to the list
         for service in services:
@@ -1123,7 +1131,7 @@ class ChooseSnippetByLabelView(CNCBaseFormView):
         # convert our list of tuples into a tuple itself
         choices_set = tuple(choices_list)
         # make our new field
-        new_choices_field = forms.ChoiceField(choices=choices_set, label='Template Name')
+        new_choices_field = fields.ChoiceField(choices=choices_set, label='Template Name')
         # set it on the original form, overwriting the hardcoded GSB version
 
         form.fields['snippet_name'] = new_choices_field
@@ -1198,7 +1206,7 @@ class ChooseSnippetView(CNCBaseFormView):
             services = snippet_utils.load_snippets_of_type('service', self.app_dir)
 
         # we need to construct a new ChoiceField with the following basic format
-        # snippet_name = forms.ChoiceField(choices=(('gold', 'Gold'), ('silver', 'Silver'), ('bronze', 'Bronze')))
+        # snippet_name = fields.ChoiceField(choices=(('gold', 'Gold'), ('silver', 'Silver'), ('bronze', 'Bronze')))
         choices_list = list()
         # grab each service and construct a simple tuple with name and label, append to the list
         for service in services:
@@ -1210,7 +1218,7 @@ class ChooseSnippetView(CNCBaseFormView):
         # convert our list of tuples into a tuple itself
         choices_set = tuple(choices_list)
         # make our new field
-        new_choices_field = forms.ChoiceField(choices=choices_set, label='Template Name')
+        new_choices_field = fields.ChoiceField(choices=choices_set, label='Template Name')
         # set it on the original form, overwriting the hardcoded GSB version
 
         form.fields[custom_field] = new_choices_field
@@ -1221,7 +1229,7 @@ class ChooseSnippetView(CNCBaseFormView):
 class ProvisionSnippetView(CNCBaseFormView):
     """
     Provision Snippet View - This view uses the Base Auth and Form View
-    The posted view is actually a dynamically generated form so the forms.Form will actually be blank
+    The posted view is actually a dynamically generated form so the Form will actually be blank
     use form_valid as it will always be true in this case.
     """
     snippet = ''
@@ -1472,7 +1480,7 @@ class EditTargetView(CNCBaseAuth, FormView):
     Edit or update the current target
     """
     # base form class, you should not need to override this
-    form_class = forms.Form
+    form_class = Form
     # form to render, override if you need a specific html fragment to render the form
     template_name = 'pan_cnc/panos_target_form.html'
     # Head to show on the rendered dynamic form - Main header
@@ -1550,9 +1558,9 @@ class EditTargetView(CNCBaseAuth, FormView):
             messages.add_message(self.request, messages.ERROR, str(te))
             return self.form_invalid(form)
 
-    def generate_dynamic_form(self, data=None) -> forms.Form:
+    def generate_dynamic_form(self, data=None) -> Form:
 
-        form = forms.Form(data=data)
+        form = Form(data=data)
 
         meta = self.meta
         if meta is None:
@@ -1581,19 +1589,19 @@ class EditTargetView(CNCBaseAuth, FormView):
         target_username = self.get_value_from_workflow('TARGET_USERNAME', '')
         target_password = self.get_value_from_workflow('TARGET_PASSWORD', '')
 
-        target_ip_field = forms.CharField(label=target_ip_label, initial=target_ip, required=True,
-                                          validators=[FqdnOrIp])
+        target_ip_field = fields.CharField(label=target_ip_label, initial=target_ip, required=True,
+                                           validators=[FqdnOrIp])
         # FR #82 - Add port to EditTarget Screen
-        target_port_field = forms.IntegerField(label=target_port_label, initial=target_port, required=True,
-                                               validators=[
-                                                   MaxValueValidator(65535),
-                                                   MinValueValidator(0)])
-        target_username_field = forms.CharField(label=target_username_label, initial=target_username, required=True)
-        target_password_field = forms.CharField(widget=forms.PasswordInput(render_value=True), required=True,
-                                                label=target_password_label,
-                                                initial=target_password)
+        target_port_field = fields.IntegerField(label=target_port_label, initial=target_port, required=True,
+                                                validators=[
+                                                    MaxValueValidator(65535),
+                                                    MinValueValidator(0)])
+        target_username_field = fields.CharField(label=target_username_label, initial=target_username, required=True)
+        target_password_field = fields.CharField(widget=PasswordInput(render_value=True), required=True,
+                                                 label=target_password_label,
+                                                 initial=target_password)
 
-        debug_field = forms.CharField(initial='False', widget=forms.HiddenInput())
+        debug_field = fields.CharField(initial='False', widget=HiddenInput())
 
         form.fields['TARGET_IP'] = target_ip_field
         form.fields['TARGET_PORT'] = target_port_field
@@ -1603,7 +1611,7 @@ class EditTargetView(CNCBaseAuth, FormView):
 
         if 'type' in meta and 'pan' in meta['type']:
             # add option to perform commit operation or not
-            # perform_commit = forms.BooleanField(label='Perform Commit', initial=True, label_suffix='', required=False)
+            # perform_commit = fields.BooleanField(label='Perform Commit', initial=True, label_suffix='', required=False)
             saved_perform_commit = self.get_value_from_workflow('perform_commit', 'no_commit')
             saved_perform_backup = self.get_value_from_workflow('perform_backup', False)
 
@@ -1616,16 +1624,16 @@ class EditTargetView(CNCBaseAuth, FormView):
 
             # fix for #156 - only sync_commit for gpcs type skillets
             if 'gpcs' in meta['type']:
-                perform_commit = forms.CharField(initial='sync_commit', widget=forms.HiddenInput())
+                perform_commit = fields.CharField(initial='sync_commit', widget=HiddenInput())
 
             else:
-                perform_commit = forms.ChoiceField(choices=choices_set, label='Commit Options',
-                                                   initial=saved_perform_commit)
+                perform_commit = fields.ChoiceField(choices=choices_set, label='Commit Options',
+                                                    initial=saved_perform_commit)
 
             form.fields['perform_commit'] = perform_commit
 
-            perform_backup = forms.BooleanField(label='Perform Backup', initial=saved_perform_backup,
-                                                label_suffix='', required=False)
+            perform_backup = fields.BooleanField(label='Perform Backup', initial=saved_perform_backup,
+                                                 label_suffix='', required=False)
 
             form.fields['perform_backup'] = perform_backup
 
@@ -1860,7 +1868,7 @@ class EditTargetView(CNCBaseAuth, FormView):
 
 class EditTerraformView(CNCBaseAuth, FormView):
     # base form class, you should not need to override this
-    form_class = forms.Form
+    form_class = Form
     # form to render, override if you need a specific html fragment to render the form
     template_name = 'pan_cnc/dynamic_form.html'
     # Head to show on the rendered dynamic form - Main header
@@ -1899,7 +1907,7 @@ class EditTerraformView(CNCBaseAuth, FormView):
     def get_context_data(self, **kwargs) -> dict:
         context = super().get_context_data(**kwargs)
         env_name = self.kwargs.get('env_name')
-        form = forms.Form()
+        form = Form()
 
         default_choice = 'validate'
         choices_list = list()
@@ -1915,7 +1923,7 @@ class EditTerraformView(CNCBaseAuth, FormView):
             default_choice = 'override'
 
         choices_set = tuple(choices_list)
-        terraform_action_list = forms.ChoiceField(choices=choices_set, label='Template Name', initial=default_choice)
+        terraform_action_list = fields.ChoiceField(choices=choices_set, label='Template Name', initial=default_choice)
         form.fields['terraform_action'] = terraform_action_list
         context['form'] = form
         context['base_html'] = self.base_html
@@ -2346,7 +2354,7 @@ class WorkflowView(CNCBaseAuth, RedirectView):
         print(f"Current step is {current_step_str}")
         try:
             current_step = int(current_step_str)
-        except ValueError as ve:
+        except ValueError:
             return self.error_out('Could not find current workflow state')
 
         if current_step == 0:
@@ -2528,7 +2536,7 @@ class UnlockEnvironmentsView(CNCBaseAuth, FormView):
     success_url = 'list_envs'
     template_name = 'pan_cnc/dynamic_form.html'
     # base form class, you should not need to override this
-    form_class = forms.Form
+    form_class = Form
     base_html = 'pan_cnc/base.html'
     header = 'Unlock Environments'
     title = 'Enter master passphrase to unlock the environments configuration'
@@ -2542,16 +2550,16 @@ class UnlockEnvironmentsView(CNCBaseAuth, FormView):
 
     def get_context_data(self, **kwargs) -> dict:
         context = super().get_context_data(**kwargs)
-        form = forms.Form()
+        form = Form()
 
-        unlock_field = forms.CharField(widget=forms.PasswordInput, label='Master Passphrase')
+        unlock_field = fields.CharField(widget=PasswordInput, label='Master Passphrase')
         form.fields['password'] = unlock_field
 
         user = self.request.user
         if not cnc_utils.check_user_secret(str(user.id)):
             context['header'] = 'Create a new Passphrase protected Environment'
             context['title'] = 'Set new Master Passphrase'
-            verify_field = forms.CharField(widget=forms.PasswordInput, label='Verify Master Passphrase')
+            verify_field = fields.CharField(widget=PasswordInput, label='Verify Master Passphrase')
             form.fields['verify'] = verify_field
         else:
             context['header'] = self.header
@@ -2625,16 +2633,16 @@ class EditEnvironmentsView(EnvironmentBase, FormView):
     success_url = '/edit_env'
     template_name = 'pan_cnc/edit_env.html'
     # base form class, you should not need to override this
-    form_class = forms.Form
+    form_class = Form
     base_html = 'pan_cnc/base.html'
 
     def get_context_data(self, **kwargs) -> dict:
         context = super().get_context_data(**kwargs)
         env_name = self.kwargs.get('env_name')
-        form = forms.Form()
-        secret_label = forms.CharField(label='Key')
-        secret_data = forms.CharField(label='Value')
-        env_name_field = forms.CharField(widget=forms.HiddenInput, initial=env_name)
+        form = Form()
+        secret_label = fields.CharField(label='Key')
+        secret_data = fields.CharField(label='Value')
+        env_name_field = fields.CharField(widget=HiddenInput, initial=env_name)
         form.fields['secret_label'] = secret_label
         form.fields['secret_data'] = secret_data
         form.fields['environment'] = env_name_field
@@ -2691,18 +2699,18 @@ class CreateEnvironmentsView(EnvironmentBase, FormView):
     success_url = '/edit_env'
     template_name = 'pan_cnc/dynamic_form.html'
     # base form class, you should not need to override this
-    form_class = forms.Form
+    form_class = Form
     base_html = 'pan_cnc/base.html'
     header = 'New Environment'
 
     def get_context_data(self, **kwargs) -> dict:
         context = super().get_context_data(**kwargs)
         clone_name = self.kwargs.get('clone', None)
-        form = forms.Form()
-        environment_name = forms.CharField(label='Name')
-        environment_description = forms.CharField(widget=forms.Textarea, label='Description')
+        form = Form()
+        environment_name = fields.CharField(label='Name')
+        environment_description = fields.CharField(widget=Textarea, label='Description')
         if clone_name:
-            clone_name_field = forms.CharField(widget=forms.HiddenInput, initial=clone_name)
+            clone_name_field = fields.CharField(widget=HiddenInput, initial=clone_name)
             form.fields['clone'] = clone_name_field
             context['title'] = f'Clone Environment from {clone_name}'
         else:
