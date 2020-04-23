@@ -27,7 +27,7 @@ def handle_logout(user, request, **kwargs) -> None:
     :param kwargs: additional kwargs
     :return: None
     """
-    uploads = request.session.get('uploads')
+    uploads = request.session.get('uploads', [])
     for i in uploads:
         if os.path.exists(i):
             print(f'Removing file {i}')

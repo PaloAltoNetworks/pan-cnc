@@ -754,6 +754,9 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
             description = variable.get('description', '')
             variable_default = variable.get('default', '')
 
+            if not variable_default:
+                variable_default = ''
+
             required = variable.get('required', False)
             force_default = variable.get('force_default', False)
 
@@ -999,8 +1002,9 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
                                                                    ],
                                                                    help_text=help_text)
             elif type_hint == 'hidden':
-                # hidden does not get rendered to the screen
-                continue
+                # FIX for #192
+                dynamic_form.fields[field_name] = fields.CharField(initial=default, widget=HiddenInput())
+                # continue
 
             else:
                 # default input type if text
