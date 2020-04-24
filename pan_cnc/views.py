@@ -1003,7 +1003,8 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
                                                                    help_text=help_text)
             elif type_hint == 'hidden':
                 # FIX for #192
-                dynamic_form.fields[field_name] = fields.CharField(initial=default, widget=HiddenInput())
+                dynamic_form.fields[field_name] = fields.CharField(initial=default, required=False,
+                                                                   widget=HiddenInput())
                 # continue
 
             else:
