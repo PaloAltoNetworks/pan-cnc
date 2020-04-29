@@ -506,6 +506,9 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
         self._service = dict()
         # name of the snippet to find and load into the service
         self._snippet = ''
+
+        # dict of form values to pre-populate if not found in the session/workflow
+        self.prepopulated_form_values = dict()
         # call the super
         super().__init__(**kwargs)
 
@@ -768,7 +771,13 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
 
             else:
                 # if the user has entered this before, let's grab it from the session
-                default = self.get_value_from_workflow(field_name, variable_default)
+                default = self.get_value_from_workflow(field_name, None)
+                # not entered before, do we have it in the prepopulated_form_values dict?
+                if default is None:
+                    if field_name in self.prepopulated_form_values:
+                        default = self.prepopulated_form_values[field_name]
+                    else:
+                        default = variable_default
 
             # Figure out which type of widget should be rendered
             # Valid widgets are dropdown, text_area, password and defaults to a char field

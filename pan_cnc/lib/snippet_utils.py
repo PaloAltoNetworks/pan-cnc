@@ -272,7 +272,7 @@ def debug_snippets_in_repo(directory: Path, err_list: list) -> list:
         try:
             with d.open(mode='r') as sc:
                 raw_service_config = oyaml.safe_load(sc.read())
-                errs = _debug_skillet_structure(raw_service_config)
+                errs = debug_skillet(raw_service_config)
                 if errs:
                     err_condition = True
                     err_detail['severity'] = 'warn'
@@ -701,7 +701,7 @@ def _normalize_snippet_structure(skillet: dict) -> dict:
     return skillet
 
 
-def _debug_skillet_structure(skillet: dict) -> list:
+def debug_skillet(skillet: dict) -> list:
     """
     Verifies the structure of a skillet and returns a list of errors or warning if found, None otherwise
     :param skillet: loaded skillet

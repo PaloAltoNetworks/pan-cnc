@@ -3,7 +3,7 @@
 
 {% block content %}
     <script type="text/javascript">
-        function set_cursor() {
+        function set_cursor_and_submit() {
             let doc = $(document.documentElement);
             doc.css('cursor', 'progress');
             $('#submit_button').prop("disabled", true);
@@ -108,7 +108,7 @@
         <div class="card-footer text-right">
             {% block form_buttons %}{% endblock %}
             <a href="/cancel" class="btn btn-danger">Cancel</a>
-            <button type="submit" class="btn btn-primary" id="submit_button" onclick="set_cursor()">Submit</button>
+            <button type="submit" class="btn btn-primary" id="submit_button" onclick="set_cursor_and_submit()">Submit</button>
         </div>
     </div>
     {% block after_form %}
