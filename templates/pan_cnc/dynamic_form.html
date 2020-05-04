@@ -88,10 +88,12 @@
                         <i class="fas fa-question-circle text-primary mr-1"></i>
                     </a>
                 {% endif %}
-                {% if app_dir and snippet_name %}
-                    <a href="/debug/{{ app_dir }}/{{ snippet_name }}" title="Debug Snippet">
-                        <i class="fas fa-cog text-muted" title="Debug Snippet"></i>
-                    </a>
+                {% if view.service.type != 'app' %}
+                    {% if app_dir and snippet_name %}
+                        <a href="/debug/{{ app_dir }}/{{ snippet_name }}" title="Debug Snippet">
+                            <i class="fas fa-cog text-muted" title="Debug Snippet"></i>
+                        </a>
+                    {% endif %}
                 {% endif %}
             </div>
         </div>
