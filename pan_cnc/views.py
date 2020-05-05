@@ -1630,19 +1630,19 @@ class EditTargetView(CNCBaseAuth, FormView):
             saved_perform_backup = self.get_value_from_workflow('perform_backup', False)
 
             choices_list = list()
-            choices_list.append(('commit', 'Fast Commit. Do not wait on commit to finish'))
+
             choices_list.append(('no_commit', 'Do not Commit. Push changes only'))
             choices_list.append(('sync_commit', 'Commit and wait to finish'))
 
             choices_set = tuple(choices_list)
 
             # fix for #156 - only sync_commit for gpcs type skillets
-            if 'gpcs' in meta['type']:
-                perform_commit = fields.CharField(initial='sync_commit', widget=HiddenInput())
+            # fix for #204 - allow no_commit option for gpcs - gpcs can be sync_commit or not_commit onlu
+            if 'gpcs' not in meta['type']:
+                choices_list.append(('commit', 'Fast Commit. Do not wait on commit to finish'))
 
-            else:
-                perform_commit = fields.ChoiceField(choices=choices_set, label='Commit Options',
-                                                    initial=saved_perform_commit)
+            perform_commit = fields.ChoiceField(choices=choices_set, label='Commit Options',
+                                                initial=saved_perform_commit)
 
             form.fields['perform_commit'] = perform_commit
 
