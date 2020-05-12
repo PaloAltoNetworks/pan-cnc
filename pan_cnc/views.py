@@ -390,7 +390,7 @@ class CNCBaseAuth(LoginRequiredMixin, View):
 
         header = self.header
         if workflow_name is not None:
-            workflow_skillet_dict = snippet_utils.load_snippet_with_name(workflow_name, self.app_dir)
+            workflow_skillet_dict = self.load_skillet_by_name(workflow_name)
             if workflow_skillet_dict is not None:
                 header = workflow_skillet_dict.get('label', self.header)
 
@@ -413,6 +413,15 @@ class CNCBaseAuth(LoginRequiredMixin, View):
         # try to grab a sensible next page to redirect to
         next_url = self.request.session.pop('last_page', '/')
         return next_url
+
+    def load_skillet_by_name(self, skillet_name) -> (dict, None):
+        """
+        Default method to load a skillet by name, child applications can override how skillets are found, stored, and
+        cached, so we will let them override this method to provide their own functionality
+        :param skillet_name: name of the skillet to load (from the name attribute in the metadata file)
+        :return: skillet metadata dict if not found
+        """
+        return snippet_utils.load_snippet_with_name(skillet_name, self.app_dir)
 
 
 class CNCView(CNCBaseAuth, TemplateView):
@@ -609,7 +618,7 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
             snippet: str = self.get_snippet()
 
             if snippet != '':
-                self.service: dict = snippet_utils.load_snippet_with_name(snippet, self.app_dir)
+                self.service: dict = self.load_skillet_by_name(snippet)
 
                 if self.service is None:
                     messages.add_message(self.request, messages.ERROR,
@@ -648,7 +657,7 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
         POST variables and then check if it's valid. If valid, save variables to the session
         and call form_valid
         """
-        self.service = snippet_utils.load_snippet_with_name(self.get_snippet(), self.app_dir)
+        self.service = self.load_skillet_by_name(self.get_snippet())
         form = self.generate_dynamic_form(self.request.POST)
 
         try:
@@ -1535,7 +1544,7 @@ class EditTargetView(CNCBaseAuth, FormView):
             messages.add_message(self.request, messages.ERROR, 'Process Error - Meta not found')
             return HttpResponseRedirect('/')
 
-        meta = snippet_utils.load_snippet_with_name(snippet_name, self.app_dir)
+        meta = self.load_skillet_by_name(snippet_name)
         if meta is None:
             messages.add_message(self.request, messages.ERROR, 'Process Error - Could not load meta')
 
@@ -1548,7 +1557,7 @@ class EditTargetView(CNCBaseAuth, FormView):
             messages.add_message(self.request, messages.ERROR, 'Process Error - Meta not found')
             return HttpResponseRedirect('/')
 
-        meta = snippet_utils.load_snippet_with_name(snippet_name, self.app_dir)
+        meta = self.load_skillet_by_name(snippet_name)
         if meta is None:
             messages.add_message(self.request, messages.ERROR, 'Process Error - Could not load meta')
             return HttpResponseRedirect('/')
@@ -1625,7 +1634,6 @@ class EditTargetView(CNCBaseAuth, FormView):
 
         if 'type' in meta and 'pan' in meta['type']:
             # add option to perform commit operation or not
-            # perform_commit = fields.BooleanField(label='Perform Commit', initial=True, label_suffix='', required=False)
             saved_perform_commit = self.get_value_from_workflow('perform_commit', 'no_commit')
             saved_perform_backup = self.get_value_from_workflow('perform_backup', False)
 
@@ -1691,7 +1699,7 @@ class EditTargetView(CNCBaseAuth, FormView):
         if snippet_name == '':
             return HttpResponseRedirect(self.error_out('No Skillet provided!'))
 
-        meta = snippet_utils.load_snippet_with_name(snippet_name, self.app_dir)
+        meta = self.load_skillet_by_name(snippet_name)
 
         if meta is None:
             return HttpResponseRedirect(self.error_out('Could not load Skillet!'))
@@ -1743,9 +1751,6 @@ class EditTargetView(CNCBaseAuth, FormView):
             context['target_ip'] = target_ip
             self.request.session['last_page'] = f'/{self.app_dir}/skillet/{panos_skillet.name}'
             return render(self.request, 'pan_cnc/debug_panos_skillet.html', context=context)
-
-        # workflow = self.get_workflow()
-        # self.request.session[self.app_dir] = workflow
 
         err_condition = False
         if target_ip is None or target_ip == '':
@@ -1912,7 +1917,7 @@ class EditTerraformView(CNCBaseAuth, FormView):
         # call chain in the child classes
         snippet_name = self.get_value_from_workflow('snippet_name', '')
         if snippet_name != '':
-            self.meta = snippet_utils.load_snippet_with_name(snippet_name, self.app_dir)
+            self.meta = self.load_skillet_by_name(snippet_name)
             return self.render_to_response(self.get_context_data())
         else:
             messages.add_message(self.request, messages.ERROR, 'Process Error - Meta not found')
@@ -1952,9 +1957,9 @@ class EditTerraformView(CNCBaseAuth, FormView):
         terraform_action = self.request.POST.get('terraform_action', 'validate')
 
         if snippet_name != '':
-            meta = snippet_utils.load_snippet_with_name(snippet_name, self.app_dir)
+            meta = self.load_skillet_by_name(snippet_name)
             # fix for panhandler #170 - self.meta not being set prevents vars from being set in context
-            # for terrraform destroy
+            # for terraform destroy
             self.meta = meta
         else:
             raise SnippetRequiredException
@@ -2141,7 +2146,7 @@ class NextTaskView(CNCView):
 
     def get_context_data(self, **kwargs):
         self.app_dir = self.get_app_dir()
-        skillet = snippet_utils.load_snippet_with_name(self.get_snippet(), self.app_dir)
+        skillet = self.load_skillet_by_name(self.get_snippet())
         context = dict()
         context['base_html'] = self.base_html
 
@@ -2275,7 +2280,7 @@ class TaskLogsView(CNCBaseAuth, View):
                         # directly
                         skillet_name = self.get_value_from_workflow('snippet_name', '')
                         if skillet_name != '':
-                            meta = snippet_utils.load_snippet_with_name(skillet_name, self.app_dir)
+                            meta = self.load_skillet_by_name(skillet_name)
                             # FIXME right here for python types
                             if 'snippets' in meta:
                                 for snippet in meta['snippets']:
@@ -2389,7 +2394,7 @@ class WorkflowView(CNCBaseAuth, RedirectView):
                 return self.error_out('Process Error - No Workflow found!')
 
         print(f"found workflow skillet name {skillet_name}")
-        self.meta = snippet_utils.load_snippet_with_name(skillet_name, self.app_dir)
+        self.meta = self.load_skillet_by_name(skillet_name)
         if self.meta is None:
             return self.error_out('Process Error - No skillet could be loaded')
 
@@ -2428,7 +2433,7 @@ class WorkflowView(CNCBaseAuth, RedirectView):
             if snippet.should_execute(context):
                 current_skillet_name = snippet.name
                 # find and load hhe next skillet here soo we can gather it's type
-                skillet = snippet_utils.load_snippet_with_name(snippet.name, self.app_dir)
+                skillet = self.load_skillet_by_name(snippet.name)
                 if skillet is not None:
                     current_skillet_type = skillet.get('type', None)
                 break
@@ -2894,7 +2899,7 @@ class DebugMetadataView(CNCView):
 
     def get_context_data(self, **kwargs):
         snippet_data = snippet_utils.get_snippet_metadata(self.snippet_name, self.app_dir)
-        snippet = snippet_utils.load_snippet_with_name(self.snippet_name, self.app_dir)
+        snippet = self.load_skillet_by_name(self.snippet_name)
         context = super().get_context_data()
         context['header'] = 'Debug Metadata'
         context['title'] = 'Metadata for %s' % self.snippet_name
@@ -2973,7 +2978,7 @@ class ReinitPythonVenv(CNCView):
             self.app_dir = app_dir
 
         skillet_name = self.kwargs.get('skillet', '')
-        skillet = snippet_utils.load_snippet_with_name(skillet_name, app_dir)
+        skillet = self.load_skillet_by_name(skillet_name)
         context = super().get_context_data()
         context['base_html'] = self.base_html
         context['title'] = f"Upgrading Environment for: {skillet['label']}"

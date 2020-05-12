@@ -359,6 +359,17 @@ def get_snippet_metadata(snippet_name, app_name) -> (str, None):
     :return: str of .meta-cnc.yaml file
     """
     skillet = load_snippet_with_name(snippet_name, app_name)
+    return read_skillet_metadata(skillet)
+
+
+def read_skillet_metadata(skillet: dict) -> (str, None):
+    """
+    Returns the snippet metadata as a str
+    :param skillet: loaded skillet dictionary
+    :return: str of .meta-cnc.yaml file
+    """
+
+    skillet_name = skillet.get('name', 'none')
     if skillet is not None and 'snippet_path' in skillet:
         parent = Path(skillet['snippet_path'])
         if parent.exists():
@@ -374,8 +385,8 @@ def get_snippet_metadata(snippet_name, app_name) -> (str, None):
                     with mdf.open('r') as sc:
                         data = sc.read()
                         snippet_data = oyaml.safe_load(data)
-                        if 'name' in snippet_data and snippet_data['name'] == snippet_name:
-                            print(f'Found {snippet_name} at {parent.absolute()}')
+                        if 'name' in snippet_data and snippet_data['name'] == skillet_name:
+                            print(f'Found {skillet_name} at {parent.absolute()}')
                             return data
                         else:
                             print('name mismatch loading .meta-cnc file')

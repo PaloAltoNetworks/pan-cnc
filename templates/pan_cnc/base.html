@@ -63,7 +63,7 @@
 
             // perform the post
             let post = $.post(url, params, function (response) {
-                if (response['status'] == 'success') {
+                if (response['status'] === 'success') {
                     let v = response['v'];
                     let v_div = $('#secret_' + indx);
                     v_div.empty();
@@ -178,7 +178,7 @@
         <!-- Modal -->
         <div class="modal fade" id="envModal" tabindex="-1" role="dialog" aria-labelledby="envModalLabel"
              aria-hidden="true">
-            <div class="modal-dialog" role="document">
+            <div class="modal-dialog modal-lg" role="document">
                 <div class="modal-content">
                     <div class="modal-header">
                         <h5 class="modal-title" id="envModalLabel">Environment</h5>
