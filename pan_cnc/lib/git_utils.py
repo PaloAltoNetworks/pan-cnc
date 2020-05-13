@@ -551,10 +551,19 @@ def update_repo_in_cache(repo_name: str, repo_dir: str, app_dir: str) -> None:
     :param app_dir: current application
     :return: None
     """
-    cnc_utils.set_long_term_cached_value(app_dir, f'{repo_name}_detail', None, 0, 'git_repo_details')
 
     # get updated repo_details
     updated_repo_details = get_repo_details(repo_name, repo_dir, app_dir)
+
+    return update_repo_detail_in_cache(updated_repo_details, app_dir)
+
+
+def update_repo_detail_in_cache(repo_detail: dict, app_dir: str) -> None:
+
+    repo_name = repo_detail['name']
+
+    # re-cache this value
+    cnc_utils.set_long_term_cached_value(app_dir, f'{repo_name}_detail', repo_detail, 604800, 'git_repo_details')
 
     # now, find and remove the old details
     repos = cnc_utils.get_long_term_cached_value(app_dir, 'imported_repositories')
@@ -569,6 +578,7 @@ def update_repo_in_cache(repo_name: str, repo_dir: str, app_dir: str) -> None:
         repos = list()
 
     # add our new repo details and re-cache
-    repos.append(updated_repo_details)
+    repos.append(repo_detail)
     cnc_utils.set_long_term_cached_value(app_dir, 'imported_repositories', repos, 604800,
                                          'imported_git_repos')
+
