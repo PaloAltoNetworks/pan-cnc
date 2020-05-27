@@ -15,7 +15,9 @@
 # Author: Nathan Embery nembery@paloaltonetworks.com
 
 import datetime
+import os
 import subprocess
+import traceback
 from pathlib import Path
 
 import requests
@@ -25,6 +27,7 @@ from git import GitError
 from git import InvalidGitRepositoryError
 from git import NoSuchPathError
 from git import Repo
+from paramiko import RSAKey
 from requests import RequestException
 
 from pan_cnc.lib import cnc_utils
@@ -172,6 +175,13 @@ def get_repo_details(repo_name, repo_dir, app_name='cnc'):
     if 'repo' not in url_details or url_details['repo'] is None or url_details['repo'] == '':
         url_details['repo'] = repo_name
 
+    repo_detail['public_key_path'] = ''
+    repo_detail['private_key_path'] = ''
+    if url.startswith('git@') or url.startswith('ssh://'):
+        # this is an SSH based repository, let's generate a deploy key and store it in the details
+        repo_detail['public_key_path'] = get_ssh_pub_key_path(repo_name)
+        repo_detail['private_key_path'] = get_ssh_priv_key_path(repo_name)
+
     branch = 'master'
     commit_log = list()
     last_updated = 0
@@ -226,7 +236,11 @@ def get_repo_details(repo_name, repo_dir, app_name='cnc'):
     repo_detail['last_updated'] = last_updated_str
     repo_detail['last_updated_time'] = last_updated
 
-    upstream_details = get_repo_upstream_details(repo_name, url, app_name)
+    upstream_details = dict()
+
+    if 'github' in url.lower():
+        upstream_details = get_repo_upstream_details(repo_name, url, app_name)
+
     if 'description' in upstream_details:
         if upstream_details['description'] is None or upstream_details['description'] == 'None':
             repo_detail['description'] = f"{url} {branch}"
@@ -251,8 +265,11 @@ def update_repo(repo_dir: str, branch=None):
     if not repo_path.exists():
         return 'Error: Path does not exist'
 
+    repo = Repo(repo_dir)
+
     try:
-        repo = Repo(repo_dir)
+
+        current_branch = repo.active_branch.name
 
         changes = repo.index.diff(None)
         if len(changes) > 0:
@@ -260,11 +277,11 @@ def update_repo(repo_dir: str, branch=None):
 
         checkout = False
         if branch is not None:
-            current_branch = repo.active_branch.name
             if branch != current_branch:
                 print(f'Checking out new branch: {branch}')
                 checkout = True
                 repo.git.checkout(branch)
+                current_branch = branch
 
         remote_branches = __get_remote_repo_branches(repo)
         if repo.active_branch.name not in remote_branches:
@@ -273,10 +290,17 @@ def update_repo(repo_dir: str, branch=None):
             else:
                 return 'Local branch is up to date'
 
-        f = repo.remotes.origin.pull()
+        f = repo.git.pull('origin', current_branch)
 
     except GitCommandError as gce:
         print(gce)
+        print(traceback.format_exc())
+
+        if 'CONFLICT' in str(gce):
+            print('undoing pull')
+            repo.git.reset('HEAD', '--hard')
+            return 'Error: Could not update! Merge Conflict prevented your changes from being accepted upstream!'
+
         return 'Error: Could not update! Ensure there are no local changes before updating'
 
     except InvalidGitRepositoryError as igre:
@@ -294,16 +318,23 @@ def update_repo(repo_dir: str, branch=None):
     if checkout:
         return f"Checked out new Branch: {branch}"
 
-    if len(f) > 0:
-        flags = f[0].flags
-        if flags == 4:
-            return "This branch is already up to date"
-        elif flags == 64:
-            return "This branch has been updated to Latest"
-        else:
-            return "Error: Unknown flag returned"
+    if f == 'Already up to date.':
+        return "This branch is already up to date"
+    elif str(f).startswith('Updating'):
+        return "This branch has been updated to Latest"
+    else:
+        return f
 
-    return "Unknown Error"
+    # if len(f) > 0:
+    #     flags = f[0].flags
+    #     if flags == 4:
+    #         return "This branch is already up to date"
+    #     elif flags == 64:
+    #         return "This branch has been updated to Latest"
+    #     else:
+    #         return "Error: Unknown flag returned"
+
+    # return "Unknown Error"
 
 
 def get_repo_branches_from_dir(repo_dir: str) -> list:
@@ -559,7 +590,6 @@ def update_repo_in_cache(repo_name: str, repo_dir: str, app_dir: str) -> None:
 
 
 def update_repo_detail_in_cache(repo_detail: dict, app_dir: str) -> None:
-
     repo_name = repo_detail['name']
 
     # re-cache this value
@@ -582,3 +612,122 @@ def update_repo_detail_in_cache(repo_detail: dict, app_dir: str) -> None:
     cnc_utils.set_long_term_cached_value(app_dir, 'imported_repositories', repos, 604800,
                                          'imported_git_repos')
 
+
+def __get_ssh_key_dir() -> str:
+    """
+    Utility function to return the ssh key directory
+
+    :return: full path to the cnc specific ssh key directory
+    """
+    user_dir = os.path.expanduser('~/.pan_cnc/.ssh')
+
+    if not os.path.exists(user_dir):
+        os.makedirs(user_dir, mode=0o700)
+
+    return user_dir
+
+
+def generate_ssh_key(repo_name: str) -> str:
+    """
+    Creates an SSH key pair for use as a read / write deployment key
+
+    :param repo_name: Name of the Repository to use
+    :return: public key contents as a string
+    """
+
+    user_dir = __get_ssh_key_dir()
+
+    private_key_path = os.path.join(user_dir, repo_name)
+    pub_key_path = os.path.join(user_dir, repo_name + '.pub')
+
+    # check if this already exists
+    if os.path.exists(pub_key_path):
+        with open(pub_key_path, 'r') as pkp:
+            pub_key = pkp.read()
+
+        return pub_key
+
+    private_key = RSAKey.generate(bits=2048)
+    private_key.write_private_key_file(private_key_path, password=None)
+
+    pub = RSAKey(filename=private_key_path, password=None)
+
+    public_key_contents = f'{pub.get_name()} {pub.get_base64()} PAN_CNC'
+    with open(pub_key_path, 'w') as pkp:
+        pkp.write(public_key_contents)
+
+    return public_key_contents
+
+
+def get_ssh_pub_key_path(repo_name: str) -> str:
+    """
+    Gets the ssh public key path, generating the key if necessary
+
+    :param repo_name: name of the repository
+    :return: path to the public key as a string
+    """
+    ssh_dir = __get_ssh_key_dir()
+
+    pub_key_path = os.path.join(ssh_dir, repo_name + '.pub')
+    if not os.path.exists(pub_key_path):
+        generate_ssh_key(repo_name)
+
+    return pub_key_path
+
+
+def get_ssh_priv_key_path(repo_name: str) -> str:
+    """
+    Gets the ssh private key path, generating the key if necessary
+
+    :param repo_name: name of the repository
+    :return: path to the public key as a string
+    """
+    ssh_dir = __get_ssh_key_dir()
+
+    priv_key_path = os.path.join(ssh_dir, repo_name)
+    if not os.path.exists(priv_key_path):
+        generate_ssh_key(repo_name)
+
+    return priv_key_path
+
+
+def push_local_changes(repo_dir: str, key_path: str) -> (bool, str):
+    """
+    Attempt to push local commits upstream using the provided deploy key
+
+    :param repo_dir: directory of the repository to push
+    :param key_path: path to the private key to use for deployment
+    :return: tuple of success: bool and message: str
+    """
+
+    repo = Repo(repo_dir)
+
+    output = ''
+    success = True
+
+    try:
+        git_ssh_command = f'ssh -i {key_path}'
+        with repo.git.custom_environment(GIT_SSH_COMMAND=git_ssh_command):
+            push_info_list = repo.remote().push(repo.active_branch)
+
+            for pi in push_info_list:
+                output += f'{pi.summary}\n'
+                if pi.flags >= 1024:
+                    success = False
+
+    except GitCommandError as gce:
+        print(gce)
+        return False, gce
+    except GitError as ge:
+        print(ge)
+        return False, ge
+    except Exception as e:
+        print(e)
+        return False, e
+
+    return success, output
+
+
+def get_git_status(repo_dir):
+    repo = Repo(repo_dir)
+    return repo.git.status()

@@ -65,14 +65,13 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'widget_tweaks',
     'django.contrib.staticfiles',
-    'cnc_tags',
+    'cnc'
     #   'django.contrib.admin',
 ]
 
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
-    # 'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -107,7 +106,7 @@ WSGI_APPLICATION = 'pan_cnc.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
+        'NAME': os.path.join(USER_PAN_CNC_DIR, 'db.sqlite3'),
     }
 }
 
@@ -182,10 +181,10 @@ for app in os.listdir(SRC_PATH):
                         # print(app_conf)
                         INSTALLED_APPS_CONFIG[app] = app_conf
 
-                        DATABASES[app] = {
-                            'ENGINE': 'django.db.backends.sqlite3',
-                            'NAME': os.path.join(app_persistent_dir, 'db.sqlite3'),
-                        }
+                        # DATABASES[app] = {
+                        #     'ENGINE': 'django.db.backends.sqlite3',
+                        #     'NAME': os.path.join(app_persistent_dir, 'db.sqlite3'),
+                        # }
 
                 except OSError as ose:
                     print('Could not open .pan-cnc.yaml for app: %s' % app)
