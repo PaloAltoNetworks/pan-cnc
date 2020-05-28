@@ -3,7 +3,7 @@
 export HOME=/home/cnc_user
 export COLUMNS=80
 
-CNC_APP_LOWER=$(echo "$CNC_APP" | tr '[:upper:]' '[:lower:]')
+#CNC_APP_LOWER=$(echo "$CNC_APP" | tr '[:upper:]' '[:lower:]')
 
 cd /app/cnc || exit 1
 celery -A pan_cnc worker --loglevel=info  &
@@ -15,18 +15,18 @@ if [ ! -f /app/cnc/db.sqlite3 ];
     || exit 1
 fi
 
-# if this CNC app supplies it's own DB, let's go ahead and make sure it's all set
-if [ -d /app/src/"$CNC_APP_LOWER"/migrations ];
-  then
-    if [ -f $HOME/.pan_cnc/panhandler/db.sqlite3 ];
-     then
-      echo "Backing up existing db"
-      mv $HOME/.pan_cnc/panhandler/db.sqlite3 $HOME/.pan_cnc/panhandler/db.sqlite3.dev
-    fi
-    echo "Creating ${CNC_APP} database"
-    python /app/cnc/manage.py migrate --database="$CNC_APP_LOWER" \
-    || exit 1
-fi
+## if this CNC app supplies it's own DB, let's go ahead and make sure it's all set
+#if [ -d /app/src/"$CNC_APP_LOWER"/migrations ];
+#  then
+#    if [ -f $HOME/.pan_cnc/panhandler/db.sqlite3 ];
+#     then
+#      echo "Backing up existing db"
+#      mv $HOME/.pan_cnc/panhandler/db.sqlite3 $HOME/.pan_cnc/panhandler/db.sqlite3.dev
+#    fi
+#    echo "Creating ${CNC_APP} database"
+#    python /app/cnc/manage.py migrate --database="$CNC_APP_LOWER" \
+#    || exit 1
+#fi
 
 echo "====="
 echo "====="
