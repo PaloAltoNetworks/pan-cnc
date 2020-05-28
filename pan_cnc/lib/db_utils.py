@@ -82,8 +82,9 @@ def update_skillet_cache() -> None:
     :return: None
     """
     all_skillets = load_all_skillets(refresh=True)
-    # FIXME - ensure this is app agnostic
-    cnc_utils.set_long_term_cached_value('cnc', 'all_snippets', all_skillets, -1)
+    # FIXME - this can and will break if every more than one app tries to do this...
+    app_name = get_default_app_name()
+    cnc_utils.set_long_term_cached_value(app_name, 'all_snippets', all_skillets, -1)
 
 
 def get_repository_details(repository_name: str) -> (dict, None):
