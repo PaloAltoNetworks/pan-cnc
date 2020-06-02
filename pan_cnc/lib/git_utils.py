@@ -48,18 +48,21 @@ def clone_or_update_repo(repo_dir, repo_name, repo_url, branch='master'):
     try:
 
         repo = Repo(repo_dir)
-        f = repo.remotes.origin.pull()
-        if len(f) > 0:
-            flags = f[0].flags
-            if flags == 4:
-                print("Already up to date")
-                return False
-            elif flags == 64:
-                print("Updated to Latest")
-                return True
-            else:
-                print("Unknown flag returned")
-                return False
+
+        git_ssh_command = f'ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'
+        with repo.git.custom_environment(GIT_SSH_COMMAND=git_ssh_command):
+            f = repo.remotes.origin.pull()
+            if len(f) > 0:
+                flags = f[0].flags
+                if flags == 4:
+                    print("Already up to date")
+                    return False
+                elif flags == 64:
+                    print("Updated to Latest")
+                    return True
+                else:
+                    print("Unknown flag returned")
+                    return False
 
         repo.close()
         return True
@@ -290,7 +293,9 @@ def update_repo(repo_dir: str, branch=None):
             else:
                 return 'Local branch is up to date'
 
-        f = repo.git.pull('origin', current_branch)
+        git_ssh_command = f'ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'
+        with repo.git.custom_environment(GIT_SSH_COMMAND=git_ssh_command):
+            f = repo.git.pull('origin', current_branch)
 
     except GitCommandError as gce:
         print(gce)
