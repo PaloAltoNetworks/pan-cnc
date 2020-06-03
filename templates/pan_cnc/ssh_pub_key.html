@@ -1,0 +1,36 @@
+{% extends base_html|default:'pan_cnc/base.html' %}
+{% load static %}
+
+{% block content %}
+    <div class="card border-primary mb-5 shadow-lg rounded">
+        <div class="card-header">
+            SSH Public Key
+        </div>
+        <div class="card-body">
+            <p class="card-text">
+                Copy the following text and add it to your private SSH repositories to allow access to this application.
+            </p>
+            <p class="card-text bg-light p-5">
+                {{ public_key }}
+            </p>
+            <p class="card-text">
+                Instructions for adding this key to your repository:
+            </p>
+            <ul class="list-group">
+                <li class="list-group-item">
+                    <a href="https://docs.gitlab.com/ee/ssh/#adding-an-ssh-key-to-your-gitlab-account">GitLab</a>
+                </li>
+                <li class="list-group-item"><a
+                        href="https://help.github.com/en/github/authenticating-to-github/adding-a-new-ssh-key-to-your-github-account">Github</a>
+                </li>
+                <li class="list-group-item"><a
+                        href="https://confluence.atlassian.com/bitbucket/access-keys-294486051.html">BitBucket</a></li>
+                <li class="list-group-item"><a
+                        href="https://duckduckgo.com/?q=add+SSH+key+to+git+repository&t=ffab&ia=web">Others</a></li>
+            </ul>
+        </div>
+        <div class="card-footer text-right">
+            <a class="btn btn-primary" href="{{ last_page }}">Got it</a>
+        </div>
+    </div>
+{% endblock %}

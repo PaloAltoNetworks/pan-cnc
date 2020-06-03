@@ -40,8 +40,7 @@ def initialize_repo(repo_detail: dict) -> list:
     (repository_object, created) = RepositoryDetails.objects.get_or_create(
         name=repo_name,
         defaults={'url': repo_detail.get('url', ''),
-                  'details_json': json.dumps(repo_detail),
-                  'deploy_key_path': repo_detail.get('private_key_path', '')
+                  'details_json': json.dumps(repo_detail)
                   }
     )
 

@@ -16,6 +16,7 @@
 
 import datetime
 import os
+import shlex
 import subprocess
 import traceback
 from pathlib import Path
@@ -32,6 +33,7 @@ from requests import RequestException
 
 from pan_cnc.lib import cnc_utils
 from pan_cnc.lib.exceptions import ImportRepositoryException
+from pan_cnc.lib.exceptions import RepositoryPermissionsException
 
 urllib3.disable_warnings()
 
@@ -49,20 +51,18 @@ def clone_or_update_repo(repo_dir, repo_name, repo_url, branch='master'):
 
         repo = Repo(repo_dir)
 
-        git_ssh_command = f'ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'
-        with repo.git.custom_environment(GIT_SSH_COMMAND=git_ssh_command):
-            f = repo.remotes.origin.pull()
-            if len(f) > 0:
-                flags = f[0].flags
-                if flags == 4:
-                    print("Already up to date")
-                    return False
-                elif flags == 64:
-                    print("Updated to Latest")
-                    return True
-                else:
-                    print("Unknown flag returned")
-                    return False
+        f = repo.remotes.origin.pull()
+        if len(f) > 0:
+            flags = f[0].flags
+            if flags == 4:
+                print("Already up to date")
+                return False
+            elif flags == 64:
+                print("Updated to Latest")
+                return True
+            else:
+                print("Unknown flag returned")
+                return False
 
         repo.close()
         return True
@@ -92,7 +92,7 @@ def clone_repo(repo_dir, repo_name, repo_url, branch='master'):
     :return: bool
     """
     try:
-        message = clone_repository(repo_dir, repo_name, repo_url, branch)
+        message = clone_repository(repo_dir, repo_name, repo_url)
         print(message)
         return True
     except ImportRepositoryException as ire:
@@ -118,10 +118,18 @@ def clone_repository(repo_dir, repo_name, repo_url, branch='master'):
             true_binary_path = true_binary.decode('utf-8').strip()
             print(f'USING fake ASKPASS of {true_binary_path}')
             env['GIT_ASKPASS'] = true_binary_path
+        elif 'git@' in repo_url:
+            is_known, message = ensure_known_host(repo_url)
+            if not is_known:
+                raise ImportRepositoryException(f'Could not verify SSH Host Key! {message}')
 
         # remove depth option to allow us to query remote branches
         Repo.clone_from(repo_url, repo_dir, env=env, config='http.sslVerify=false')
+
     except (GitCommandError, GitError) as gce:
+        if 'Permission denied (publickey)' in str(gce):
+            raise RepositoryPermissionsException(str(gce))
+
         raise ImportRepositoryException(gce)
 
     return "Imported repository successfully"
@@ -177,13 +185,6 @@ def get_repo_details(repo_name, repo_dir, app_name='cnc'):
 
     if 'repo' not in url_details or url_details['repo'] is None or url_details['repo'] == '':
         url_details['repo'] = repo_name
-
-    repo_detail['public_key_path'] = ''
-    repo_detail['private_key_path'] = ''
-    if url.startswith('git@') or url.startswith('ssh://'):
-        # this is an SSH based repository, let's generate a deploy key and store it in the details
-        repo_detail['public_key_path'] = get_ssh_pub_key_path(repo_name)
-        repo_detail['private_key_path'] = get_ssh_priv_key_path(repo_name)
 
     branch = 'master'
     commit_log = list()
@@ -293,9 +294,7 @@ def update_repo(repo_dir: str, branch=None):
             else:
                 return 'Local branch is up to date'
 
-        git_ssh_command = f'ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'
-        with repo.git.custom_environment(GIT_SSH_COMMAND=git_ssh_command):
-            f = repo.git.pull('origin', current_branch)
+        f = repo.git.pull('origin', current_branch)
 
     except GitCommandError as gce:
         print(gce)
@@ -446,6 +445,7 @@ def __get_remote_repo_branches(repo: Repo) -> list:
 
     try:
         # fix for PH: #130 - deleted branches continue to show up in ph after upstream branch deleted
+
         repo.git.fetch(all=True, prune=True)
 
         raw_branches = repo.git.branch('-r')
@@ -464,6 +464,12 @@ def __get_remote_repo_branches(repo: Repo) -> list:
     except GitCommandError as gce:
         print('Could not get branches from repo')
         print(gce)
+
+        # this is the first place we attempt to read from upstream. If there's a permissions problem, flag it here
+        # and raise an exception where it can be properly handled
+        if 'Permission denied (publickey)' in str(gce):
+            raise RepositoryPermissionsException(str(gce))
+
     except GitError as ge:
         print('Unknown GitError')
         print(ge)
@@ -544,27 +550,37 @@ def get_repo_commits_url(repo_url):
     return f'https://github.com/{owner}/{repo}/commit/'
 
 
-def parse_repo_origin_url(repo_url):
+def parse_repo_origin_url(repo_url) -> dict:
+    """
+    parse a repository clone url and return a dict containing three keys: owner, repo, domain
+
+    :param repo_url: clone url such as  # https://github.com/owner/repo/
+    :return: dictionary
+    """
     url_details = dict()
 
     try:
         if repo_url.endswith('.git') and repo_url.startswith('git@'):
             # git@github.com:nembery/Skillets.git
+            domain = repo_url.split(':')[0].replace('git@', '')
             url_parts = repo_url.split(':')[1].split('/')
             owner = url_parts[0]
             repo = url_parts[1].split('.git')[0]
         elif repo_url.endswith('.git'):
             # https://github.com/owner/repo.git
+            domain = repo_url.split('//')[1].split('/')[0]
             url_parts = repo_url.split('/')[-2:]
             owner = url_parts[0]
             repo = url_parts[1].split('.git')[0]
         elif repo_url.endswith('/'):
             # https://github.com/owner/repo/
+            domain = repo_url.split('//')[1].split('/')[0]
             url_parts = repo_url.split('/')[-3:]
             owner = url_parts[0]
             repo = url_parts[1].split('.git')[0]
         else:
             # https://github.com/owner/repo ?
+            domain = repo_url.split('//')[1].split('/')[0]
             url_parts = repo_url.split('/')[-2:]
             owner = url_parts[0]
             repo = url_parts[1].split('.git')[0]
@@ -572,7 +588,9 @@ def parse_repo_origin_url(repo_url):
         print('Could not parse repo url!')
         owner = None
         repo = None
+        domain = None
 
+    url_details['domain'] = domain
     url_details['owner'] = owner
     url_details['repo'] = repo
 
@@ -624,7 +642,7 @@ def __get_ssh_key_dir() -> str:
 
     :return: full path to the cnc specific ssh key directory
     """
-    user_dir = os.path.expanduser('~/.pan_cnc/.ssh')
+    user_dir = os.path.expanduser('~/.ssh')
 
     if not os.path.exists(user_dir):
         os.makedirs(user_dir, mode=0o700)
@@ -632,18 +650,18 @@ def __get_ssh_key_dir() -> str:
     return user_dir
 
 
-def generate_ssh_key(repo_name: str) -> str:
+def generate_ssh_key(key_name: str) -> str:
     """
     Creates an SSH key pair for use as a read / write deployment key
 
-    :param repo_name: Name of the Repository to use
+    :param key_name: Name of the Repository to use
     :return: public key contents as a string
     """
 
     user_dir = __get_ssh_key_dir()
 
-    private_key_path = os.path.join(user_dir, repo_name)
-    pub_key_path = os.path.join(user_dir, repo_name + '.pub')
+    private_key_path = os.path.join(user_dir, key_name)
+    pub_key_path = os.path.join(user_dir, key_name + '.pub')
 
     # check if this already exists
     if os.path.exists(pub_key_path):
@@ -662,6 +680,16 @@ def generate_ssh_key(repo_name: str) -> str:
         pkp.write(public_key_contents)
 
     return public_key_contents
+
+
+def get_default_ssh_pub_key():
+    """
+    Return the contents of the default ssh public key
+
+    :return: public key as a string
+    """
+
+    return generate_ssh_key('id_rsa')
 
 
 def get_ssh_pub_key_path(repo_name: str) -> str:
@@ -711,14 +739,12 @@ def push_local_changes(repo_dir: str, key_path: str) -> (bool, str):
     success = True
 
     try:
-        git_ssh_command = f'ssh -i {key_path}'
-        with repo.git.custom_environment(GIT_SSH_COMMAND=git_ssh_command):
-            push_info_list = repo.remote().push(repo.active_branch)
+        push_info_list = repo.remote().push(repo.active_branch)
 
-            for pi in push_info_list:
-                output += f'{pi.summary}\n'
-                if pi.flags >= 1024:
-                    success = False
+        for pi in push_info_list:
+            output += f'{pi.summary}\n'
+            if pi.flags >= 1024:
+                success = False
 
     except GitCommandError as gce:
         print(gce)
@@ -736,3 +762,44 @@ def push_local_changes(repo_dir: str, key_path: str) -> (bool, str):
 def get_git_status(repo_dir):
     repo = Repo(repo_dir)
     return repo.git.status()
+
+
+def ensure_known_host(url: str) -> (bool, str):
+    url_parts = parse_repo_origin_url(url)
+    domain = url_parts['domain']
+
+    if domain is None:
+        return False, f'Could not parse domain from {url}'
+
+    found = False
+    ssh_dir = __get_ssh_key_dir()
+    known_hosts_path = os.path.join(ssh_dir, 'known_hosts')
+
+    if not os.path.exists(known_hosts_path):
+        with open(known_hosts_path, 'a'):
+            pass
+
+        os.chmod(known_hosts_path, mode=0o644)
+
+    with open(known_hosts_path, 'r') as khp:
+        for line in khp.readline():
+            if domain in line:
+                found = True
+                break
+
+    found_keys = ''
+
+    if not found:
+        quoted_domain = shlex.quote(domain)
+        try:
+            keyscan_results = subprocess.check_output(f'ssh-keyscan {quoted_domain}', shell=True)
+            found_keys = keyscan_results.decode('utf-8').strip()
+            print(f'Adding {found_keys} to known_hosts file')
+            with open(known_hosts_path, 'a') as khp:
+                khp.write(found_keys)
+
+        except subprocess.CalledProcessError as cpe:
+            print(cpe)
+            return False, str(cpe)
+
+    return True, found_keys

@@ -71,6 +71,7 @@ from skilletlib.snippet.workflow import WorkflowSnippet
 from pan_cnc.lib import cnc_utils
 from pan_cnc.lib import output_utils
 from pan_cnc.lib import snippet_utils
+from pan_cnc.lib import git_utils
 from pan_cnc.lib import task_utils
 from pan_cnc.lib import widgets
 from pan_cnc.lib.exceptions import CCFParserError
@@ -370,6 +371,8 @@ class CNCBaseAuth(LoginRequiredMixin, View):
 
         if 'app_dir' in self.request.session:
             app_dir = self.request.session.get('app_dir', '')
+        elif 'current_app_dir' in self.request.session:
+            app_dir = self.request.session.get('current_app_dir', '')
         elif self.app_dir != '':
             app_dir = self.app_dir
 
@@ -432,7 +435,6 @@ class CNCView(CNCBaseAuth, TemplateView):
     template_name = "pan_cnc/index.html"
     # base html - allow sub apps to override this with special html base if desired
     base_html = 'pan_cnc/base.html'
-    app_dir = 'pan_cnc'
     help_text = ''
 
     def set_last_page_visit(self) -> None:
@@ -2984,4 +2986,15 @@ class ReinitPythonVenv(CNCView):
         context['title'] = f"Upgrading Environment for: {skillet['label']}"
         r = task_utils.python3_init(skillet)
         self.request.session['task_id'] = r.id
+        return context
+
+
+class DefaultSSHKeyView(CNCView):
+    template_name = "pan_cnc/ssh_pub_key.html"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+
+        pub_key = git_utils.get_default_ssh_pub_key()
+        context['public_key'] = pub_key
         return context
