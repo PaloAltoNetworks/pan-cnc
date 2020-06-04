@@ -81,6 +81,14 @@ for app_name in settings.INSTALLED_APPS_CONFIG:
         print('Skipping app: %s with no views configured' % app_name)
         continue
 
+    # ensure we import the views module here for all apps
+    try:
+        app_view_module = importlib.import_module('%s.views' % app_name)
+    except ModuleNotFoundError:
+        print('No view module found for this app!')
+        print(sys.path)
+        app_view_module = object()
+
     for v in app['views']:
         if 'class' not in v or 'name' not in v:
             print('Skipping view with no class configured!')
@@ -91,13 +99,6 @@ for app_name in settings.INSTALLED_APPS_CONFIG:
         # common to have the intro page be a blank url portion, reflect that here
         if view_name is None:
             view_name = ''
-
-        # ensure we import the views module here for all apps
-        try:
-            app_view_module = importlib.import_module('%s.views' % app_name)
-        except ModuleNotFoundError:
-            print('No view module found for this app!')
-            app_view_module = object()
 
         django_generic_module = importlib.import_module('django.views.generic')
         pancnc_view_module = importlib.import_module('pan_cnc.views')
