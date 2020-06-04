@@ -59,4 +59,3 @@ class RepositoryPermissionsException(ImportRepositoryException):
 
 class DockerExecutionException(Exception):
     pass
-

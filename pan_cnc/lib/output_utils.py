@@ -103,7 +103,7 @@ def _handle_xml_outputs(snippet: dict, results: str) -> dict:
     Parse the results string as an XML document
     Example .meta-cnc snippets section:
     snippets:
-    
+
   - name: system_info
     path: /api/?type=op&cmd=<show><system><info></info></system></show>&key={{ api_key }}
     output_type: xml
@@ -114,7 +114,7 @@ def _handle_xml_outputs(snippet: dict, results: str) -> dict:
         capture_pattern: result/system/uptime
       - name: sw_version
         capture_pattern: result/system/sw-version
-        
+
     :param snippet: snippet definition from the .meta-cnc snippets section
     :param results: string as returned from some action, to be parsed as XML document
     :return: dict containing all outputs found from the capture pattern in each output

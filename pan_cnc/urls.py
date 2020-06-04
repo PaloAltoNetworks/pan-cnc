@@ -26,13 +26,14 @@ Use at your own risk.
 """
 
 import importlib
+import sys
 
 from django.conf import settings
 from django.contrib.auth import views as auth_views
 from django.urls import path
+
 from pan_cnc import views as pan_cnc_views
 from pan_cnc.lib import cnc_utils
-import sys
 
 # ensure every view gets this in the context, even django default views
 app_settings = settings.INSTALLED_APPS_CONFIG
@@ -166,4 +167,3 @@ for app_name in settings.INSTALLED_APPS_CONFIG:
 
         urlpatterns += [new_path]
         indx += 1
-

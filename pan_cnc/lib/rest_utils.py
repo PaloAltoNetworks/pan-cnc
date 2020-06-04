@@ -21,9 +21,9 @@ import os
 import requests
 from jinja2 import BaseLoader
 from jinja2 import Environment
-from urllib3.exceptions import HTTPError
 from requests.exceptions import MissingSchema
 from requests.exceptions import RequestException
+from urllib3.exceptions import HTTPError
 
 from pan_cnc.lib import jinja_filters
 from pan_cnc.lib import output_utils
@@ -202,4 +202,3 @@ def execute_all(meta_cnc, app_dir, context):
         response['status'] = 'error'
         response['message'] = re
         return response
-

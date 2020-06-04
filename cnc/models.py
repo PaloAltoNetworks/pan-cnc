@@ -14,4 +14,3 @@ class Skillet(models.Model):
     name = models.CharField(max_length=200, unique=True)
     skillet_json = models.TextField(max_length=2048, default='')
     repository = models.ForeignKey(RepositoryDetails, on_delete=models.CASCADE)
-

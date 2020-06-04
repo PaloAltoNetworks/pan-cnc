@@ -69,9 +69,9 @@ from skilletlib.skillet.rest import RestSkillet
 from skilletlib.snippet.workflow import WorkflowSnippet
 
 from pan_cnc.lib import cnc_utils
+from pan_cnc.lib import git_utils
 from pan_cnc.lib import output_utils
 from pan_cnc.lib import snippet_utils
-from pan_cnc.lib import git_utils
 from pan_cnc.lib import task_utils
 from pan_cnc.lib import widgets
 from pan_cnc.lib.exceptions import CCFParserError
@@ -648,7 +648,7 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
             messages.add_message(self.request, messages.ERROR, 'Process Error - Snippet not found')
             return HttpResponseRedirect('/')
 
-        except CCFParserError as cpe:
+        except CCFParserError:
             print('Could not load CCF Metadata!')
             messages.add_message(self.request, messages.ERROR, 'Process Error - Could not load CCF')
             return HttpResponseRedirect('/')
@@ -1818,7 +1818,7 @@ class EditTargetView(CNCBaseAuth, FormView):
             print('Performing configuration backup before Configuration Push')
             try:
                 p.backup_config()
-            except PanoplyException as tce:
+            except PanoplyException:
                 return HttpResponseRedirect(self.error_out('Connected to Device but could not perform backup!'))
 
         try:
@@ -2565,7 +2565,7 @@ class UnlockEnvironmentsView(CNCBaseAuth, FormView):
                     This form will unlock your Environment. If you have not created an Environment, a new one will be
                     created using the password supplied below.
 
-                    Creating an environment allows you to keep passwords and other data specific to an environment 
+                    Creating an environment allows you to keep passwords and other data specific to an environment
                     in one place. The environments file is encrypted and placed in your home directory for safe keeping.
                 """
 

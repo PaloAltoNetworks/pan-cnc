@@ -211,6 +211,12 @@ def push_meta(meta, context, force_sync=False, perform_commit=True) -> (str, Non
     else:
         raise CCFParserError(f'Could not locate .meta-cnc file on filesystem for Skillet: {name}')
 
+    environment = Environment(loader=BaseLoader())
+
+    for f in jinja_filters.defined_filters:
+        if hasattr(jinja_filters, f):
+            environment.filters[f] = getattr(jinja_filters, f)
+
     try:
         for snippet in meta['snippets']:
             if 'xpath' not in snippet or 'file' not in snippet:
@@ -231,11 +237,6 @@ def push_meta(meta, context, force_sync=False, perform_commit=True) -> (str, Non
             xml_full_path = os.path.join(snippets_dir, xml_file_name)
             with open(xml_full_path, 'r') as xml_file:
                 xml_string = xml_file.read()
-                environment = Environment(loader=BaseLoader())
-
-                for f in jinja_filters.defined_filters:
-                    if hasattr(jinja_filters, f):
-                        environment.filters[f] = getattr(jinja_filters, f)
 
                 xml_template = environment.from_string(xml_string)
                 xpath_template = environment.from_string(xpath)

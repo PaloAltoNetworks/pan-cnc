@@ -186,9 +186,9 @@ for app in os.listdir(SRC_PATH):
                         #     'NAME': os.path.join(app_persistent_dir, 'db.sqlite3'),
                         # }
 
-                except OSError as ose:
+                except OSError:
                     print('Could not open .pan-cnc.yaml for app: %s' % app)
                     pass
-                except ValueError as ve:
+                except ValueError:
                     print('Could not load .pan-cnc.yaml for app: %s' % app)
                     pass
