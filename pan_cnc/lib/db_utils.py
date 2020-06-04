@@ -162,7 +162,7 @@ def load_skillet_by_name(skillet_name: str) -> (dict, None):
     except ObjectDoesNotExist:
         return None
     except ValueError:
-        print(f'Could not parse Skillet metadata in load_skillet_by_name')
+        print('Could not parse Skillet metadata in load_skillet_by_name')
         return None
 
 

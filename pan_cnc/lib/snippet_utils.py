@@ -484,8 +484,8 @@ def invalidate_snippet_caches(app_name: str) -> None:
     :param app_name: name of the CNC application
     :return: None
     """
-    cnc_utils.set_long_term_cached_value(app_name, f'all_snippets', None, 0)
-    cnc_utils.set_long_term_cached_value(app_name, f'snippet_types', None, 0)
+    cnc_utils.set_long_term_cached_value(app_name, 'all_snippets', None, 0)
+    cnc_utils.set_long_term_cached_value(app_name, 'snippet_types', None, 0)
 
     # also clear the in memory cache as well
     # FIXME - try to be smarter about what we evict from the cache!

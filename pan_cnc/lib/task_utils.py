@@ -70,7 +70,7 @@ def perform_terraform_cmd(resource_def: dict, cmd: str, snippet_context: dict) -
 
     resource_def['snippets'].append(snippet)
 
-    print(f'Performing skillet execute')
+    print('Performing skillet execute')
     return execute_docker_skillet.delay(resource_def, tf_vars)
 
 
@@ -152,7 +152,7 @@ def python3_execute_bare(resource_def, args) -> AsyncResult:
 
 
 def python3_init(resource_def) -> AsyncResult:
-    print(f"Performing python3 init")
+    print("Performing python3 init")
     (resource_dir, script_name) = _normalize_python_script_path(resource_def)
     tools_dir = os.path.join(settings.CNC_PATH, 'tools')
     return python3_init_with_deps.delay(resource_dir, tools_dir)
@@ -165,7 +165,7 @@ def python3_execute(resource_def, args) -> AsyncResult:
 
 
 def python3_init_complete(resource_def) -> bool:
-    print(f"Performing python3 check")
+    print("Performing python3 check")
     (resource_dir, script_name) = _normalize_python_script_path(resource_def)
     init_done_file = os.path.join(resource_dir, '.python3_init_done')
     if os.path.exists(init_done_file):
@@ -176,7 +176,7 @@ def python3_init_complete(resource_def) -> bool:
 
 
 def skillet_execute(skillet_def: dict, args: dict) -> AsyncResult:
-    print(f'Performing skillet execute')
+    print('Performing skillet execute')
     return execute_docker_skillet.delay(skillet_def, args)
 
 

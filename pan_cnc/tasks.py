@@ -93,11 +93,11 @@ async def cmd_runner(cmd_seq: list, cwd: str, env: dict, o: OutputHolder) -> int
             o.add_output(line.decode())
             current_task.update_state(state='PROGRESS', meta=o.get_progress())
         except UnicodeDecodeError as ude:
-            print(f'Could not read results from task')
+            print('Could not read results from task')
             print(ude)
             return 255
         except LimitOverrunError as loe:
-            print(f'Could not read results from task due to buffer overrun')
+            print('Could not read results from task due to buffer overrun')
             print(loe)
             return 255
         except ValueError as ve:

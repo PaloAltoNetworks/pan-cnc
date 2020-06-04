@@ -498,7 +498,7 @@ def get_repo_upstream_details(repo_name: str, repo_url: str, app_name: str) -> d
     if cached_details is not None:
         return cached_details
 
-    api_throttle_active = cnc_utils.get_long_term_cached_value(app_name, f'git_utils_api_throttle')
+    api_throttle_active = cnc_utils.get_long_term_cached_value(app_name, 'git_utils_api_throttle')
     if api_throttle_active:
         print('Skipping get_repo_upstream_details due to availability')
         return details
@@ -536,7 +536,7 @@ def get_repo_upstream_details(repo_name: str, repo_url: str, app_name: str) -> d
         api_throttle_active = True
 
     if api_throttle_active:
-        print(f'Disabling upstream api queries for 1 hour')
+        print('Disabling upstream api queries for 1 hour')
         cnc_utils.set_long_term_cached_value(app_name, 'git_utils_api_throttle', True, 3601,
                                              'git_repo_details')
     return details

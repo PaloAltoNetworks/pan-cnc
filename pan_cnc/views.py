@@ -2061,9 +2061,9 @@ class CancelTaskView(CNCBaseAuth, RedirectView):
             task.revoke(terminate=True)
             task_utils.purge_all_tasks()
             self.request.session.pop('task_id')
-            messages.add_message(self.request, messages.INFO, f'Cancelled Task Successfully')
+            messages.add_message(self.request, messages.INFO, 'Cancelled Task Successfully')
         else:
-            messages.add_message(self.request, messages.ERROR, f'No Task found to cancel')
+            messages.add_message(self.request, messages.ERROR, 'No Task found to cancel')
 
         return '/'
 
@@ -2390,7 +2390,7 @@ class WorkflowView(CNCBaseAuth, RedirectView):
             self.request.session['workflow_ui_step'] = ui_step
             # no longer on step 0, so the saved snippet name will not point us back to the origin
             # workflow we need
-            print(f"Getting our original workflow name out of the session")
+            print("Getting our original workflow name out of the session")
             skillet_name = self.request.session.get('workflow_name', None)
             if skillet_name is None:
                 return self.error_out('Process Error - No Workflow found!')
@@ -2735,7 +2735,7 @@ class CreateEnvironmentsView(EnvironmentBase, FormView):
             form.fields['clone'] = clone_name_field
             context['title'] = f'Clone Environment from {clone_name}'
         else:
-            context['title'] = f'Create New Environment'
+            context['title'] = 'Create New Environment'
 
         context['header'] = self.header
         form.fields['name'] = environment_name
@@ -2851,7 +2851,6 @@ class DeleteEnvironmentKeyView(EnvironmentBase, RedirectView):
         env_name = self.kwargs.get('env_name')
         key_name = self.kwargs.get('key_name')
 
-        # print(f'{env_name} {key_name}')
         if env_name in self.e and key_name in self.e[env_name]['secrets']:
             print(f'Deleting Secret {key_name} from {env_name}')
             messages.add_message(self.request, messages.SUCCESS, 'Secret Deleted')
