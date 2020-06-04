@@ -8,15 +8,16 @@
         </div>
         <div class="card-body">
             <p class="card-text">
-                Copy the following text and add it to your private SSH repositories to allow access to this application.
+                Copy the following text and add it to your private SSH repositories or user account to allow
+                access from this application.
             </p>
             <p class="card-text bg-light p-5">
                 {{ public_key }}
             </p>
             <p class="card-text">
-                Instructions for adding this key to your repository:
+                Instructions for adding this key to your account:
             </p>
-            <ul class="list-group">
+            <ul class="list-group w-25">
                 <li class="list-group-item">
                     <a href="https://docs.gitlab.com/ee/ssh/#adding-an-ssh-key-to-your-gitlab-account">GitLab</a>
                 </li>
@@ -30,7 +31,7 @@
             </ul>
         </div>
         <div class="card-footer text-right">
-            <a class="btn btn-primary" href="{{ last_page }}">Got it</a>
+            <a class="btn btn-primary" href="{{ request.session.last_page|urlencode }}">Got it</a>
         </div>
     </div>
 {% endblock %}

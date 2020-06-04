@@ -2991,7 +2991,10 @@ class ReinitPythonVenv(CNCView):
 class DefaultSSHKeyView(CNCView):
     template_name = "pan_cnc/ssh_pub_key.html"
 
-    def get_context_data(self, **kwargs):
+    def set_last_page_visit(self) -> None:
+        pass
+
+    def get_context_data(self, **kwargs) -> dict:
         context = super().get_context_data(**kwargs)
 
         pub_key = git_utils.get_default_ssh_pub_key()
