@@ -782,8 +782,10 @@ def ensure_known_host(url: str) -> (bool, str):
         os.chmod(known_hosts_path, mode=0o644)
 
     with open(known_hosts_path, 'r') as khp:
-        for line in khp.readline():
+        # partial fix for GL #28 - do not use readline
+        for line in khp:
             if domain in line:
+                print('This is already a known host')
                 found = True
                 break
 
@@ -792,8 +794,13 @@ def ensure_known_host(url: str) -> (bool, str):
     if not found:
         quoted_domain = shlex.quote(domain)
         try:
+            print(f'Running keyscan on domain: {quoted_domain}')
             keyscan_results = subprocess.check_output(f'ssh-keyscan {quoted_domain}', shell=True)
             found_keys = keyscan_results.decode('utf-8').strip()
+            # partial fix for Gl #28 - do not add blank results to known_hosts
+            if not found_keys:
+                return False, f'Could not get keyscan results for domain: {quoted_domain}'
+
             print(f'Adding {found_keys} to known_hosts file')
             with open(known_hosts_path, 'a') as khp:
                 khp.write(found_keys)
