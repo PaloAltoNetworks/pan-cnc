@@ -29,6 +29,7 @@ from yaml.reader import ReaderError
 from yaml.scanner import ScannerError
 
 from . import cnc_utils
+from . import db_utils
 from . import jinja_filters
 from .exceptions import CCFParserError
 from .exceptions import SnippetNotFoundException
@@ -61,7 +62,8 @@ def load_all_snippets(app_dir) -> list:
         return all_snippets
 
     print('Getting all snippets again')
-    snippet_list = load_snippets_of_type(snippet_type=None, app_dir=app_dir)
+    # snippet_list = load_snippets_of_type(snippet_type=None, app_dir=app_dir)
+    snippet_list = db_utils.load_all_skillets()
     cnc_utils.set_long_term_cached_value(app_dir, 'all_snippets', snippet_list, -1)
     return snippet_list
 

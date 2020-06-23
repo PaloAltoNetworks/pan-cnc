@@ -69,6 +69,7 @@ from skilletlib.skillet.rest import RestSkillet
 from skilletlib.snippet.workflow import WorkflowSnippet
 
 from pan_cnc.lib import cnc_utils
+from pan_cnc.lib import db_utils
 from pan_cnc.lib import git_utils
 from pan_cnc.lib import output_utils
 from pan_cnc.lib import snippet_utils
@@ -2899,7 +2900,9 @@ class DebugMetadataView(CNCView):
         pass
 
     def get_context_data(self, **kwargs):
-        snippet_data = snippet_utils.get_snippet_metadata(self.snippet_name, self.app_dir)
+        # snippet_data = snippet_utils.get_snippet_metadata(self.snippet_name, self.app_dir)
+        skillet = db_utils.load_skillet_by_name(self.snippet_name)
+        snippet_data = snippet_utils.read_skillet_metadata(skillet)
         snippet = self.load_skillet_by_name(self.snippet_name)
         context = super().get_context_data()
         context['header'] = 'Debug Metadata'
@@ -2926,6 +2929,7 @@ class ClearCacheView(CNCBaseAuth, RedirectView):
         # clear everything except our cached imported git repositories
         repos = cnc_utils.get_long_term_cached_value(self.app_dir, 'imported_repositories')
         cnc_utils.clear_long_term_cache(self.app_dir)
+        cnc_utils.clear_long_term_cache('cnc')
         cnc_utils.set_long_term_cached_value(self.app_dir, 'imported_repositories', repos, 604800,
                                              'imported_git_repos')
 

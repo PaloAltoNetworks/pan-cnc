@@ -83,7 +83,14 @@ def update_skillet_cache() -> None:
     all_skillets = load_all_skillets(refresh=True)
     # FIXME - this can and will break if every more than one app tries to do this...
     app_name = get_default_app_name()
+
+    # ensure everything gets removed!
+    cnc_utils.clear_long_term_cache(app_name)
+
     cnc_utils.set_long_term_cached_value(app_name, 'all_snippets', all_skillets, -1)
+    # db_utils.load_add_skillets saves all_skillets under 'cnc' app name, ensure this is updated here as well...
+    cnc_utils.set_long_term_cached_value('cnc', 'all_snippets', all_skillets, -1)
+    # remove it all!
 
 
 def get_repository_details(repository_name: str) -> (dict, None):
