@@ -1,13 +1,19 @@
 {% extends 'pan_cnc/dynamic_form.html' %}
 {% block head %}
     <script type="text/javascript">
-    function debug_and_submit() {
-        let debug_button = $('#id_debug');
-        debug_button.val('True');
-        let dynamic_form = $('#dynamic_form');
-        $('#submit_button').prop("disabled", true);
-        dynamic_form.submit();
-    }
+        function debug_and_submit() {
+            let doc = $(document.documentElement);
+            doc.css('cursor', 'progress');
+
+            $('#debug_button').prop("disabled", true);
+            $('#submit_button').prop("disabled", true);
+
+            let debug_button = $('#id_debug');
+            debug_button.val('True');
+
+            let dynamic_form = $('#dynamic_form');
+            dynamic_form.submit();
+        }
     </script>
 {% endblock %}
 

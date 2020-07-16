@@ -40,11 +40,25 @@
                 </h5>
             </div>
             <div id="{{ k }}_div" class="card-body collapse show">
-                <code>
-                    {{ v.xpath }}
-                </code>
-                <hr/>
-                <pre><code class="xml">{{ v.xml }}</code></pre>
+                <pre><code class="json">{{ v.json }}</code></pre>
+                {% if 'xpath' in v.metadata and 'element' in v.metadata %}
+                    <code>
+                        {{ v.metadata.xpath }}
+                    </code>
+                    <hr/>
+                    <pre><code class="xml">{{ v.metadata.element }}</code></pre>
+                {% endif %}
+                {% if 'when' in v.metadata %}
+                    <div class="card-text">When Conditional:</div>
+                    <pre><code class="python" title="When Conditional">{{ v.metadata.when }}</code></pre>
+                {% endif %}
+                {% if 'captured_outputs_json' in v %}
+                    <div class="card-text">Snippet Outputs:</div>
+                    <pre><code class="python" title="Captured Outputs">{{ v.captured_outputs_json }}</code></pre>
+                {% endif %}
+                <p class="card-text">
+                    {{ v.message }}
+                </p>
 
             </div>
         {% endfor %}

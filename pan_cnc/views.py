@@ -59,6 +59,7 @@ from django.views.generic import RedirectView
 from django.views.generic import TemplateView
 from django.views.generic import View
 from django.views.generic.edit import FormView
+from skilletlib import SkilletLoader
 from skilletlib.exceptions import LoginException
 from skilletlib.exceptions import PanoplyException
 from skilletlib.exceptions import TargetConnectionException
@@ -1726,34 +1727,7 @@ class EditTargetView(CNCBaseAuth, FormView):
         self.save_value_to_workflow('TARGET_USERNAME', target_username)
 
         if debug == 'True' or debug is True:
-            context = dict()
-            context['base_html'] = self.base_html
-            changes = dict()
-            try:
-                skillet_context = self.get_snippet_variables_from_workflow()
-                # changes = pan_utils.debug_meta(meta, self.get_snippet_variables_from_workflow())
-                panos_skillet = PanosSkillet(self.meta)
-                for snippet in panos_skillet.get_snippets():
-                    snippet.render_metadata(skillet_context)
-                    if snippet.cmd == 'set':
-                        xpath = snippet.metadata['xpath']
-                        element = snippet.render(snippet.metadata['element'], skillet_context)
-                        change = dict()
-                        change['xml'] = element
-                        change['xpath'] = xpath
-                        change['when'] = snippet.metadata.get('when', None)
-                        changes[snippet.name] = change
-            except CCFParserError as cpe:
-                label = meta['label']
-                messages.add_message(self.request, messages.ERROR, f'Could not debug Skillet: {label}')
-                context['results'] = str(cpe)
-                return render(self.request, 'pan_cnc/results.html', context=context)
-
-            context['results'] = changes
-            context['meta'] = meta
-            context['target_ip'] = target_ip
-            self.request.session['last_page'] = f'/{self.app_dir}/skillet/{panos_skillet.name}'
-            return render(self.request, 'pan_cnc/debug_panos_skillet.html', context=context)
+            return self.debug_skillet(target_ip, target_username, target_password, meta, form)
 
         err_condition = False
         if target_ip is None or target_ip == '':
@@ -1886,6 +1860,78 @@ class EditTargetView(CNCBaseAuth, FormView):
 
         print(f'Redirecting to {next_url}')
         return HttpResponseRedirect(f"{next_url}")
+
+    def debug_skillet(self, target_ip, target_username, target_password, meta, form):
+        context = dict()
+        context['base_html'] = self.base_html
+        changes = dict()
+        try:
+            initial_context = self.get_snippet_variables_from_workflow()
+
+            initial_context['ip_address'] = target_ip
+            initial_context['username'] = target_username
+            initial_context['password'] = target_password
+
+            # https://gitlab.com/panw-gse/as/panhandler/-/issues/32
+            # Show when conditional output as well as variable parsing etc...
+            sl = SkilletLoader()
+
+            panos_skillet = sl.create_skillet(meta)
+
+            try:
+                # this will contact the device and gather information and grab the device config
+                skillet_context = panos_skillet.initialize_context(initial_context)
+
+            except TargetConnectionException as tce:
+                messages.add_message(self.request, messages.ERROR, f'Could not authenticate to device: {tce}')
+                return self.form_invalid(form)
+
+            for snippet in panos_skillet.get_snippets():
+                change = dict()
+
+                snippet.render_metadata(skillet_context)
+                changes[snippet.name] = change
+                change['metadata'] = snippet.metadata
+                change['json'] = json.dumps(snippet.metadata, indent=4)
+
+                if not snippet.should_execute(skillet_context):
+                    change['message'] = 'This snippet would be skipped due to when conditional'
+                    continue
+
+                if 'cmd' in snippet.metadata and \
+                        snippet.metadata['cmd'] in ('op', 'set', 'edit', 'override', 'move', 'rename',
+                                                    'clone', 'delete'):
+
+                    change['message'] = 'This destructive snippet would be executed'
+
+                else:
+                    try:
+                        (output, status) = snippet.execute(skillet_context)
+                        # capture all outputs
+                        snippet_outputs = snippet.get_default_output(output, status)
+                        captured_outputs = snippet.capture_outputs(output, status)
+
+                        skillet_context.update(snippet_outputs)
+                        skillet_context.update(captured_outputs)
+
+                        change['message'] = 'This snippet was executed to gather results'
+                        change['captured_outputs'] = captured_outputs
+                        change['captured_outputs_json'] = json.dumps(captured_outputs, indent=4)
+
+                    except PanoplyException as pe:
+                        change['message'] = str(pe)
+
+        except CCFParserError as cpe:
+            label = meta['label']
+            messages.add_message(self.request, messages.ERROR, f'Could not debug Skillet: {label}')
+            context['results'] = str(cpe)
+            return render(self.request, 'pan_cnc/results.html', context=context)
+
+        context['results'] = changes
+        context['meta'] = meta
+        context['target_ip'] = target_ip
+        self.request.session['last_page'] = f'/{self.app_dir}/skillet/{panos_skillet.name}'
+        return render(self.request, 'pan_cnc/debug_panos_skillet.html', context=context)
 
 
 class EditTerraformView(CNCBaseAuth, FormView):
