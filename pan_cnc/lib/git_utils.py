@@ -768,6 +768,8 @@ def ensure_known_host(url: str) -> (bool, str):
     url_parts = parse_repo_origin_url(url)
     domain = url_parts['domain']
 
+    print(f'Checking {domain} host key')
+
     if domain is None:
         return False, f'Could not parse domain from {url}'
 
@@ -785,11 +787,11 @@ def ensure_known_host(url: str) -> (bool, str):
         # partial fix for GL #28 - do not use readline
         for line in khp:
             if domain in line:
-                print('This is already a known host')
+                # added extra info for #38
+                print(f'This is already a known domain: {domain}')
+                print(f'Domain {domain} was found in {line}')
                 found = True
                 break
-
-    found_keys = ''
 
     if not found:
         quoted_domain = shlex.quote(domain)
@@ -809,4 +811,7 @@ def ensure_known_host(url: str) -> (bool, str):
             print(cpe)
             return False, str(cpe)
 
-    return True, found_keys
+        return True, found_keys
+
+    else:
+        return True, f'Domain: {domain} already in known_hosts'
