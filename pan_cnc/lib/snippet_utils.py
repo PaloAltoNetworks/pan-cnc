@@ -22,6 +22,7 @@ import oyaml
 from django.conf import settings
 from jinja2 import Environment
 from jinja2.loaders import BaseLoader
+from skilletlib import SkilletLoader
 from yaml.constructor import ConstructorError
 from yaml.error import YAMLError
 from yaml.parser import ParserError
@@ -255,84 +256,32 @@ def _check_dir(directory: Path, snippet_type: str, snippet_list: list) -> list:
 
 
 def debug_snippets_in_repo(directory: Path, err_list: list) -> list:
-    """
-    Recursive function to look for all files in the current directory with a name matching '.meta-cnc.yaml'
-    otherwise, iterate through all sub-dirs and skip dirs with name that match '.git', '.venv', and '.terraform'
-    will descend into all other dirs and call itself again.
-    Returns a list of skillet errors
-    :param directory: PosixPath of directory to begin searching
-    :param err_list: combined list of all skillet errors
-    :return: list of dicts containing skillet errors
-    """
+    sl = SkilletLoader()
 
-    err_condition = False
-    err_detail = dict()
-    for d in directory.glob('.meta-cnc.y*'):
-        snippet_path = str(d.parent.absolute())
-        err_detail['path'] = snippet_path
-        print(f'debug snippet_path: {snippet_path}')
-        try:
-            with d.open(mode='r') as sc:
-                raw_service_config = oyaml.safe_load(sc.read())
-                errs = debug_skillet(raw_service_config)
-                if errs:
-                    err_condition = True
-                    err_detail['severity'] = 'warn'
-                    err_detail['err_list'] = errs
+    all_skillets = sl.load_all_skillets_from_dir(directory)
 
-        except IOError as ioe:
-            err = 'Could not open metadata file in dir %s' % d.parent
-            print(ioe)
-            err_condition = True
-            err_detail['severity'] = 'error'
-            err_detail['err_list'] = [err, str(ioe)]
-            continue
-        except ParserError as pe:
-            err = 'Could not parse metadata file in dir %s' % d.parent
-            print(pe)
-            err_condition = True
-            err_detail['severity'] = 'error'
-            err_detail['err_list'] = [err, str(pe)]
-            continue
-        except ScannerError as se:
-            err = 'Could not parse meta-cnc file in dir %s' % d.parent
-            print(se)
-            err_condition = True
-            err_detail['severity'] = 'error'
-            err_detail['err_list'] = [err, str(se)]
-            continue
-        except ConstructorError as ce:
-            err = 'Could not parse metadata file in dir %s' % d.parent
-            print(ce)
-            err_condition = True
-            err_detail['severity'] = 'error'
-            err_detail['err_list'] = [err, str(ce)]
-            continue
-        # catch everything else that should be generated from oyaml libraries
-        except YAMLError as ye:
-            err = 'YAMLError: Could not parse metadata file in dir %s' % d.parent
-            print(ye)
-            err_condition = True
-            err_detail['severity'] = 'error'
-            err_detail['err_list'] = [err, str(ye)]
-            continue
+    for e in sl.skillet_errors:
+        err_detail = dict()
+        err_detail['severity'] = 'error'
 
-    # Do not descend into sub dirs after a .meta-cnc file has already been found
-    if err_condition:
+        if type(e) is dict:
+            err_detail['path'] = e.get('path', str(directory.absolute()))
+            err_detail['err_list'] = [e.get('error', 'Could not load Skillet YAML')]
+        else:
+            err_detail['path'] = str(directory.absolute())
+            err_detail['err_list'] = [e]
+
         err_list.append(err_detail)
-        return err_list
 
-    for d in directory.iterdir():
-        if d.is_file():
-            continue
-        if '.git' in d.name:
-            continue
-        if '.venv' in d.name:
-            continue
-        if '.terraform' in d.name:
-            continue
-        if d.is_dir():
-            err_list.extend(debug_snippets_in_repo(d, list()))
+    for skillet in all_skillets:
+        debug_errors = sl.debug_skillet_structure(skillet.skillet_dict)
+        if debug_errors:
+            err_detail = dict()
+            err_detail['path'] = skillet.path
+            err_detail['severity'] = 'error'
+            err_detail['err_list'] = debug_errors
+
+            err_list.append(err_detail)
 
     return err_list
 
