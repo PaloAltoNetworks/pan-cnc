@@ -1309,14 +1309,22 @@ class ProvisionSnippetView(CNCBaseFormView):
             return self.form_invalid(form)
 
         if self.service['type'] == 'template':
-            template = snippet_utils.render_snippet_template(self.service, self.app_dir,
-                                                             self.get_snippet_variables_from_workflow())
+
+            # fix for #40 - Use skilletlib or template type skillets to pick up inline type templates that use
+            # 'element' instead of 'file'
+            sl = SkilletLoader()
+            template_skillet = sl.create_skillet(self.service)
+
+            output = template_skillet.execute(self.get_snippet_variables_from_workflow())
+            template = output.get('template', '')
+
             if len(self.service['snippets']) == 0:
                 template = 'Could not find a valid template to load!'
                 snippet = dict()
             else:
                 snippet = self.service['snippets'][0]
                 # check for and handle outputs
+                # FIXME - use captured outputs from the skillet.execute method instead of this...
                 if 'outputs' in snippet:
                     # template type only has 1 snippet defined, which is the template to render
                     outputs = output_utils.parse_outputs(self.service, snippet, template)
