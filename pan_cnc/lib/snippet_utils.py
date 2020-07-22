@@ -323,34 +323,56 @@ def read_skillet_metadata(skillet: dict) -> (str, None):
     skillet_name = skillet.get('name', 'none')
     if skillet is not None and 'snippet_path' in skillet:
         parent = Path(skillet['snippet_path'])
+
         if parent.exists():
             # handle .yaml and .yml if possible
             mdfs = list(parent.glob('.meta-cnc.y*'))
+
             if len(mdfs) == 1:
                 mdf = mdfs[0]
+
             else:
                 print('Could not find meta-cnc.yaml')
                 return None
+
             if mdf.exists() and mdf.is_file():
                 try:
                     with mdf.open('r') as sc:
                         data = sc.read()
+
+                        if data == '':
+                            # check for blank metadata for https://gitlab.com/panw-gse/as/panhandler/-/issues/39
+                            print('metadata file is blank!')
+                            return None
+
                         snippet_data = oyaml.safe_load(data)
+
                         if 'name' in snippet_data and snippet_data['name'] == skillet_name:
                             print(f'Found {skillet_name} at {parent.absolute()}')
                             return data
+
                         else:
                             print('name mismatch loading .meta-cnc file')
+
                 except IOError as ioe:
                     print('Could not open metadata file in dir %s' % mdf)
                     print(ioe)
                     return None
+
                 except ParserError as pe:
                     print(pe)
                     print('Could not parse metadata file')
                     return None
+
+                except TypeError as te:
+                    # fix for https://gitlab.com/panw-gse/as/panhandler/-/issues/39
+                    print(te)
+                    print('Could not load metadata file - type error')
+                    return None
+
             else:
                 print('.meta-cnc cannot be found in this dir')
+
     else:
         print('Returned .meta-cnc contents was None')
 
