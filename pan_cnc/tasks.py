@@ -167,6 +167,10 @@ def python3_execute_script(working_dir, script, input_type, args):
 
     env = dict()
     env['PYTHONUNBUFFERED'] = "1"
+    # https://gitlab.com/panw-gse/as/panhandler/-/issues/44 - ensure PATH and VIRTUALENV are set properly in the env
+    orig_path = os.environ.get('PATH', '/usr/bin')
+    env['PATH'] = f'{working_dir}/.venv/bin:{orig_path}'
+    env['VIRTUAL_ENV'] = f'{working_dir}/.venv'
 
     sanitized_args = __santize_args(args)
 
