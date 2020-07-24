@@ -135,7 +135,15 @@ class CNCBaseAuth(LoginRequiredMixin, View):
                     var_name = variable['name']
                     var_type = variable['type_hint']
 
-                    if var_type == 'file':
+                    if var_type == 'hidden':
+                        # fix for https://gitlab.com/panw-gse/as/panhandler/-/issues/45
+                        # do not care about hidden values and adding back into workflow, for non-text hidden values
+                        # such as list, this will cause the list to be inserted as a json string
+                        # hidden values are only rendered to be used as a source for dynamic entries anyway
+                        # per https://github.com/PaloAltoNetworks/panhandler/issues/192
+                        continue
+
+                    elif var_type == 'file':
                         try:
 
                             if var_name in self.request.FILES:
@@ -1901,9 +1909,11 @@ class EditTargetView(CNCBaseAuth, FormView):
                 changes[snippet.name] = change
                 change['metadata'] = snippet.metadata
                 change['json'] = json.dumps(snippet.metadata, indent=4)
+                change['when'] = True
 
                 if not snippet.should_execute(skillet_context):
                     change['message'] = 'This snippet would be skipped due to when conditional'
+                    change['when'] = False
                     continue
 
                 if 'cmd' in snippet.metadata and \

@@ -36,10 +36,21 @@
         {% for k,v in results.items %}
             <div class="card-header">
                 <h5 class="mb-0">
-                    <a href="#{{ k }}_div" data-toggle="collapse">{{ k }}</a>
+                    <a href="#{{ k | slugify }}_div" data-toggle="collapse">{{ k }}</a>
                 </h5>
             </div>
-            <div id="{{ k }}_div" class="card-body collapse show">
+            {% if v.when == True %}
+            <div id="{{ k | slugify }}_div" class="card-body collapse show">
+            {% else %}
+            <div id="{{ k | slugify }}_div" class="card-body collapse">
+            {% endif %}
+                <p class="card-text">
+                    {{ v.message }}
+                </p>
+                {% if 'when' in v.metadata %}
+                    <div class="card-text">When Conditional:</div>
+                    <pre><code class="python" title="When Conditional">{{ v.metadata.when }}</code></pre>
+                {% endif %}
                 <pre><code class="json">{{ v.json }}</code></pre>
                 {% if 'xpath' in v.metadata and 'element' in v.metadata %}
                     <code>
@@ -48,18 +59,11 @@
                     <hr/>
                     <pre><code class="xml">{{ v.metadata.element }}</code></pre>
                 {% endif %}
-                {% if 'when' in v.metadata %}
-                    <div class="card-text">When Conditional:</div>
-                    <pre><code class="python" title="When Conditional">{{ v.metadata.when }}</code></pre>
-                {% endif %}
+
                 {% if 'captured_outputs_json' in v %}
                     <div class="card-text">Snippet Outputs:</div>
                     <pre><code class="python" title="Captured Outputs">{{ v.captured_outputs_json }}</code></pre>
                 {% endif %}
-                <p class="card-text">
-                    {{ v.message }}
-                </p>
-
             </div>
         {% endfor %}
         <div class="card-footer text-right">
