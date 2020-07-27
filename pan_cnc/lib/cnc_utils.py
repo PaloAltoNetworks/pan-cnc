@@ -390,6 +390,12 @@ def evict_cache_items_of_type(app_name, cache_type):
 
 
 def init_app(app_cnc_config):
+
+    # do not init app if we are testing...
+    if is_testing():
+        print('skipping due to testing')
+        return None
+
     if 'name' not in app_cnc_config:
         print('No name found in app_cnc_config!')
         return None
