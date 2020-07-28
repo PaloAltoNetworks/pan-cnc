@@ -389,9 +389,13 @@ def checkout_local_branch(repo_dir: str, branch_name: str) -> bool:
 def commit_local_changes(repo_dir: str, message: str, file_path: str) -> None:
     try:
         repo = Repo(repo_dir)
-        index = repo.index
-        index.add([file_path])
 
+        index = repo.index
+
+        # fix for picking up deleted files
+        repo.git.add('--all')
+        # index.add([file_path])
+        #
         index.commit(message=message)
 
     except GitCommandError as gce:

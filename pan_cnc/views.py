@@ -1099,8 +1099,8 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
             toggle_hint = variable.get('toggle_hint', {})
 
             #     toggle_hint:
-            #       - source: bgp_type
-            #         value: disable
+            #       source: bgp_type
+            #       value: disable
 
             if toggle_hint != {}:
                 f = dynamic_form.fields[field_name]
@@ -3028,6 +3028,24 @@ class DebugContextView(CNCView):
         context['title'] = 'Workflow Context'
         context['workflow'] = json.dumps(w, indent=2)
         return context
+
+
+class ClearContextView(CNCBaseAuth, RedirectView):
+    """
+     Clear Context class, allows user to remove all items in the context
+    """
+    def get_redirect_url(self, *args, **kwargs):
+
+        self.app_dir = db_utils.get_default_app_name()
+
+        if self.app_dir in self.request.session:
+            self.request.session[self.app_dir] = dict()
+            messages.add_message(self.request, messages.INFO, 'Context cleared')
+
+        if 'last_page' in self.request.session:
+            return self.request.session['last_page']
+        else:
+            return '/welcome'
 
 
 class ReinitPythonVenv(CNCView):
