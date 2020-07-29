@@ -173,11 +173,17 @@ def get_repo_details(repo_name, repo_dir, app_name='cnc'):
     is_github = False
     if 'github' in url:
         link = f"https://github.com/{url_details['owner']}/{url_details['repo']}"
+        commits_url = f"https://github.com/{url_details['owner']}/{url_details['repo']}/commit/"
         is_github = True
     elif 'spring.palo' in url:
         link = f"https://spring.paloaltonetworks.com/{url_details['owner']}/{url_details['repo']}"
+        commits_url = f"https://spring.paloaltonetworks.com/{url_details['owner']}/{url_details['repo']}/commit/"
+    elif 'gitlab' in url:
+        link = f"https://gitlab.com/{url_details['owner']}/{url_details['repo']}"
+        commits_url = f"https://gitlab.com/{url_details['owner']}/{url_details['repo']}/-/commit/"
     else:
-        link = url
+        link = ''
+        commits_url = ''
 
     if 'repo' not in url_details or url_details['repo'] is None or url_details['repo'] == '':
         url_details['repo'] = repo_name
@@ -192,7 +198,7 @@ def get_repo_details(repo_name, repo_dir, app_name='cnc'):
     repo_detail['dir'] = repo_name
     repo_detail['url'] = url
     repo_detail['branch'] = branch
-    repo_detail['commits_url'] = get_repo_commits_url(url)
+    repo_detail['commits_url'] = commits_url
 
     repo_detail['is_github'] = is_github
 
@@ -560,30 +566,67 @@ def parse_repo_origin_url(repo_url) -> dict:
     url_details = dict()
 
     try:
+
         if repo_url.endswith('.git') and repo_url.startswith('git@'):
+            # git@gitlab.com:panw-gse/as/panhandler_test_2.git
             # git@github.com:nembery/Skillets.git
             domain = repo_url.split(':')[0].replace('git@', '')
             url_parts = repo_url.split(':')[1].split('/')
-            owner = url_parts[0]
-            repo = url_parts[1].split('.git')[0]
-        elif repo_url.endswith('.git'):
+
+            # fix for https://gitlab.com/panw-gse/as/panhandler/-/issues/41 - ensure we parse owner and repo properly
+            if len(url_parts) > 2:
+                # git@gitlab.com:panw-gse/as/panhandler_test_2.git
+                owner = '/'.join(url_parts[0:-1])
+                repo = url_parts[-1].replace('.git', '')
+            else:
+                # git@github.com:nembery/Skillets.git
+                owner = url_parts[0]
+                repo = url_parts[1].split('.git')[0]
+
+        elif repo_url.startswith('https') and repo_url.endswith('.git'):
             # https://github.com/owner/repo.git
+            # https://gitlab.com/panw-gse/as/panhandler_test_2.git
             domain = repo_url.split('//')[1].split('/')[0]
-            url_parts = repo_url.split('/')[-2:]
-            owner = url_parts[0]
-            repo = url_parts[1].split('.git')[0]
-        elif repo_url.endswith('/'):
+            url_parts = repo_url.split('/')[3:]
+
+            if len(url_parts) > 2:
+                owner = '/'.join(url_parts[0:-1])
+                repo = url_parts[-1].replace('.git', '')
+            else:
+                owner = url_parts[0]
+                repo = url_parts[1].split('.git')[0]
+
+        elif repo_url.startswith('https') and repo_url.endswith('/'):
             # https://github.com/owner/repo/
             domain = repo_url.split('//')[1].split('/')[0]
-            url_parts = repo_url.split('/')[-3:]
-            owner = url_parts[0]
-            repo = url_parts[1].split('.git')[0]
-        else:
+            url_parts = repo_url.split('/')[3:-1]
+
+            if len(url_parts) > 2:
+                owner = '/'.join(url_parts[0:-1])
+                repo = url_parts[-1]
+            else:
+                owner = url_parts[0]
+                repo = url_parts[1]
+
+        elif repo_url.startswith('https'):
             # https://github.com/owner/repo ?
+            # https://gitlab.com/panw-gse/as/panhandler_test_2
             domain = repo_url.split('//')[1].split('/')[0]
-            url_parts = repo_url.split('/')[-2:]
-            owner = url_parts[0]
-            repo = url_parts[1].split('.git')[0]
+            url_parts = repo_url.split('/')[3:]
+
+            if len(url_parts) > 2:
+                owner = '/'.join(url_parts[0:-1])
+                repo = url_parts[-1]
+            else:
+                owner = url_parts[0]
+                repo = url_parts[1]
+
+        else:
+            print(f'Repository URL is in an unknown format {repo_url}')
+            owner = None
+            repo = None
+            domain = None
+
     except IndexError:
         print('Could not parse repo url!')
         owner = None
