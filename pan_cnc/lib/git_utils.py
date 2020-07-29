@@ -118,10 +118,6 @@ def clone_repository(repo_dir, repo_name, repo_url, branch='master'):
             true_binary_path = true_binary.decode('utf-8').strip()
             print(f'USING fake ASKPASS of {true_binary_path}')
             env['GIT_ASKPASS'] = true_binary_path
-        elif 'git@' in repo_url:
-            is_known, message = ensure_known_host(repo_url)
-            if not is_known:
-                raise ImportRepositoryException(f'Could not verify SSH Host Key! {message}')
 
         # remove depth option to allow us to query remote branches
         Repo.clone_from(repo_url, repo_dir, env=env, config='http.sslVerify=false')
