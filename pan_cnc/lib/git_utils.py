@@ -20,6 +20,7 @@ import shlex
 import subprocess
 import traceback
 from pathlib import Path
+from typing import Union
 
 import requests
 import urllib3
@@ -807,7 +808,14 @@ def get_git_status(repo_dir):
     return repo.git.status()
 
 
-def ensure_known_host(url: str) -> (bool, str):
+def ensure_known_host(url: str) -> (Union[bool, None], str):
+    """
+    Perform an ssh-keyscan against the target domain and add the results into the known_hosts files if not found
+
+    :param url: url of the git repository to scan
+    :return: Tuple of (Success:true / Failure:False / No-op:None, message)
+    """
+
     url_parts = parse_repo_origin_url(url)
     domain = url_parts['domain']
 
@@ -816,45 +824,66 @@ def ensure_known_host(url: str) -> (bool, str):
     if domain is None:
         return False, f'Could not parse domain from {url}'
 
-    found = False
     ssh_dir = __get_ssh_key_dir()
     known_hosts_path = os.path.join(ssh_dir, 'known_hosts')
 
+    quoted_domain = shlex.quote(domain)
+
+    try:
+        print(f'Running keyscan on domain: {quoted_domain}')
+        keyscan_results = subprocess.check_output(f'ssh-keyscan -t rsa {quoted_domain} 2>/dev/null', shell=True)
+        found_keys = keyscan_results.decode('utf-8').strip()
+        # partial fix for Gl #28 - do not add blank results to known_hosts
+        if not found_keys:
+            # FW Policy may disable ssh-keyscan, check for domain and pass if it's already been found
+            if __check_know_hosts(domain):
+                print('keyscan failed, but we do have a domain entry in known hosts...check FW Policy for this domain')
+                return None, f'Doamin: {domain} is already known'
+            else:
+                # we have no keyscan results and this domain is not already known, so nothing we can do here...
+                print('keyscan failed, but there is no domain entry in known hosts...check FW Policy for this domain')
+                return False, f'Could not get keyscan results for domain: {quoted_domain} - Check Firewall / GP Policy'
+
+        # we have a keyscan result - check if it's already known
+        if __check_know_hosts(found_keys):
+            print(f'Domain {domain} is already known by this key')
+            return None, f'Doamin: {domain} is already known'
+
+        # we have a keyscan that is not already known, add it to the file
+        print(f'Adding {found_keys} to known_hosts file')
+        with open(known_hosts_path, 'a') as khp:
+            khp.write(found_keys)
+
+        return True, {found_keys}
+
+    except subprocess.CalledProcessError as cpe:
+        print(cpe)
+        return False, str(cpe)
+
+
+def __check_know_hosts(domain_or_key: str) -> bool:
+    """
+    Checks known hosts file for a str and return true if found.
+    This is used to check if a domain is already known, or if a ssh-key belonging to a domain is found...
+
+    :param domain_or_key: domain name or ssh-key to check
+    :return: bool true if found in known_host file already
+    """
+
+    ssh_dir = __get_ssh_key_dir()
+    known_hosts_path = os.path.join(ssh_dir, 'known_hosts')
+
+    # touch known hosts file if it does not exist
     if not os.path.exists(known_hosts_path):
         with open(known_hosts_path, 'a'):
             pass
 
         os.chmod(known_hosts_path, mode=0o644)
+        return False
 
     with open(known_hosts_path, 'r') as khp:
-        # partial fix for GL #28 - do not use readline
         for line in khp:
-            if domain in line:
-                # added extra info for #38
-                print(f'This is already a known domain: {domain}')
-                print(f'Domain {domain} was found in {line}')
-                found = True
-                break
+            if domain_or_key in line:
+                return True
 
-    if not found:
-        quoted_domain = shlex.quote(domain)
-        try:
-            print(f'Running keyscan on domain: {quoted_domain}')
-            keyscan_results = subprocess.check_output(f'ssh-keyscan {quoted_domain}', shell=True)
-            found_keys = keyscan_results.decode('utf-8').strip()
-            # partial fix for Gl #28 - do not add blank results to known_hosts
-            if not found_keys:
-                return False, f'Could not get keyscan results for domain: {quoted_domain}'
-
-            print(f'Adding {found_keys} to known_hosts file')
-            with open(known_hosts_path, 'a') as khp:
-                khp.write(found_keys)
-
-        except subprocess.CalledProcessError as cpe:
-            print(cpe)
-            return False, str(cpe)
-
-        return True, found_keys
-
-    else:
-        return True, f'Domain: {domain} already in known_hosts'
+    return False
