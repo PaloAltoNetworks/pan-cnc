@@ -13,6 +13,9 @@ if [ ! -f $HOME/.pan_cnc/db.sqlite3 ];
     python /app/cnc/manage.py shell -c \
     "from django.contrib.auth.models import User; User.objects.create_superuser('${CNC_USERNAME}','admin@example.com', '${CNC_PASSWORD}')" \
     || exit 1
+else
+  # always run migrations before launchg
+  python /app/cnc/manage.py migrate
 fi
 
 ## if this CNC app supplies it's own DB, let's go ahead and make sure it's all set
