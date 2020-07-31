@@ -854,7 +854,7 @@ def ensure_known_host(url: str) -> (Union[bool, None], str):
         with open(known_hosts_path, 'a') as khp:
             khp.write(found_keys)
 
-        return True, {found_keys}
+        return True, found_keys
 
     except subprocess.CalledProcessError as cpe:
         print(cpe)
