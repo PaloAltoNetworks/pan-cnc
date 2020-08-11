@@ -803,9 +803,19 @@ def push_local_changes(repo_dir: str, key_path: str) -> (bool, str):
     return success, output
 
 
-def get_git_status(repo_dir):
-    repo = Repo(repo_dir)
-    return repo.git.status()
+def get_git_status(repo_dir) -> str:
+    """
+    Simple function to return the git status from a repository
+
+    :param repo_dir: directory to a valid git repo
+    :return: status as a str, blank str on error
+    """
+    try:
+        repo = Repo(repo_dir)
+        return repo.git.status()
+    except GitError as git_error:
+        print(git_error)
+        return ''
 
 
 def ensure_known_host(url: str) -> (Union[bool, None], str):
@@ -852,7 +862,7 @@ def ensure_known_host(url: str) -> (Union[bool, None], str):
         # we have a keyscan that is not already known, add it to the file
         print(f'Adding {found_keys} to known_hosts file')
         with open(known_hosts_path, 'a') as khp:
-            khp.write(found_keys)
+            khp.write(f'{found_keys}\n')
 
         return True, found_keys
 
