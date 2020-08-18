@@ -861,8 +861,17 @@ def ensure_known_host(url: str) -> (Union[bool, None], str):
 
         # we have a keyscan that is not already known, add it to the file
         print(f'Adding {found_keys} to known_hosts file')
+
+        # detect if this file ends with a newline or not, we may need to add it during the append
+        with open(known_hosts_path, 'f') as khp:
+            if khp.read().endswith('\n'):
+                needs_newline = ''
+            else:
+                needs_newline = '\n'
+
+        # now append the found_keys along with a leading newline if necessary
         with open(known_hosts_path, 'a') as khp:
-            khp.write(f'{found_keys}\n')
+            khp.write(f'{needs_newline}{found_keys}\n')
 
         return True, found_keys
 

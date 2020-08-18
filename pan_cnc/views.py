@@ -404,8 +404,22 @@ class CNCBaseAuth(LoginRequiredMixin, View):
         header = self.header
         if workflow_name is not None:
             workflow_skillet_dict = self.load_skillet_by_name(workflow_name)
+
             if workflow_skillet_dict is not None:
-                header = workflow_skillet_dict.get('label', self.header)
+                workflow_label = workflow_skillet_dict.get('label', self.header)
+                if hasattr(self, 'meta') and isinstance(self.meta, dict):
+                    skillet_label = self.meta.get('label', '')
+                elif hasattr(self, 'service') and isinstance(self.service, dict):
+                    skillet_label = self.service.get('label', '')
+                elif self.get_value_from_workflow('snippet_name', None) is not None:
+                    skillet_label = self.get_value_from_workflow('snippet_name')
+                else:
+                    skillet_label = ''
+
+                if skillet_label == '':
+                    header = workflow_label
+                else:
+                    header = f'{workflow_label} / {skillet_label}'
 
         if next_step is None:
             return header
@@ -2014,7 +2028,7 @@ class EditTerraformView(CNCBaseAuth, FormView):
         context['form'] = form
         context['base_html'] = self.base_html
         context['env_name'] = env_name
-        context['header'] = self.header
+        context['header'] = self.get_header()
         context['title'] = self.title
         return context
 
@@ -2032,7 +2046,7 @@ class EditTerraformView(CNCBaseAuth, FormView):
             raise SnippetRequiredException
 
         context = super().get_context_data()
-        context['header'] = 'Terraform Template'
+        context['header'] = self.get_header()
 
         if terraform_action == 'override':
             print('Overriding existing terraform state')
@@ -2211,6 +2225,33 @@ class NextTaskView(CNCView):
             print('snippet is not set in NextTaskView:get_snippet')
             raise SnippetRequiredException
 
+    def get_header(self) -> str:
+
+        header = super().get_header()
+
+        task_next = self.request.session['task_next']
+
+        if 'terraform' in task_next:
+            if 'init' in task_next:
+                new_header = f'{header} / Init'
+            elif 'validate' in task_next:
+                new_header = f'{header} / Validate'
+            elif 'plan' in task_next:
+                new_header = f'{header} / Plan'
+            elif 'apply' in task_next:
+                new_header = f'{header} / Apply'
+            elif 'output' in task_next:
+                new_header = f'{header} / Output'
+            else:
+                new_header = f'{header} / {task_next}'
+
+        elif 'python' in task_next:
+            new_header = f'{header} / Script execution progress'
+        else:
+            new_header = f'{header} / Task execution progress'
+
+        return new_header
+
     def get_context_data(self, **kwargs):
         self.app_dir = self.get_app_dir()
         skillet = self.load_skillet_by_name(self.get_snippet())
@@ -2226,12 +2267,7 @@ class NextTaskView(CNCView):
 
         task_next = self.request.session['task_next']
 
-        if 'terraform' in task_next:
-            context['header'] = 'Terraform execution progress'
-        elif 'python' in task_next:
-            context['header'] = 'Script execution progress'
-        else:
-            context['header'] = 'Task execution progress'
+        context['header'] = self.get_header()
 
         #
         # terraform tasks

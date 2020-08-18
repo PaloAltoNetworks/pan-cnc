@@ -36,15 +36,15 @@
                         r.height(40);
                     }
                 }
-                if (r.html() !== msg) {
-                    r.html(msg);
+                if (r.val() !== msg) {
+                    r.val(msg);
                 }
                 if (msg !== '') {
                     let current_height = r.height();
                     let current_scrollheight = r.get(0).scrollHeight;
                     // not sure where this extra 24 px comes from, but we only need to adjust when it's
-                    // greater than 25 or so
-                    if ((current_scrollheight - current_height) > 25) {
+                    // greater than 26 or so -- edit nembery 08-18-20 found diff of 26 a few times, upping to 30
+                    if ((current_scrollheight - current_height) > 30) {
                         let r_height = r.get(0).scrollHeight + 10;
                         r.height(r_height);
                     }
@@ -195,7 +195,15 @@
         <div class="card-footer text-right">
             <p class="card-text" id="footer">
                 {% if completed %}
-                    <a href="{{ request.session.last_page|urlencode }}" class="btn btn-primary">Complete</a>
+                    {% if request.session.next_step %}
+                        {% if request.session.last_step %}
+                            <a href="/workflow/{{ request.session.next_step }}" class="btn btn-primary">Complete</a>
+                        {% else %}
+                            <a href="/workflow/{{ request.session.next_step }}" class="btn btn-primary">Continue</a>
+                        {% endif %}
+                    {% else %}
+                        <a href="{{ request.session.last_page|urlencode }}" class="btn btn-primary">Complete</a>
+                    {% endif %}
                 {% endif %}
             </p>
         </div>

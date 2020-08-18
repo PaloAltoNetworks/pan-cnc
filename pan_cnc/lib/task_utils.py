@@ -84,6 +84,7 @@ def __get_terraform_image(resource_def: dict) -> str:
     :return: str containing the value of the 'terraform_image' if found, otherwise
         a default value
     """
+
     for label, value in resource_def.get('labels', dict()).items():
         if label == 'terraform_image':
             return value
