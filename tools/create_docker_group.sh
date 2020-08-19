@@ -28,7 +28,7 @@ if [ "${DOCKER_GID}" -eq "0" ]; then
 fi
 
 # attempt to find if a group already exists with this gid
-DOCKER_GROUP=$(grep "${DOCKER_GID}" /etc/group | cut -f1 -d':')
+DOCKER_GROUP=$(grep ":${DOCKER_GID}:" /etc/group | cut -f1 -d':')
 
 # if there is an existing group, ensure our user is a part of it, otherwise add them
 if [ "${DOCKER_GROUP}" != "" ]; then
