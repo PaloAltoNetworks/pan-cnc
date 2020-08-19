@@ -39,7 +39,7 @@ if [ "${DOCKER_GROUP}" != "" ]; then
 else
   # create the group and add the user
   echo "Creating new group and adding user"
-  addgroup -g "${DOCKER_GID}" cnc_docker
+  addgroup --gid "${DOCKER_GID}" cnc_docker
   addgroup cnc_user cnc_docker
 fi
 
