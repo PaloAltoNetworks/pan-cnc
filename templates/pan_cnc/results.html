@@ -38,6 +38,9 @@
                 {% endif %}
             </h4>
             <p class="card-text">
+                {%  if output_template %}
+                    <div class="pb-4">{{ output_template }}</div>
+                {% endif %}
                 {% if captured_outputs %}
                     <div id="capture_msg">
                         Successfully captured Skillet output. Click 'Show Captured Values' to view raw output.

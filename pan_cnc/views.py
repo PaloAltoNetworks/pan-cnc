@@ -1401,6 +1401,9 @@ class ProvisionSnippetView(CNCBaseFormView):
 
             context['captured_outputs'] = captured_outputs
 
+            if 'output_template' in results:
+                context['output_template'] = results['output_template']
+
             return render(self.request, 'pan_cnc/results.html', context)
 
         elif self.service['type'] == 'python3':
@@ -1521,6 +1524,9 @@ class ProvisionSnippetView(CNCBaseFormView):
             context['view'] = self
             context['title'] = f'Successfully Executed {self.service.get("label")}'
             context['captured_outputs'] = captured_outputs
+
+            if 'output_template' in outputs:
+                context['output_template'] = outputs['output_template']
 
             return render(self.request, 'pan_cnc/results.html', context)
 
