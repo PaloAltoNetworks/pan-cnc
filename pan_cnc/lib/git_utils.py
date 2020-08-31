@@ -417,10 +417,6 @@ def __get_repo_branches(repo: Repo) -> list:
     # keep a list of branches
     branches = list()
 
-    # always keep at least the current active branch
-    branch = repo.active_branch.name
-    branches.append(branch)
-
     try:
         remote_branches = __get_remote_repo_branches(repo)
         branches.extend(remote_branches)
@@ -433,10 +429,17 @@ def __get_repo_branches(repo: Repo) -> list:
     except GitCommandError as gce:
         print('Could not get branches from repo')
         print(gce)
+
     except GitError as ge:
         print('Unknown GitError')
         print(ge)
+
     finally:
+        # always keep at least the current active branch
+        branch = repo.active_branch.name
+        if branch not in branches:
+            branches.append(branch)
+
         return branches
 
 
