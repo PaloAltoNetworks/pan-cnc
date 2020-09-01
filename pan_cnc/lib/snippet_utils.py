@@ -359,16 +359,16 @@ def read_skillet_metadata(skillet: dict) -> (str, None):
                     print(ioe)
                     return None
 
-                except ParserError as pe:
+                except (ParserError, ConstructorError) as pe:
                     print(pe)
                     print('Could not parse metadata file')
-                    return None
+                    return data
 
                 except TypeError as te:
                     # fix for https://gitlab.com/panw-gse/as/panhandler/-/issues/39
                     print(te)
                     print('Could not load metadata file - type error')
-                    return None
+                    return data
 
             else:
                 print('.meta-cnc cannot be found in this dir')
