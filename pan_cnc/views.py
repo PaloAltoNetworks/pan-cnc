@@ -1115,12 +1115,25 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
             #     toggle_hint:
             #       source: bgp_type
             #       value: disable
+            # OR
+            #     toggle_hint:
+            #       source: bgp_type
+            #       value:
+            #         - value1
+            #         - value2
 
             if toggle_hint != {}:
                 f = dynamic_form.fields[field_name]
                 w = f.widget
+
+                toggle_hint_value = toggle_hint.get('value', '')
+                if type(toggle_hint_value) is list:
+                    toggle_hint_value_str = ','.join(toggle_hint_value)
+                else:
+                    toggle_hint_value_str = toggle_hint_value
+
                 w.attrs.update({'data-source': toggle_hint.get('source', '')})
-                w.attrs.update({'data-value': toggle_hint.get('value', '')})
+                w.attrs.update({'data-value': toggle_hint_value_str})
 
         return dynamic_form
 
