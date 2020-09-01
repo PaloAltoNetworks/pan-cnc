@@ -153,7 +153,7 @@ class DockerHelper:
 
     def get_container_logs(self) -> str:
         """
-        Returns the last 50 lines of log output for this container (if found)
+        Returns the last 75 lines of log output for this container (if found)
 
         :return: logs as str
         """
@@ -162,4 +162,4 @@ class DockerHelper:
         if this_container_id == '':
             return 'No logs found, could not get container id'
 
-        return self.client.logs(tail=50, container=this_container_id)
+        return self.client.logs(tail=75, container=this_container_id).decode('utf-8')
