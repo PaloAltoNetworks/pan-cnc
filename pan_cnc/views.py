@@ -81,6 +81,7 @@ from pan_cnc.lib.exceptions import SnippetRequiredException
 from pan_cnc.lib.validators import Cidr
 from pan_cnc.lib.validators import FqdnOrIp
 from pan_cnc.lib.validators import JSONValidator
+from pan_cnc.tasklibs import docker_utils
 
 
 class CNCBaseAuth(LoginRequiredMixin, View):
@@ -3082,6 +3083,35 @@ class DebugContextView(CNCView):
         context['header'] = self.header
         context['title'] = 'Workflow Context'
         context['workflow'] = json.dumps(w, indent=2)
+
+        dh = docker_utils.DockerHelper()
+        context['logs'] = dh.get_container_logs()
+
+        return context
+
+
+class ViewLogsView(CNCView):
+
+    template_name = 'pan_cnc/debug_logs.html'
+    help_text = 'This is the raw debug logs from this application. This can be useful to find various errors and ' \
+                'trouble shoot issues. Please provide this output when opening an issue or requesting help.'
+
+    def __init__(self):
+        self.snippet_name = ''
+        self.app_dir = ''
+        super().__init__()
+
+    def set_last_page_visit(self) -> None:
+        pass
+
+    def get_context_data(self, **kwargs):
+        self.clean_up_workflow()
+        context = super().get_context_data()
+        context['header'] = "Debug Logs"
+
+        dh = docker_utils.DockerHelper()
+        context['logs'] = dh.get_container_logs()
+
         return context
 
 

@@ -65,6 +65,7 @@ urlpatterns = [
     path('clear_cache', pan_cnc_views.ClearCacheView.as_view()),
     path('view_workflow', pan_cnc_views.DebugContextView.as_view()),
     path('view_context', pan_cnc_views.DebugContextView.as_view()),
+    path('logs', pan_cnc_views.ViewLogsView.as_view()),
     path('clear_context', pan_cnc_views.ClearContextView.as_view()),
     path('ssh_key', pan_cnc_views.DefaultSSHKeyView.as_view()),
     path('reinit/<app_dir>/<skillet>', pan_cnc_views.ReinitPythonVenv.as_view()),

@@ -1,25 +1,10 @@
 {% extends base_html|default:'pan_cnc/base.html' %}
 {% load static %}
-{% block head %}
-    <link href="{% static 'css/highlight-atom-one-light.css' %}" rel="stylesheet">
-    <script src="{% static 'js/highlight.pack.js' %}"></script>
-    <script type="text/javascript">
 
-        function set_cursor() {
-            let doc = $(document.documentElement);
-            doc.css('cursor', 'progress');
-            $('#submit_button').prop("disabled", true);
-            $('#dynamic_form').submit();
-        }
-
-        hljs.initHighlightingOnLoad();
-
-    </script>
-{% endblock %}
 {% block content %}
     <div class="card border-primary mb-5 shadow-lg">
         <div class="card-header">
-        {{ view.get_header|default:header }}
+        {{ header }}
             <div class="float-right">
             {% if view.help_text != '' %}
             <a href="#" data-toggle="modal" data-target="#helpTextModal" title="Help">
@@ -29,15 +14,11 @@
         </div>
         </div>
         <div class="card-body">
-            <pre><code class="json">{{ workflow }}</code></pre>
-            <pre><code class="json">{{ logs }}</code></pre>
+            <pre>{{ logs }}</pre>
         </div>
 
         <div class="card-footer text-right">
             <p class="card-text">
-                <a href="/clear_context" class="btn btn-danger mr-1" title="Remove all items from the Context">
-                    Clear Context
-                </a>
                 <a href="{{ request.session.last_page|urlencode }}" class="btn btn-primary">Continue</a>
             </p>
         </div>
