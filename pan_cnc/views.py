@@ -3083,10 +3083,6 @@ class DebugContextView(CNCView):
         context['header'] = self.header
         context['title'] = 'Workflow Context'
         context['workflow'] = json.dumps(w, indent=2)
-
-        dh = docker_utils.DockerHelper()
-        context['logs'] = dh.get_container_logs()
-
         return context
 
 
