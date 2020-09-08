@@ -673,6 +673,10 @@ def __parse_domain_from_url(repo_url: str) -> str:
         repo_url_parts = repo_url.split(':')
         first = repo_url_parts[0].replace('git@', '')
 
+    else:
+        # this is an unsupported format
+        return domain
+
     if ':' in first:
         second = first.split(':')[0]
     else:
