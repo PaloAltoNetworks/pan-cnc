@@ -571,11 +571,13 @@ def parse_repo_origin_url(repo_url) -> dict:
 
     try:
 
-        if repo_url.endswith('.git') and repo_url.startswith('git@'):
+        if repo_url.startswith('git@') and repo_url.endswith('.git'):
             # git@gitlab.com:panw-gse/as/panhandler_test_2.git
             # git@github.com:nembery/Skillets.git
-            domain = repo_url.split(':')[0].replace('git@', '')
-            url_parts = repo_url.split(':')[1].split('/')
+            # git@x.x.x.x:10022:msmihula/radc.git
+            repo_url_parts = repo_url.split(':')
+            domain = __parse_domain_from_url(repo_url)
+            url_parts = repo_url_parts[-1].split('/')
 
             # fix for https://gitlab.com/panw-gse/as/panhandler/-/issues/41 - ensure we parse owner and repo properly
             if len(url_parts) > 2:
@@ -587,10 +589,11 @@ def parse_repo_origin_url(repo_url) -> dict:
                 owner = url_parts[0]
                 repo = url_parts[1].split('.git')[0]
 
-        elif repo_url.startswith('https') and repo_url.endswith('.git'):
+        elif repo_url.startswith('http') and repo_url.endswith('.git'):
             # https://github.com/owner/repo.git
             # https://gitlab.com/panw-gse/as/panhandler_test_2.git
-            domain = repo_url.split('//')[1].split('/')[0]
+            # http://x.x.x.x:10080/msmihula/radc
+            domain = __parse_domain_from_url(repo_url)
             url_parts = repo_url.split('/')[3:]
 
             if len(url_parts) > 2:
@@ -600,9 +603,9 @@ def parse_repo_origin_url(repo_url) -> dict:
                 owner = url_parts[0]
                 repo = url_parts[1].split('.git')[0]
 
-        elif repo_url.startswith('https') and repo_url.endswith('/'):
+        elif repo_url.startswith('http') and repo_url.endswith('/'):
             # https://github.com/owner/repo/
-            domain = repo_url.split('//')[1].split('/')[0]
+            domain = __parse_domain_from_url(repo_url)
             url_parts = repo_url.split('/')[3:-1]
 
             if len(url_parts) > 2:
@@ -612,10 +615,10 @@ def parse_repo_origin_url(repo_url) -> dict:
                 owner = url_parts[0]
                 repo = url_parts[1]
 
-        elif repo_url.startswith('https'):
+        elif repo_url.startswith('http'):
             # https://github.com/owner/repo ?
             # https://gitlab.com/panw-gse/as/panhandler_test_2
-            domain = repo_url.split('//')[1].split('/')[0]
+            domain = __parse_domain_from_url(repo_url)
             url_parts = repo_url.split('/')[3:]
 
             if len(url_parts) > 2:
@@ -642,6 +645,41 @@ def parse_repo_origin_url(repo_url) -> dict:
     url_details['repo'] = repo
 
     return url_details
+
+
+def __parse_domain_from_url(repo_url: str) -> str:
+    """
+    parse the domain component from a repository clone url
+
+    :param repo_url: url to be cloned, see examples below
+    :return: str containing only the domain name
+    """
+    # git@gitlab.com:panw-gse/as/panhandler_test_2.git
+    # git@github.com:nembery/Skillets.git
+    # git@x.x.x.x:10022:xxx/xxx.git
+    # https://github.com/owner/repo ?
+    # https://gitlab.com/panw-gse/as/panhandler_test_2
+    # https://github.com/owner/repo.git
+    # https://gitlab.com/panw-gse/as/panhandler_test_2.git
+    # http://x.x.x.x:10080/xxx/xxx
+
+    domain = None
+    first = ''
+
+    if repo_url.startswith('http') or repo_url.startswith('ssh://') or repo_url.startswith('git://'):
+        first = repo_url.split('//')[1]
+
+    elif repo_url.startswith('git@'):
+        repo_url_parts = repo_url.split(':')
+        first = repo_url_parts[0].replace('git@', '')
+
+    if ':' in first:
+        second = first.split(':')[0]
+    else:
+        second = first
+
+    domain = second.split('/')[0]
+    return domain
 
 
 def update_repo_in_cache(repo_name: str, repo_dir: str, app_dir: str) -> None:
@@ -866,7 +904,7 @@ def ensure_known_host(url: str) -> (Union[bool, None], str):
         print(f'Adding {found_keys} to known_hosts file')
 
         # detect if this file ends with a newline or not, we may need to add it during the append
-        with open(known_hosts_path, 'f') as khp:
+        with open(known_hosts_path, 'r') as khp:
             if khp.read().endswith('\n'):
                 needs_newline = ''
             else:

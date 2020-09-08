@@ -1123,7 +1123,7 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
             #         - value1
             #         - value2
 
-            if toggle_hint != {}:
+            if toggle_hint != {} and type(toggle_hint) is dict:
                 f = dynamic_form.fields[field_name]
                 w = f.widget
 
