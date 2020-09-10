@@ -71,7 +71,8 @@ def perform_terraform_cmd(resource_def: dict, cmd: str, snippet_context: dict) -
     resource_def['snippets'].append(snippet)
 
     print('Performing skillet execute')
-    return execute_docker_skillet.delay(resource_def, tf_vars)
+    return execute_docker_skillet.delay(resource_def, env)
+
 
 
 def __get_terraform_image(resource_def: dict) -> str:
