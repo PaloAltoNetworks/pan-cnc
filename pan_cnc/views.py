@@ -864,6 +864,7 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
                                                                        initial=default,
                                                                        required=required,
                                                                        help_text=help_text)
+
             elif type_hint == "text_area" or type_hint == 'textarea':
                 # Fix for FR: #97 - add rows / cols to text_area
                 attrs = dict()
