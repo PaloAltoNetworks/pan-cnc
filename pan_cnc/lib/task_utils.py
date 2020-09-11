@@ -74,7 +74,6 @@ def perform_terraform_cmd(resource_def: dict, cmd: str, snippet_context: dict) -
     return execute_docker_skillet.delay(resource_def, env)
 
 
-
 def __get_terraform_image(resource_def: dict) -> str:
     """
     Check the skillet metadata (resource_def) for a label with key
