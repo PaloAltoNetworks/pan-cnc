@@ -10,6 +10,7 @@ jsonpath-ng
 netaddr
 oyaml
 pan-python
+paramiko
 passlib
 pyAesCrypt
 requests
