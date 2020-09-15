@@ -67,7 +67,9 @@ from skilletlib.exceptions import TargetGenericException
 from skilletlib.panoply import Panos
 from skilletlib.skillet.panos import PanosSkillet
 from skilletlib.skillet.rest import RestSkillet
+from skilletlib.skillet.template import TemplateSkillet
 from skilletlib.snippet.workflow import WorkflowSnippet
+from skilletlib.skillet.python3 import Python3Skillet
 
 from pan_cnc.lib import cnc_utils
 from pan_cnc.lib import db_utils
@@ -2405,8 +2407,32 @@ class TaskLogsView(CNCBaseAuth, View):
                         skillet_name = self.get_value_from_workflow('snippet_name', '')
                         if skillet_name != '':
                             meta = self.load_skillet_by_name(skillet_name)
-                            # FIXME right here for python types
-                            if 'snippets' in meta:
+                            # fix for #101 - panhandler runs python scripts in a virtual env directly and does not
+                            # use skilletlib. As such, the output capturing does not happen using newer skilletlib
+                            # methods. This code takes the python skillet and treats it as a template skillet. This
+                            # works because we have the script output, so assign it to the template snippet 'element'
+                            # then 'execute' it, which will grab all the outputs along the way
+                            if meta['type'] == 'python3':
+                                # create the object
+                                python_skillet = Python3Skillet(meta)
+                                # this is a temporary fix as skilletlib does not execute python skillets (yet)
+                                # execute will simply returrn the python3_output text through capture_outputs etc
+                                results = python_skillet.execute({'python3_output': out})
+                                captured_outputs = False
+                                if 'outputs' in results and type(results['outputs']) is dict:
+                                    if len(results['outputs']) > 0:
+                                        captured_outputs = True
+                                        # outputs.update(results['outputs'])
+                                    for k, v in results['outputs'].items():
+                                        self.save_value_to_workflow(k, v)
+
+                                logs_output['captured_outputs'] = captured_outputs
+
+                                if 'output_template' in results:
+                                    logs_output['output_template'] = results['output_template']
+
+                            # not a python skillet - FIXME - review for other types as well
+                            elif 'snippets' in meta:
                                 for snippet in meta['snippets']:
                                     if 'output_type' in snippet and 'name' in snippet:
                                         print('getting output from last task')
@@ -2415,7 +2441,7 @@ class TaskLogsView(CNCBaseAuth, View):
 
                                 if outputs:
                                     self.save_dict_to_workflow(outputs)
-                                    print(self.request.session)
+                                    # print(self.request.session)
                         else:
                             print('Could not load a valid snippet for output capture!')
 

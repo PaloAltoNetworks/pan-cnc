@@ -101,6 +101,7 @@
                         let debug_link = $('<a/>');
                         debug_link.attr('href', '#');
                         debug_link.attr('onclick', 'show_captured_values();');
+                        debug_link.attr('id', 'show_captured_values_button');
                         debug_link.addClass('btn').addClass('btn-success').addClass('mr-2');
                         debug_link.html('Show Captured Values');
                         f.append(debug_link);
@@ -126,10 +127,12 @@
 
         function show_captured_values() {
             let r = $('#results');
-            r.html(captured_output);
+            r.val(captured_output);
 
             let r_height = r.get(0).scrollHeight + 10;
             r.height(r_height);
+
+            $('#show_captured_values_button').remove();
         }
 
         function countdown() {
