@@ -66,12 +66,20 @@
                     if (returncode === 0) {
                         t.html("Completed: {{ view.service.label }}");
                         {% if request.session.task_next %}
-                            next_link.attr('href', '/next_task');
-                            next_link.html('Next');
-                            next_link.addClass('btn').addClass('btn-primary');
+                            {% if auto_continue == True %}
+                                window.location = '/next_task';
+                            {% else %}
+                                next_link.attr('href', '/next_task');
+                                next_link.html('Next');
+                                next_link.addClass('btn').addClass('btn-primary');
+                            {% endif %}
                         {% elif request.session.next_step %}
-                            next_link.attr('href', '/workflow/{{ request.session.next_step }}');
-                            next_link.addClass('btn').addClass('btn-primary');
+                            {% if auto_continue == True %}
+                                window.location = '/next_task';
+                            {% else %}
+                                next_link.attr('href', '/workflow/{{ request.session.next_step }}');
+                                next_link.addClass('btn').addClass('btn-primary');
+                            {% endif %}
                             {% if request.session.last_step %}
                                 next_link.html('Complete');
                             {% else %}
