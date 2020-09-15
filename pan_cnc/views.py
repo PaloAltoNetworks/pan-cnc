@@ -66,10 +66,9 @@ from skilletlib.exceptions import TargetConnectionException
 from skilletlib.exceptions import TargetGenericException
 from skilletlib.panoply import Panos
 from skilletlib.skillet.panos import PanosSkillet
-from skilletlib.skillet.rest import RestSkillet
-from skilletlib.skillet.template import TemplateSkillet
-from skilletlib.snippet.workflow import WorkflowSnippet
 from skilletlib.skillet.python3 import Python3Skillet
+from skilletlib.skillet.rest import RestSkillet
+from skilletlib.snippet.workflow import WorkflowSnippet
 
 from pan_cnc.lib import cnc_utils
 from pan_cnc.lib import db_utils
@@ -723,6 +722,64 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
         template = snippet_utils.render_snippet_template(self.service, self.app_dir, self.get_workflow())
         return template
 
+    @staticmethod
+    def __get_choice_list_from_source(source_list: (list, str)) -> list:
+        """
+        Internal method to return a list of tuples from the supplied source option.
+
+        This allows some flexibility for the builder. The following syntax is now supported:
+        source:
+          - interface1
+          - interface2
+
+        source:
+          - key: some key
+            value: some value
+          - key: another key
+            value: another value
+
+        source:
+          - random_key_name: some key
+            random_value_name: some value
+          - random_key_name: another key
+            random_value_name: another value
+
+        :param source_list:
+        :return:
+        """
+
+        def __get_choice_from_item(this_item: Any) -> tuple:
+            """ private method to get a choice tuple from the item """
+
+            if isinstance(this_item, dict):
+                keys = [*this_item]
+                if 'key' in keys and 'value' in keys:
+                    return this_item['value'], this_item['key']
+                elif len(keys) >= 2:
+                    return this_item[keys[1]], this_item[keys[0]]
+
+            elif isinstance(this_item, str):
+                return this_item, this_item
+
+            return ()
+
+        choices_list = list()
+        if isinstance(source_list, list):
+            # source_list.sort()
+
+            for item in source_list:
+                choice = __get_choice_from_item(item)
+
+                if choice:
+                    choices_list.append(choice)
+
+        else:
+            choice = __get_choice_from_item(source_list)
+            if choice:
+                choices_list.append(choice)
+
+        return choices_list
+
     def generate_dynamic_form(self, data=None) -> Form:
         """
         The heart of this class. This will generate a Form object based on the value of the self.snippet
@@ -841,20 +898,9 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
             elif type_hint == 'dropdown' and 'source' in variable:
                 source = variable.get('source', None)
                 source_list = self.get_value_from_workflow(source, None)
-
                 if source_list is not None:
-                    choices_list = list()
 
-                    if type(source_list) is list:
-                        source_list.sort()
-
-                        for item in source_list:
-                            choice = (item, item)
-                            choices_list.append(choice)
-                    else:
-                        item = source_list
-                        choice = (item, item)
-                        choices_list.append(choice)
+                    choices_list = self.__get_choice_list_from_source(source_list)
 
                     dynamic_form.fields[field_name] = fields.ChoiceField(choices=tuple(choices_list), label=description,
                                                                          initial=default, required=required,
@@ -978,24 +1024,20 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
             elif type_hint == "radio" and "source" in variable:
                 source = variable.get('source', None)
                 source_list = self.get_value_from_workflow(source, [])
+                if source_list is not None:
+                    choices_list = self.__get_choice_list_from_source(source_list)
 
-                choices_list = list()
-
-                if isinstance(source_list, list):
-                    source_list.sort()
-
-                    for item in source_list:
-                        choice = (item, item)
-                        choices_list.append(choice)
-
+                    dynamic_form.fields[field_name] = fields.ChoiceField(widget=RadioSelect, choices=choices_list,
+                                                                         label=description, initial=default,
+                                                                         required=required,
+                                                                         help_text=help_text)
                 else:
-                    item = source_list
-                    choice = (item, item)
-                    choices_list.append(choice)
-                dynamic_form.fields[field_name] = fields.ChoiceField(widget=RadioSelect, choices=choices_list,
-                                                                     label=description, initial=default,
-                                                                     required=required,
-                                                                     help_text=help_text)
+                    # if source is empty, then render a text input only...
+                    dynamic_form.fields[field_name] = fields.CharField(label=description,
+                                                                       initial=default,
+                                                                       required=required,
+                                                                       help_text=help_text)
+
             elif type_hint == "checkbox" and "cbx_list" in variable:
                 cbx_list = variable['cbx_list']
                 choices_list = list()
@@ -1012,24 +1054,21 @@ class CNCBaseFormView(CNCBaseAuth, FormView):
             elif type_hint == 'checkbox' and 'source' in variable:
                 source = variable.get('source', None)
                 source_list = self.get_value_from_workflow(source, [])
-                choices_list = list()
+                if source_list is not None:
+                    choices_list = self.__get_choice_list_from_source(source_list)
 
-                if isinstance(source_list, list):
-                    source_list.sort()
-                    for item in source_list:
-                        choice = (item, item)
-                        choices_list.append(choice)
-
+                    dynamic_form.fields[field_name] = fields.MultipleChoiceField(widget=CheckboxSelectMultiple,
+                                                                                 choices=choices_list,
+                                                                                 label=description, initial=default,
+                                                                                 required=required,
+                                                                                 help_text=help_text)
                 else:
-                    item = source_list
-                    choice = (item, item)
-                    choices_list.append(choice)
+                    # if source is empty, then render a text input only...
+                    dynamic_form.fields[field_name] = fields.CharField(label=description,
+                                                                       initial=default,
+                                                                       required=required,
+                                                                       help_text=help_text)
 
-                dynamic_form.fields[field_name] = fields.MultipleChoiceField(widget=CheckboxSelectMultiple,
-                                                                             choices=choices_list,
-                                                                             label=description, initial=default,
-                                                                             required=required,
-                                                                             help_text=help_text)
             elif type_hint == 'disabled':
                 dynamic_form.fields[field_name] = fields.CharField(label=description, initial=default,
                                                                    disabled=True, required=required,
@@ -1439,6 +1478,7 @@ class ProvisionSnippetView(CNCBaseFormView):
                 self.request.session['task_next'] = ''
             else:
                 context['title'] = f"Preparing environment for: {self.service['label']}"
+                context['auto_continue'] = True
                 r = task_utils.python3_init(self.service)
                 self.request.session['task_next'] = 'python3_execute'
 
@@ -3177,6 +3217,7 @@ class ReinitPythonVenv(CNCView):
         context = super().get_context_data()
         context['base_html'] = self.base_html
         context['title'] = f"Upgrading Environment for: {skillet['label']}"
+        context['auto_continue'] = True
         r = task_utils.python3_init(skillet)
         self.request.session['task_id'] = r.id
         return context
