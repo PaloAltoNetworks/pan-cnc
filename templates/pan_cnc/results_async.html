@@ -95,6 +95,15 @@
                         c.append('Error Executing Task');
                         c.append('<br>');
                     }
+                    if ('output_template' in json_data) {
+                        // the results contain a rendered output_template, let's show this to the user instead of the
+                        // async results
+                        let ot = $('<div/>');
+                        ot.attr('id', 'output_template');
+                        ot.html(json_data['output_template']);
+                        $('#results').parent().append(ot);
+                        $('#results').hide();
+                    }
 
                     // check for captured_variables
                     if ('captured_output' in json_data) {
