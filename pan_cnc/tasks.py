@@ -294,18 +294,22 @@ def execute_docker_skillet(skillet_def: dict, args: dict) -> str:
 
             r = skillet.get_results()
 
+            # FIXME - docker skillets can run multiple snippets / cmds inside the container
+            # should check for the output of each and determine if a single failure is considered a failure
+            # for the entire skillet or only a failure for one step ?
             if isinstance(r, dict) and 'snippets' in r:
                 for k, v in r['snippets'].items():
-                    result = v.get('results', 'error')
+                    result = v.get('results', 'failure')
 
                     if result == 'success':
                         full_output = v.get('raw', '')
-                    elif result == 'error':
+                    elif result == 'error' or 'fail' in result:
                         err = v.get('raw', 'error')
                         rc = 2
                     else:
                         full_output = v.get('raw', '')
                         err = f'Unknown return value type {result}'
+                        rc = 3
             else:
                 full_output = r
                 err = 'unknown output from skillet'

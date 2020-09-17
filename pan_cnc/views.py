@@ -2035,7 +2035,7 @@ class EditTerraformView(CNCBaseAuth, FormView):
     # form to render, override if you need a specific html fragment to render the form
     template_name = 'pan_cnc/dynamic_form.html'
     # Head to show on the rendered dynamic form - Main header
-    header = 'Terraform Template'
+    header = 'Terraform'
     # title to show on dynamic form
     title = 'Choose the action to perform'
     # where to go after this? once the form has been submitted, redirect to where?
@@ -2086,7 +2086,8 @@ class EditTerraformView(CNCBaseAuth, FormView):
             default_choice = 'override'
 
         choices_set = tuple(choices_list)
-        terraform_action_list = fields.ChoiceField(choices=choices_set, label='Template Name', initial=default_choice)
+        terraform_action_list = fields.ChoiceField(choices=choices_set, label='Terraform Command Sequence',
+                                                   initial=default_choice)
         form.fields['terraform_action'] = terraform_action_list
         context['form'] = form
         context['base_html'] = self.base_html
@@ -2212,6 +2213,7 @@ class CancelTaskView(CNCBaseAuth, RedirectView):
 
 class NextTaskView(CNCView):
     template_name = 'pan_cnc/results_async.html'
+    header = 'Task'
 
     def __init__(self, **kwargs):
         # what's our app_dir, # this is usually dynamically set in urls.py, however, this is not a view that the
@@ -2295,6 +2297,11 @@ class NextTaskView(CNCView):
         task_next = self.request.session['task_next']
 
         if 'terraform' in task_next:
+
+            if header == 'Task':
+                # we are not in a workflow
+                header = 'Terraform'
+
             if 'init' in task_next:
                 new_header = f'{header} / Init'
             elif 'validate' in task_next:
@@ -2309,6 +2316,10 @@ class NextTaskView(CNCView):
                 new_header = f'{header} / {task_next}'
 
         elif 'python' in task_next:
+            if header == 'Task':
+                # we are not in a workflow
+                header = 'Python3'
+
             new_header = f'{header} / Script execution progress'
         else:
             new_header = f'{header} / Task execution progress'
