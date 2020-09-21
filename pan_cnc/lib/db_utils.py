@@ -111,6 +111,30 @@ def get_repository_details(repository_name: str) -> (dict, None):
         return None
 
 
+def update_repository_details(repo_name: str, repo_detail: dict) -> None:
+    """
+    Update the repository details json object on the db record
+
+    :param repo_name: name of the repository object to update
+    :param repo_detail: dictionary of repository details includes branches, url, name, commits, etc
+    :return: None
+    """
+    try:
+        repo_db_record = RepositoryDetails.objects.get(name=repo_name)
+    except ObjectDoesNotExist as odne:
+        print(r'Could not update non-existent db record for {repo_name}')
+        print(odne)
+        return None
+
+    try:
+        repo_db_record.details_json = json.dumps(repo_detail)
+    except ValueError as ve:
+        print(f'Could not update db record with malformed json: {ve}')
+        return None
+
+    repo_db_record.save()
+
+
 def refresh_skillets_from_repo(repo_name: str) -> list:
     all_skillets = list()
 
