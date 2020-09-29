@@ -1938,6 +1938,11 @@ class EditTargetView(CNCBaseAuth, FormView):
         except PanoplyException as pe:
             return HttpResponseRedirect(self.error_out(f'Error Executing Skillet on Device! {pe}'))
 
+        if 'output_template' in outputs:
+            context = self.get_context_data()
+            context['output_template'] = outputs['output_template']
+            return render(self.request, 'pan_cnc/results.html', context=context)
+
         # fix for #72, in non-workflow case, revert to using our captured last_page visit
         # next_url = self.pop_value_from_workflow('next_url', None)
         next_step = self.request.session.get('next_step', None)
