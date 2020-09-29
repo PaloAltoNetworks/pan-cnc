@@ -39,21 +39,26 @@
             </h4>
             <p class="card-text">
                 {%  if output_template %}
-                    <div class="pb-4">{{ output_template }}</div>
-                {% endif %}
-                {% if captured_outputs %}
-                    <div id="capture_msg">
-                        Successfully captured Skillet output. Click 'Show Captured Values' to view raw output.
-                    </div>
-                    <pre class="pb-4"
-                         id="results"
-                         style="display: none; white-space: pre; overflow-x: scroll">{{ results | safe | linebreaksbr }}</pre>
-                {% else %}
-                    {% if '<?xml version="1.0"?>' in results or '<config urldb' in results %}
-                        <pre class="pb-4" style="white-space: pre; overflow-x: scroll">{{ results }}</pre>
+                    {% if output_template_markup %}
+                    <div class="pb-4">{{ output_template | safe }}</div>
                     {% else %}
+                        <pre class="pb-4">{{ output_template }}</pre>
+                    {% endif %}
+                {% else %}
+                    {% if captured_outputs %}
+                        <div id="capture_msg">
+                            Successfully captured Skillet output. Click 'Show Captured Values' to view raw output.
+                        </div>
                         <pre class="pb-4"
-                             style="white-space: pre; overflow-x: scroll">{{ results | safe | linebreaksbr }}</pre>
+                             id="results"
+                             style="display: none; white-space: pre; overflow-x: scroll">{{ results | safe | linebreaksbr }}</pre>
+                    {% else %}
+                        {% if '<?xml version="1.0"?>' in results or '<config urldb' in results %}
+                            <pre class="pb-4" style="white-space: pre; overflow-x: scroll">{{ results }}</pre>
+                        {% else %}
+                            <pre class="pb-4"
+                                 style="white-space: pre; overflow-x: scroll">{{ results | safe | linebreaksbr }}</pre>
+                        {% endif %}
                     {% endif %}
                 {% endif %}
             </p>

@@ -1940,7 +1940,15 @@ class EditTargetView(CNCBaseAuth, FormView):
 
         if 'output_template' in outputs:
             context = self.get_context_data()
-            context['output_template'] = outputs['output_template']
+            context['title'] = 'PAN-OS Skillet Results'
+            output_template = outputs['output_template']
+            context['output_template'] = output_template
+
+            if not output_template.startswith('<div'):
+                context['output_template_markup'] = False
+            else:
+                context['output_template_markup'] = True
+
             return render(self.request, 'pan_cnc/results.html', context=context)
 
         # fix for #72, in non-workflow case, revert to using our captured last_page visit
