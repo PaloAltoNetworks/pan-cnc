@@ -13,6 +13,11 @@ if [ ! -S $DOCKER_SOCKET ]; then
   exit 0
 fi
 
+# fix for docker on mac version 19.03.13 see issue: https://gitlab.com/panw-gse/as/panhandler/-/issues/113
+if ! stat -c %a $DOCKER_SOCKET | grep -q '.[67].'; then
+  chmod g+w $DOCKER_SOCKET
+fi
+
 # Socket is mounted, get the group id using stat
 DOCKER_GID=$(stat -c %g ${DOCKER_SOCKET})
 
