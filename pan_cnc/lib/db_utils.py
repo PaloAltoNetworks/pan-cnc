@@ -186,6 +186,20 @@ def refresh_skillets_from_repo(repo_name: str) -> list:
         return all_skillets
 
 
+def refresh_skillets_from_all_repos() -> None:
+    """
+    Finds all previously indexed repositories and re-indexes all skillets found there-in
+
+    This gets call from the /clear_context menu item to ensure all local changes are found and up to date
+
+    :return: None
+    """
+
+    all_repos = RepositoryDetails.objects.all()
+    for repository in all_repos:
+        refresh_skillets_from_repo(repository.name)
+
+
 def load_skillet_by_name(skillet_name: str) -> (dict, None):
     try:
         skillet = Skillet.objects.get(name=skillet_name)

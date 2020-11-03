@@ -3144,6 +3144,8 @@ class ClearCacheView(CNCBaseAuth, RedirectView):
         cnc_utils.set_long_term_cached_value(self.app_dir, 'imported_repositories', repos, 604800,
                                              'imported_git_repos')
 
+        # fix for panhandler#118
+        db_utils.refresh_skillets_from_all_repos()
         messages.add_message(self.request, messages.INFO, 'Long term cache cleared')
         return '/'
 
