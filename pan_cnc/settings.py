@@ -35,6 +35,8 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 USER_HOME = os.environ.get('HOME', '/home/cnc_user')
 USER_PAN_CNC_DIR = os.path.join(USER_HOME, '.pan_cnc')
 
+REPORT_PATH = '/tmp/report.html'
+
 SITE_PATH = os.path.abspath(os.path.dirname(__file__))
 PROJECT_PATH = os.path.normpath(os.path.join(SITE_PATH, '..', '..'))
 SRC_PATH = os.path.join(PROJECT_PATH, 'src')
