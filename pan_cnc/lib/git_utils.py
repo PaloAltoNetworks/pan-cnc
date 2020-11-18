@@ -288,6 +288,7 @@ def update_repo(repo_dir: str, branch=None):
                 print(f'Checking out new branch: {branch}')
                 checkout = True
                 repo.git.checkout(branch)
+
                 current_branch = branch
 
         remote_branches = __get_remote_repo_branches(repo)
@@ -298,6 +299,7 @@ def update_repo(repo_dir: str, branch=None):
                 return 'Local branch is up to date'
 
         f = repo.git.pull('origin', current_branch)
+        repo.submodule_update(recursive=True)
 
     except GitCommandError as gce:
         print(gce)
