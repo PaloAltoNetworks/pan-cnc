@@ -183,7 +183,12 @@ def _check_dir(directory: Path, snippet_type: str, snippet_list: list) -> list:
     """
 
     err_condition = False
-    for d in directory.glob('.meta-cnc.y*'):
+
+    skillet_definitions = list()
+    skillet_definitions.extend(directory.glob('*.skillet.y*ml'))
+    skillet_definitions.extend(directory.glob('.meta-cnc.y*ml'))
+
+    for d in skillet_definitions:
         snippet_path = str(d.parent.absolute())
         # print(f'snippet_path is {snippet_path}')
         try:
@@ -327,6 +332,9 @@ def read_skillet_metadata(skillet: dict) -> (str, None):
         if parent.exists():
             # handle .yaml and .yml if possible
             mdfs = list(parent.glob('.meta-cnc.y*'))
+
+            # allow .skillet.yaml files here too
+            mdfs.extend(parent.glob('*.skillet.y*ml'))
 
             if len(mdfs) == 1:
                 mdf = mdfs[0]
