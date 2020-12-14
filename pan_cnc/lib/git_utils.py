@@ -121,7 +121,9 @@ def clone_repository(repo_dir, repo_name, repo_url, branch='master'):
             env['GIT_ASKPASS'] = true_binary_path
 
         # remove depth option to allow us to query remote branches
-        Repo.clone_from(repo_url, repo_dir, env=env, config='http.sslVerify=false')
+        repo = Repo.clone_from(repo_url, repo_dir, env=env, config='http.sslVerify=false')
+        # ensure we init and grab all submodules as well for #121
+        repo.submodule_update(recursive=True, init=True)
 
     except (GitCommandError, GitError) as gce:
         if 'Permission denied (publickey)' in str(gce):
