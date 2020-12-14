@@ -300,6 +300,7 @@ def update_repo(repo_dir: str, branch=None):
 
         f = repo.git.pull('origin', current_branch)
         repo.git.submodule('update', '--init')
+        repo.submodule_update(recursive=True, init=True, force_reset=True, force_remove=True)
 
     except GitCommandError as gce:
         print(gce)
