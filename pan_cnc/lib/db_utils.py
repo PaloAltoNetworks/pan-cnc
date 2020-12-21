@@ -144,6 +144,10 @@ def refresh_skillets_from_repo(repo_name: str) -> list:
     snippets_dir = os.path.join(user_dir, app_name, 'repositories')
     repo_dir = os.path.join(snippets_dir, repo_name)
 
+    if not os.path.exists(repo_dir):
+        print(f'Repository {repo_dir} does not exist!')
+        return all_skillets
+
     try:
         repo_object = RepositoryDetails.objects.get(name=repo_name)
 

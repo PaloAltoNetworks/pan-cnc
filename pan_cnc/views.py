@@ -3175,7 +3175,13 @@ class DebugContextView(CNCView):
         context = super().get_context_data()
         context['header'] = self.header
         context['title'] = 'Workflow Context'
-        context['workflow'] = json.dumps(w, indent=2)
+
+        try:
+            context['workflow'] = json.dumps(w, indent=2)
+
+        except ValueError as ve:
+            context['workflow'] = f'Error getting context {ve}'
+
         return context
 
 
