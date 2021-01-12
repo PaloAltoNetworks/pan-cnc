@@ -1583,7 +1583,14 @@ class ProvisionSnippetView(CNCBaseFormView):
             context['captured_outputs'] = captured_outputs
 
             if 'output_template' in outputs:
-                context['output_template'] = outputs['output_template']
+                context['title'] = 'PAN-OS Skillet Results'
+                output_template = outputs['output_template']
+                context['output_template'] = output_template
+
+                if not output_template.startswith('<div'):
+                    context['output_template_markup'] = False
+                else:
+                    context['output_template_markup'] = True
 
             return render(self.request, 'pan_cnc/results.html', context)
 
