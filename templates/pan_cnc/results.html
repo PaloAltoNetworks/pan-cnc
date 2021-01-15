@@ -65,7 +65,7 @@
         </div>
         <div class="card-footer text-right">
             <p class="card-text">
-                {% if captured_outputs %}
+                {% if captured_outputs and not output_template %}
                     <a href="#" onclick="show_captured_values()" class="btn btn-success">Show Captured Values</a>
                 {% endif %}
                 {% if request.session.next_step %}
