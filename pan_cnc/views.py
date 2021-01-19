@@ -452,12 +452,15 @@ class CNCBaseAuth(LoginRequiredMixin, View):
         :param skillet_name: name of the skillet to load (from the name attribute in the metadata file)
         :return: skillet metadata dict if not found
         """
-        db_skillet = snippet_utils.load_snippet_with_name(skillet_name, self.app_dir)
-        if db_skillet is None:
-            # check for a workflow_skillet in the session.
-            return self.request.session.get('workflow_skillet', None)
 
-        return db_skillet
+        # if a workflow skillet is found on the session, check if the name matches and return if so. This
+        # ensures skillets required for a workflow that may be from a submodule are preferred over other
+        # skillets that may have the same name
+        workflow_skillet = self.request.session.get('workflow_skillet', {})
+        if skillet_name == workflow_skillet.get('name', ''):
+            return workflow_skillet
+
+        return snippet_utils.load_snippet_with_name(skillet_name, self.app_dir)
 
 
 class CNCView(CNCBaseAuth, TemplateView):
