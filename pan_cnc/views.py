@@ -434,6 +434,7 @@ class CNCBaseAuth(LoginRequiredMixin, View):
         self.request.session.pop('next_url', None)
         self.request.session.pop('workflow_ui_step', None)
         self.request.session.pop('workflow_name', None)
+        self.request.session.pop('workflow_skillet', None)
 
     def error_out(self, message: str) -> str:
         messages.add_message(self.request, messages.ERROR, message)
@@ -447,10 +448,16 @@ class CNCBaseAuth(LoginRequiredMixin, View):
         """
         Default method to load a skillet by name, child applications can override how skillets are found, stored, and
         cached, so we will let them override this method to provide their own functionality
+
         :param skillet_name: name of the skillet to load (from the name attribute in the metadata file)
         :return: skillet metadata dict if not found
         """
-        return snippet_utils.load_snippet_with_name(skillet_name, self.app_dir)
+        db_skillet = snippet_utils.load_snippet_with_name(skillet_name, self.app_dir)
+        if db_skillet is None:
+            # check for a workflow_skillet in the session.
+            return self.request.session.get('workflow_skillet', None)
+
+        return db_skillet
 
 
 class CNCView(CNCBaseAuth, TemplateView):
@@ -2220,6 +2227,9 @@ class CancelTaskView(CNCBaseAuth, RedirectView):
             except ValueError as ve:
                 print(ve)
                 pass
+            except ProcessLookupError as pe:
+                print(pe)
+                pass
 
             task.revoke(terminate=True)
             task_utils.purge_all_tasks()
@@ -2603,6 +2613,7 @@ class WorkflowView(CNCBaseAuth, RedirectView):
             skillet_name = self.get_value_from_workflow('snippet_name', '')
             # let's save this for later when we are on step #2 or later
             self.request.session['workflow_name'] = skillet_name
+
         else:
             previous_ui_step = self.request.session.get('workflow_ui_step', 1)
             ui_step = previous_ui_step + 1
@@ -2616,6 +2627,7 @@ class WorkflowView(CNCBaseAuth, RedirectView):
 
         print(f"found workflow skillet name {skillet_name}")
         self.meta = self.load_skillet_by_name(skillet_name)
+
         if self.meta is None:
             return self.error_out('Process Error - No skillet could be loaded')
 
@@ -2647,13 +2659,24 @@ class WorkflowView(CNCBaseAuth, RedirectView):
         # find which step we should execute
         context = self.get_workflow()
         index = current_step
+
+        sl = SkilletLoader(self.meta['snippet_path'])
+
         for snippet_def in self.meta['snippets'][index:]:
             # instantiate a snippet class so we can evaluate the context to determine if we should execute this one
             # or another skillet later in the list
             snippet = WorkflowSnippet(self.meta['snippets'][current_step], skillet=None, skillet_loader=None)
             if snippet.should_execute(context):
                 current_skillet_name = snippet.name
-                # find and load hhe next skillet here soo we can gather it's type
+                # find and load the next skillet here so we can gather it's type
+                private_skillet = sl.get_skillet_with_name(current_skillet_name, include_resolved_skillets=True)
+                if private_skillet:
+                    self.request.session['workflow_skillet'] = private_skillet.skillet_dict
+                else:
+                    # we we do not have a private / resolved submodule skillet, then the
+                    # normal load_skillet_by_name call will find it
+                    self.request.session.pop('workflow_skillet', None)
+
                 skillet = self.load_skillet_by_name(snippet.name)
                 if skillet is not None:
                     current_skillet_type = skillet.get('type', None)
@@ -3119,8 +3142,6 @@ class DebugMetadataView(CNCView):
 
     def get_context_data(self, **kwargs):
         # snippet_data = snippet_utils.get_snippet_metadata(self.snippet_name, self.app_dir)
-        skillet = db_utils.load_skillet_by_name(self.snippet_name)
-        snippet_data = snippet_utils.read_skillet_metadata(skillet)
         snippet = self.load_skillet_by_name(self.snippet_name)
         context = super().get_context_data()
         context['header'] = 'Debug Metadata'
@@ -3130,6 +3151,7 @@ class DebugMetadataView(CNCView):
             messages.add_message(self.request, messages.ERROR, f'Could not load skillet with name {self.snippet_name}')
             return context
 
+        snippet_data = snippet_utils.read_skillet_metadata(snippet)
         print(f"loaded snippet from {snippet['snippet_path']}")
         context['skillet'] = snippet_data
         context['meta'] = snippet
@@ -3193,7 +3215,6 @@ class DebugContextView(CNCView):
 
 
 class ViewLogsView(CNCView):
-
     template_name = 'pan_cnc/debug_logs.html'
     help_text = 'This is the raw debug logs from this application. This can be useful to find various errors and ' \
                 'trouble shoot issues. Please provide this output when opening an issue or requesting help.'
@@ -3221,6 +3242,7 @@ class ClearContextView(CNCBaseAuth, RedirectView):
     """
      Clear Context class, allows user to remove all items in the context
     """
+
     def get_redirect_url(self, *args, **kwargs):
 
         self.app_dir = db_utils.get_default_app_name()
@@ -3246,7 +3268,7 @@ class ReinitPythonVenv(CNCView):
         pass
 
     def get_context_data(self, **kwargs):
-        self.clean_up_workflow()
+
         app_dir = self.kwargs.get('app_dir', '')
         if app_dir != '':
             self.app_dir = app_dir
@@ -3255,10 +3277,12 @@ class ReinitPythonVenv(CNCView):
         skillet = self.load_skillet_by_name(skillet_name)
         context = super().get_context_data()
         context['base_html'] = self.base_html
-        context['title'] = f"Upgrading Environment for: {skillet['label']}"
-        context['auto_continue'] = True
-        r = task_utils.python3_init(skillet)
-        self.request.session['task_id'] = r.id
+        if skillet is not None:
+            context['title'] = f"Upgrading Environment for: {skillet['label']}"
+            context['auto_continue'] = True
+            self.clean_up_workflow()
+            r = task_utils.python3_init(skillet)
+            self.request.session['task_id'] = r.id
         return context
 
 
