@@ -256,13 +256,17 @@ class CNCBaseAuth(LoginRequiredMixin, View):
         """
         Returns only the values from the context or the currently loaded environment
         for each variable in the skillet
+
         :param skillet: optional skillet dict to include
         :return: dict containing the variables defined in the skillet with values from the context or the env
         """
 
+        if skillet is None:
+            skillet = {}
         combined_workflow = self.get_snippet_context()
         snippet_vars = dict()
-        if skillet is None:
+
+        if skillet == {}:
             if hasattr(self, 'service'):
                 skillet = self.service
             elif hasattr(self, 'meta'):
@@ -289,6 +293,7 @@ class CNCBaseAuth(LoginRequiredMixin, View):
         """
         Convenience method to return the current workflow and env secrets in a single context
         useful for rendering snippets that require values from both
+
         :return: dict containing env secrets and workflow values
         """
         # context = self.get_workflow()
@@ -302,6 +307,7 @@ class CNCBaseAuth(LoginRequiredMixin, View):
         """
         Return the variable value either from the workflow (if it's already been saved there)
         or from the environment, if it happens to be configured there
+
         :param var_name: name of variable to find and return
         :param default: default value if nothing has been saved to the workflow or configured in the environment
         :return: value of variable
@@ -320,6 +326,7 @@ class CNCBaseAuth(LoginRequiredMixin, View):
         """
         Return the variable value either from the workflow (if it's already been saved there)
         or the default. If found, go ahead and remove it,
+
         :param var_name: name of variable to find and return
         :param default: default value if nothing has been saved to the workflow or configured in the environment
         :return: value of variable
@@ -330,6 +337,7 @@ class CNCBaseAuth(LoginRequiredMixin, View):
     def get_environment_secrets(self) -> dict:
         """
         Returns a dict containing the currently loaded environment secrets
+
         :return: dict with key value pairs of secrets
         """
         default = dict()
@@ -354,6 +362,7 @@ class CNCBaseAuth(LoginRequiredMixin, View):
     def get_value_from_environment(self, var_name, default) -> Any:
         """
         Return the specified value from the environment secrets dict
+
         :param var_name: name of the key to lookup
         :param default: what to return if the key was not found
         :return: value of the specified secret key
@@ -1530,7 +1539,7 @@ class ProvisionSnippetView(CNCBaseFormView):
                 # if we are NOT in a workflow, then we will always show the UI
                 require_ui = True
             else:
-                # we are in a workflow, so let's check if this is only going to do some op commands and sucn
+                # we are in a workflow, so let's check if this is only going to do some op commands and such
                 # any set or edit type commands will require a commit or backup option
 
                 for snippet in panos_skillet.get_snippets():
@@ -2681,6 +2690,11 @@ class WorkflowView(CNCBaseAuth, RedirectView):
                     self.request.session.pop('workflow_skillet', None)
 
                 skillet = self.load_skillet_by_name(snippet.name)
+
+                # ensure we perform the workflow transforms here before we continue
+                skillet_context = snippet.transform_context(context)
+                self.save_dict_to_workflow(skillet_context)
+
                 if skillet is not None:
                     current_skillet_type = skillet.get('type', None)
                 break
