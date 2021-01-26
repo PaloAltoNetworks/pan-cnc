@@ -1477,6 +1477,11 @@ class ProvisionSnippetView(CNCBaseFormView):
             context['captured_outputs'] = captured_outputs
 
             if 'output_template' in results:
+                if not results['output_template'].startswith('<div'):
+                    context['output_template_markup'] = False
+                else:
+                    context['output_template_markup'] = True
+
                 context['output_template'] = results['output_template']
 
             return render(self.request, 'pan_cnc/results.html', context)
