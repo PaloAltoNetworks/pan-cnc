@@ -454,17 +454,18 @@ def init_app(app_cnc_config):
     return None
 
 
-def get_app_config(app_name):
+def get_app_config(app_name) -> dict:
     """
     Return the app configuration dict (pan-cnc) or None if app by app_name is not found / loaded
+
     :param app_name: name of the app to load. This should match the 'name' attribute in the pan-cnc file
-    :return: dict containing app_config or None if not found
+    :return: dict containing app_config or empty dict is not found
     """
     if app_name in settings.INSTALLED_APPS_CONFIG:
         return settings.INSTALLED_APPS_CONFIG[app_name]
 
     print('Could not load app_config')
-    return None
+    return dict()
 
 
 def is_testing() -> bool:

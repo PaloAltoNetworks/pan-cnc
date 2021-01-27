@@ -20,6 +20,10 @@ def initialize_default_repositories(app_name) -> None:
     :return: None
     """
     app_config = cnc_utils.get_app_config(app_name)
+
+    if not app_config:
+        return
+
     if 'repositories' not in app_config or not isinstance(app_config['repositories'], list):
         return
 
