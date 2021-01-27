@@ -23,7 +23,7 @@ def initialize_default_repositories(app_name) -> None:
     if 'repositories' not in app_config:
         return
 
-    for r in app_config['repositories']:
+    for r in app_config.get('repositories', []):
         repo_details = dict()
         repo_details.update(r)
 
