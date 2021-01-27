@@ -3320,3 +3320,25 @@ class DefaultSSHKeyView(CNCView):
         pub_key = git_utils.get_default_ssh_pub_key()
         context['public_key'] = pub_key
         return context
+
+
+class AppWelcomeView(CNCView):
+    """
+    Simple Welcome View Class to initialize the database for custom CNC Apps.
+
+    This is used by appetizer and should be the default for any CNC Skeleton based apps as well.
+
+    """
+
+    template_name = "pan_cnc/welcome.html"
+
+    def get_context_data(self, **kwargs):
+
+        this_app = os.environ.get('CNC_APP', None)
+
+        context = super().get_context_data(**kwargs)
+        if this_app:
+            db_utils.initialize_default_repositories(this_app)
+            self.request.session['app_dir'] = this_app
+
+        return context
