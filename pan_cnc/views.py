@@ -296,12 +296,27 @@ class CNCBaseAuth(LoginRequiredMixin, View):
 
         :return: dict containing env secrets and workflow values
         """
-        # context = self.get_workflow()
-        # context.update(self.get_environment_secrets())
+
         context = dict()
         context.update(self.get_environment_secrets())
         context.update(self.get_workflow())
         return context
+
+    def get_terraform_context(self) -> dict:
+        """
+        Legacy terraform projects still expect to have access to the full context, so we need get_snippet_context
+        However, we also need any hidden or disabled variables from the skillet as well, so pull in
+        get_snippet_variables_from_workflow as well
+
+        :return: dict containing full context + skillet variables with default values
+        """
+        combined_vars = self.get_snippet_context()
+
+        snippet_vars = self.get_snippet_variables_from_workflow()
+
+        combined_vars.update(snippet_vars)
+
+        return combined_vars
 
     def get_value_from_workflow(self, var_name: str, default=None) -> Any:
         """
@@ -2394,16 +2409,16 @@ class NextTaskView(CNCView):
         # terraform tasks
         #
         if task_next == 'terraform_validate':
-            r = task_utils.perform_validate(skillet, self.get_snippet_context())
+            r = task_utils.perform_validate(skillet, self.get_terraform_context())
             new_next = 'terraform_plan'
             title = 'Executing Task: Validate'
         elif task_next == 'terraform_plan':
-            r = task_utils.perform_plan(skillet, self.get_snippet_context())
+            r = task_utils.perform_plan(skillet, self.get_terraform_context())
             new_next = 'terraform_apply'
             title = 'Executing Task: Plan'
 
         elif task_next == 'terraform_apply':
-            r = task_utils.perform_apply(skillet, self.get_snippet_context())
+            r = task_utils.perform_apply(skillet, self.get_terraform_context())
             new_next = 'terraform_output'
             title = 'Executing Task: Apply'
         elif task_next == 'terraform_output':
