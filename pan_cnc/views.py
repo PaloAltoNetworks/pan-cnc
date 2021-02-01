@@ -143,7 +143,11 @@ class CNCBaseAuth(LoginRequiredMixin, View):
                         # such as list, this will cause the list to be inserted as a json string
                         # hidden values are only rendered to be used as a source for dynamic entries anyway
                         # per https://github.com/PaloAltoNetworks/panhandler/issues/192
-                        continue
+
+                        # additional fix for https://gitlab.com/panw-gse/as/panhandler/-/issues/135
+                        # add the default values to the context, but ignore what may arrive from the form
+                        current_workflow[var_name] = variable['default']
+                        # continue
 
                     elif var_type == 'file':
                         try:
@@ -212,11 +216,13 @@ class CNCBaseAuth(LoginRequiredMixin, View):
             # ensure we always capture the current snippet if set on this class!
             if self.snippet != '':
                 current_workflow['snippet_name'] = self.snippet
+
         self.request.session[self.app_dir] = current_workflow
 
     def save_value_to_workflow(self, var_name, var_value) -> None:
         """
         Save a specific key value pair to the current workflow session cache
+
         :param var_name: variable name to use
         :param var_value: value of the variable to store
         :return: None
@@ -1427,8 +1433,23 @@ class ProvisionSnippetView(CNCBaseFormView):
             sl = SkilletLoader()
             template_skillet = sl.create_skillet(self.service)
 
+            # make all variables available as top-level and also under the 'context' attribute for compatibility
+            # with output_templates
+            template_snippet_context = self.get_snippet_variables_from_workflow()
+            template_context = dict()
+            template_context['context'] = template_snippet_context
+            template_context.update(template_snippet_context)
+
             output = template_skillet.execute(self.get_snippet_variables_from_workflow())
-            template = output.get('template', '')
+            output_template = output.get('template', '')
+
+            context = dict()
+            context['output_template'] = output_template
+
+            if not output_template.startswith('<div'):
+                context['output_template_markup'] = False
+            else:
+                context['output_template_markup'] = True
 
             if len(self.service['snippets']) == 0:
                 template = 'Could not find a valid template to load!'
@@ -1442,7 +1463,6 @@ class ProvisionSnippetView(CNCBaseFormView):
                     outputs = output_utils.parse_outputs(self.service, snippet, template)
                     self.save_dict_to_workflow(outputs)
 
-            context = dict()
             context['base_html'] = self.base_html
             # context['header'] = f"Results for {self.service['label']}"
             self.header = f"Results for {self.service['label']}"
@@ -1454,6 +1474,7 @@ class ProvisionSnippetView(CNCBaseFormView):
             context['results'] = template
             context['view'] = self
             return render(self.request, 'pan_cnc/results.html', context)
+
         elif self.service['type'] == 'rest':
             # Found a skillet type of 'rest'
             rest_skillet = RestSkillet(self.service)
