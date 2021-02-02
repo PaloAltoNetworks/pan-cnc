@@ -146,7 +146,7 @@ class CNCBaseAuth(LoginRequiredMixin, View):
 
                         # additional fix for https://gitlab.com/panw-gse/as/panhandler/-/issues/135
                         # add the default values to the context, but ignore what may arrive from the form
-                        current_workflow[var_name] = variable['default']
+                        current_workflow[var_name] = variable.get('default', '')
                         # continue
 
                     elif var_type == 'file':
