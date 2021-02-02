@@ -137,7 +137,7 @@ class CNCBaseAuth(LoginRequiredMixin, View):
                     var_name = variable['name']
                     var_type = variable['type_hint']
 
-                    if var_type == 'hidden':
+                    if var_type == 'hidden' or var_type == 'disabled':
                         # fix for https://gitlab.com/panw-gse/as/panhandler/-/issues/45
                         # do not care about hidden values and adding back into workflow, for non-text hidden values
                         # such as list, this will cause the list to be inserted as a json string
