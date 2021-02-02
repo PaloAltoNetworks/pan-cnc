@@ -1440,8 +1440,15 @@ class ProvisionSnippetView(CNCBaseFormView):
             template_context['context'] = template_snippet_context
             template_context.update(template_snippet_context)
 
-            output = template_skillet.execute(self.get_snippet_variables_from_workflow())
-            output_template = output.get('template', '')
+            try:
+                results = template_skillet.execute(template_context)
+            except BaseException as be:
+                print(be)
+                return HttpResponseRedirect(self.error_out(str(be)))
+
+            output_template = results.get('template', '')
+
+            snippet = template_skillet.snippet_stack[0]
 
             context = dict()
             context['output_template'] = output_template
@@ -1451,27 +1458,23 @@ class ProvisionSnippetView(CNCBaseFormView):
             else:
                 context['output_template_markup'] = True
 
-            if len(self.service['snippets']) == 0:
-                template = 'Could not find a valid template to load!'
-                snippet = dict()
-            else:
-                snippet = self.service['snippets'][0]
-                # check for and handle outputs
-                # FIXME - use captured outputs from the skillet.execute method instead of this...
-                if 'outputs' in snippet:
-                    # template type only has 1 snippet defined, which is the template to render
-                    outputs = output_utils.parse_outputs(self.service, snippet, template)
-                    self.save_dict_to_workflow(outputs)
+            captured_outputs = False
+            if 'outputs' in results and type(results['outputs']) is dict:
+                if len(results['outputs']) > 0:
+                    captured_outputs = True
+                for k, v in results['outputs'].items():
+                    self.save_value_to_workflow(k, v)
 
+            context['captured_outputs'] = captured_outputs
             context['base_html'] = self.base_html
-            # context['header'] = f"Results for {self.service['label']}"
+
             self.header = f"Results for {self.service['label']}"
             if 'template_title' in snippet:
                 context['title'] = snippet['template_title']
             else:
                 context['title'] = "Rendered Output"
 
-            context['results'] = template
+            context['results'] = output_template
             context['view'] = self
             return render(self.request, 'pan_cnc/results.html', context)
 
@@ -1480,8 +1483,6 @@ class ProvisionSnippetView(CNCBaseFormView):
             rest_skillet = RestSkillet(self.service)
             results = rest_skillet.execute(self.get_snippet_variables_from_workflow())
 
-            # results = rest_utils.execute_all(self.service, self.app_dir, self.get_workflow())
-
             context = dict()
             context['base_html'] = self.base_html
             # fix for #65 - show nicer output for rest type skillet
@@ -1489,13 +1490,6 @@ class ProvisionSnippetView(CNCBaseFormView):
             context['view'] = self
             skillet_label = self.service.get('label', 'Skillet')
             context['title'] = f'Successfully Executed {skillet_label}'
-
-            # Most REST actions will only have a single action/path taken. If so, we can simplify the results
-            # shown to the user by default
-            # if len(results['snippets']) == 1:
-            #     first_key = list(results['snippets'].keys())[0]
-            #     if type(results['snippets'][first_key]) is dict and 'results' in results['snippets'][first_key]:
-            #         context['results'] = results['snippets'][first_key]['results']
 
             if 'snippets' not in results:
                 print('Result from rest_utils is malformed')
