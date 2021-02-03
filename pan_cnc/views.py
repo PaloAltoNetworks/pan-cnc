@@ -134,6 +134,9 @@ class CNCBaseAuth(LoginRequiredMixin, View):
                     type(self.service['variables']) is list:
 
                 for variable in self.service['variables']:
+                    if not isinstance(variable, dict):
+                        continue
+
                     var_name = variable['name']
                     var_type = variable['type_hint']
 
@@ -146,8 +149,11 @@ class CNCBaseAuth(LoginRequiredMixin, View):
 
                         # additional fix for https://gitlab.com/panw-gse/as/panhandler/-/issues/135
                         # add the default values to the context, but ignore what may arrive from the form
-                        current_workflow[var_name] = variable.get('default', '')
-                        # continue
+                        # further, do not overwrite values that may already be there, i.e. from another captured_output
+                        if var_name not in current_workflow:
+                            current_workflow[var_name] = variable.get('default', '')
+
+                        continue
 
                     elif var_type == 'file':
                         try:
