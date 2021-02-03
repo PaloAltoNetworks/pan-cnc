@@ -321,6 +321,7 @@ def get_snippet_metadata(snippet_name, app_name) -> (str, None):
 def read_skillet_metadata(skillet: dict) -> (str, None):
     """
     Returns the snippet metadata as a str
+
     :param skillet: loaded skillet dictionary
     :return: str of .meta-cnc.yaml file
     """
@@ -330,18 +331,24 @@ def read_skillet_metadata(skillet: dict) -> (str, None):
         parent = Path(skillet['snippet_path'])
 
         if parent.exists():
-            # handle .yaml and .yml if possible
-            mdfs = list(parent.glob('.meta-cnc.y*'))
 
-            # allow .skillet.yaml files here too
-            mdfs.extend(parent.glob('*.skillet.y*ml'))
-
-            if len(mdfs) == 1:
-                mdf = mdfs[0]
+            if 'skillet_filename' in skillet:
+                sfn = skillet['skillet_filename']
+                mdf = parent.joinpath(sfn)
 
             else:
-                print('Could not find meta-cnc.yaml')
-                return None
+                # handle .yaml and .yml if possible
+                mdfs = list(parent.glob('.meta-cnc.y*'))
+
+                # allow .skillet.yaml files here too
+                mdfs.extend(parent.glob('*.skillet.y*ml'))
+
+                if len(mdfs) == 1:
+                    mdf = mdfs[0]
+
+                else:
+                    print('Could not find meta-cnc.yaml')
+                    return None
 
             if mdf.exists() and mdf.is_file():
                 try:
