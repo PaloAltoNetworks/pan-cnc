@@ -25,7 +25,8 @@
         </div>
         <div class="card-body">
             <pre><code class="yaml">{{ skillet }}</code></pre>
-            <p>Found skillet in dir: <span class="text-primary">{{ meta.snippet_path }}</span></p>
+            <p>Parent Directory: <span class="text-primary">{{ meta.snippet_path }}</span></p>
+            <p>Skillet File: <span class="text-primary">{{ meta.skillet_filename}}</span></p>
             {% if meta.type == 'python3' %}
             <p><a href="/reinit/{{ app_dir }}/{{ meta.name }}">Re-initialize Python Virtual Environment</a></p>
             {% endif %}
