@@ -76,9 +76,9 @@ function simple_increment(val) {
             }
         }
     }
-    console.log('no octets found');
+    // console.log('no octets found');
     let match = val.match(/\d+$/);
-    console.log(match);
+    // console.log(match);
     if (match !== null) {
         let match_int = parseInt(match[0]);
         if (!isNaN(match_int)) {
