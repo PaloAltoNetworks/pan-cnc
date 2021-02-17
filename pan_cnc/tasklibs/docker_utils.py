@@ -25,6 +25,7 @@ class DockerHelper:
     def check_docker_server(self) -> bool:
         """
         Verifies communication with the docker server
+
         :return: boolean true on success
         """
 
@@ -52,6 +53,7 @@ class DockerHelper:
     def get_volumes_for_container(self, container_id: str) -> list:
         """
         Get the attached volumes as a list of ':' separated strings
+
         :param container_id: container id string
         :return: list such as ['pan_cnc_volume:/home/cnc_user/.pan_cnc']
         """
@@ -81,19 +83,25 @@ class DockerHelper:
         :return: dict containing volume mounts to pass to
         """
 
+        home_dir = os.environ.get('HOME', '/home/cnc_user')
+        persistent_dir = '.pan_cnc'
+
+        persistent_volumes = dict()
+
         if not self.is_docker():
-            return None
+            # let's mount the this uses's .pan_cnc folder instead of just nothing
+            user_pancnc_dir = os.path.abspath(os.path.join(home_dir, persistent_dir))
+            persistent_volumes[user_pancnc_dir] = {
+                'bind': user_pancnc_dir, 'mode': 'rw'
+            }
+            print(persistent_volumes)
+            return persistent_volumes
 
         if not self.check_docker_server():
             return None
 
         this_container = self.get_container_id()
         volumes = self.get_volumes_for_container(this_container)
-
-        home_dir = os.environ.get('HOME', '/home/cnc_user')
-        persistent_dir = '.pan_cnc'
-
-        persistent_volumes = dict()
 
         for v in volumes:
             print(f'Checking {v}')
@@ -115,6 +123,7 @@ class DockerHelper:
     def is_docker() -> bool:
         """
         Detect if we are in a docker container
+
         :return: True if it is found that we are running in a container
         """
         path = '/proc/self/cgroup'
@@ -127,6 +136,7 @@ class DockerHelper:
     def get_container_id() -> str:
         """
         Find our current container id, the id of the container in which this process is running
+
         :return: container_id as string (for example: 6e2edce66211371bd7b2baefaf9eb4c505ef7ae001b3c8e389c2efe3df1bc6ca)
         """
         path = '/proc/self/cgroup'

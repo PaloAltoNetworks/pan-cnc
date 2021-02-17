@@ -1403,9 +1403,24 @@ class ProvisionSnippetView(CNCBaseFormView):
             elif self.service['type'] == 'panorama':
                 self.header = 'Panorama Configuration'
                 self.title = f"Customize Panorama Skillet: {self.service['label']}"
+            elif self.service['type'] == 'terraform':
+                self.header = 'Deploy with Terraform'
+                self.title = self.service.get('label', '')
+            elif self.service['type'] == 'pan_validation':
+                self.header = 'Validate Configuration'
+                self.title = self.service.get('label', '')
+            elif self.service['type'] == 'rest':
+                self.header = 'REST API'
+                self.title = self.service.get('label', '')
             elif self.service['type'] == 'workflow':
                 self.header = 'Workflow'
                 self.title = self.service['label']
+
+                # Make it a fresh start when doing a new workflow for #147
+                if self.app_dir in self.request.session:
+                    print('Clearing context for new workflow')
+                    self.request.session[self.app_dir] = dict()
+
             else:
                 # May need to add additional types here
                 t = self.service['type']
@@ -2205,6 +2220,7 @@ class EditTerraformView(CNCBaseAuth, FormView):
         elif terraform_action == 'validate':
             print('Launching terraform init')
             context['title'] = 'Executing Task: Terraform Init'
+            context['auto_continue'] = True
             r = task_utils.perform_init(meta, self.get_snippet_variables_from_workflow())
             self.request.session['task_next'] = 'terraform_validate'
         elif terraform_action == 'refresh':
@@ -2430,16 +2446,19 @@ class NextTaskView(CNCView):
         # terraform tasks
         #
         if task_next == 'terraform_validate':
-            r = task_utils.perform_validate(skillet, self.get_terraform_context())
+            r = task_utils.perform_validate(skillet, self.get_snippet_variables_from_workflow())
             new_next = 'terraform_plan'
             title = 'Executing Task: Validate'
+
+            # skip right over the results if all is well
+            context['auto_continue'] = True
         elif task_next == 'terraform_plan':
-            r = task_utils.perform_plan(skillet, self.get_terraform_context())
+            r = task_utils.perform_plan(skillet, self.get_snippet_variables_from_workflow())
             new_next = 'terraform_apply'
             title = 'Executing Task: Plan'
 
         elif task_next == 'terraform_apply':
-            r = task_utils.perform_apply(skillet, self.get_terraform_context())
+            r = task_utils.perform_apply(skillet, self.get_snippet_variables_from_workflow())
             new_next = 'terraform_output'
             title = 'Executing Task: Apply'
         elif task_next == 'terraform_output':

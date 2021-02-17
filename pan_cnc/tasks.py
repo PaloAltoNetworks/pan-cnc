@@ -286,6 +286,9 @@ def execute_docker_skillet(skillet_def: dict, args: dict) -> str:
             # FIX for #181
             sanitized_args = __santize_args(args)
 
+            # FIX for #149 - Ensure HOME is always set
+            sanitized_args['HOME'] = os.environ.get('HOME', '/home/cnc_user')
+
             output_generator = skillet.execute_async(sanitized_args)
 
             for out in output_generator:
