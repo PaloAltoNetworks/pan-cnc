@@ -55,9 +55,6 @@ def perform_terraform_cmd(resource_def: dict, cmd: str, snippet_context: dict) -
     env = dict()
     for k, v in tf_vars.items():
         env[f'TF_VAR_{k}'] = v
-        # fix for topology-1-ngfw-2-hosts#8
-        # apparently terraform can now match on exact environment variable names without requiring TF_VAR_ prefix
-        env[k] = v
 
     # fix for #100, #149 - always set home to /home/cnc_user for terraform type docker containers
     env['HOME'] = os.environ.get('HOME', '/home/cnc_user')

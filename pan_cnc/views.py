@@ -2446,19 +2446,19 @@ class NextTaskView(CNCView):
         # terraform tasks
         #
         if task_next == 'terraform_validate':
-            r = task_utils.perform_validate(skillet, self.get_snippet_variables_from_workflow())
+            r = task_utils.perform_validate(skillet, self.get_snippet_variables_from_workflow(skillet=skillet))
             new_next = 'terraform_plan'
             title = 'Executing Task: Validate'
 
             # skip right over the results if all is well
             context['auto_continue'] = True
         elif task_next == 'terraform_plan':
-            r = task_utils.perform_plan(skillet, self.get_snippet_variables_from_workflow())
+            r = task_utils.perform_plan(skillet, self.get_snippet_variables_from_workflow(skillet=skillet))
             new_next = 'terraform_apply'
             title = 'Executing Task: Plan'
 
         elif task_next == 'terraform_apply':
-            r = task_utils.perform_apply(skillet, self.get_snippet_variables_from_workflow())
+            r = task_utils.perform_apply(skillet, self.get_snippet_variables_from_workflow(skillet=skillet))
             new_next = 'terraform_output'
             title = 'Executing Task: Apply'
         elif task_next == 'terraform_output':
