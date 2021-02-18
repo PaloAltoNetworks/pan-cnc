@@ -69,6 +69,7 @@ class OutputHolder(object):
 async def cmd_runner(cmd_seq: list, cwd: str, env: dict, o: OutputHolder) -> int:
     """
     This function will get called within our tasks to execute subprocesses using asyncio
+
     :param cmd_seq: command to execute
     :param cwd: current working dir
     :param env: dict containing the environment variables to pass along
@@ -286,7 +287,7 @@ def execute_docker_skillet(skillet_def: dict, args: dict) -> str:
             # FIX for #181
             sanitized_args = __santize_args(args)
 
-            # FIX for #149 - Ensure HOME is always set
+            # FIX for #149 - Ensure HOME is always set for docker type skillets
             sanitized_args['HOME'] = os.environ.get('HOME', '/home/cnc_user')
 
             output_generator = skillet.execute_async(sanitized_args)
