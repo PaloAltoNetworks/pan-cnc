@@ -1417,9 +1417,9 @@ class ProvisionSnippetView(CNCBaseFormView):
                 self.title = self.service['label']
 
                 # Make it a fresh start when doing a new workflow for #147
-                if self.app_dir in self.request.session:
-                    print('Clearing context for new workflow')
-                    self.request.session[self.app_dir] = dict()
+                # if self.app_dir in self.request.session:
+                #     print('Clearing context for new workflow')
+                #     self.request.session[self.app_dir] = dict()
 
             else:
                 # May need to add additional types here
