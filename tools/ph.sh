@@ -7,5 +7,10 @@
 # setup global git configuration
 /app/cnc/tools/ensure_gitignore_config.sh
 
+echo "Fixing up permissions"
+chown -R cnc_user:cnc_group /home/cnc_user/.pan_cnc/
+chgrp -R cnc_group /home/cnc_user/.pan_cnc/
+chmod 770 /home/cnc_user/.pan_cnc/
+
 # next run our app as the cnc_user
 su cnc_user /app/cnc/tools/start_app.sh
