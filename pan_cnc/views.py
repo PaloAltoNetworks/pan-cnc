@@ -78,6 +78,7 @@ from pan_cnc.lib import snippet_utils
 from pan_cnc.lib import task_utils
 from pan_cnc.lib import widgets
 from pan_cnc.lib.exceptions import CCFParserError
+from pan_cnc.lib.exceptions import DuplicateSkilletException
 from pan_cnc.lib.exceptions import SnippetRequiredException
 from pan_cnc.lib.validators import Cidr
 from pan_cnc.lib.validators import FqdnOrIp
@@ -3398,7 +3399,11 @@ class AppWelcomeView(CNCView):
 
         context = super().get_context_data(**kwargs)
         if this_app:
-            db_utils.initialize_default_repositories(this_app)
+            try:
+                db_utils.initialize_default_repositories(this_app)
+            except DuplicateSkilletException as dse:
+                pass
+
             self.request.session['app_dir'] = this_app
 
         return context

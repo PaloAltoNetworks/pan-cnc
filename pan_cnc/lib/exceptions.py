@@ -53,6 +53,10 @@ class ImportRepositoryException(Exception):
     pass
 
 
+class DuplicateSkilletException(ImportRepositoryException):
+    pass
+
+
 class RepositoryPermissionsException(ImportRepositoryException):
     pass
 
