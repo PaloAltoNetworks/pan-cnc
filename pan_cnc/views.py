@@ -242,6 +242,7 @@ class CNCBaseAuth(LoginRequiredMixin, View):
     def save_dict_to_workflow(self, dict_to_save: dict) -> None:
         """
         Saves all values from a dict into the session_cache / workflow
+
         :param dict_to_save: a dict of key / value pairs to save
         :return: None
         """
@@ -252,10 +253,12 @@ class CNCBaseAuth(LoginRequiredMixin, View):
 
         # explicitly set this here
         self.request.session[self.app_dir] = workflow
+        self.request.session.modified = True
 
     def get_workflow(self) -> dict:
         """
         Return the workflow from the session cache
+
         :return:
         """
         if self.app_dir in self.request.session:
@@ -342,10 +345,12 @@ class CNCBaseAuth(LoginRequiredMixin, View):
         session_cache = self.get_workflow()
         secrets = self.get_environment_secrets()
 
-        if var_name in secrets:
-            return secrets[var_name]
-        elif var_name in session_cache:
+        # per issue #151, we should prefer the session_cache over the environment secrets
+        # this allows workflows and/or captures to set values that might be defaulted in an env
+        if var_name in session_cache:
             return session_cache[var_name]
+        elif var_name in secrets:
+            return secrets[var_name]
         else:
             return default
 
