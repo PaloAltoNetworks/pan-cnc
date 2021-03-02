@@ -281,6 +281,9 @@ def execute_docker_skillet(skillet_def: dict, args: dict) -> str:
                 if 'volumes' in skillet_def['app_data']:
                     skillet_def['app_data'].pop('volumes')
 
+            # FIX for #158 - Use current process UID for all docker containers
+            skillet_def['app_data']['user'] = os.getuid()
+
             sl = SkilletLoader()
             skillet = sl.create_skillet(skillet_def)
 
