@@ -117,13 +117,6 @@ class DockerHelper:
                     'bind': dest_dir, 'mode': 'rw'
                 }
 
-        # always append /etc/passwd, group, and shadow to the containers as well
-        # should fix #162
-        for v in ('/etc/passwd', '/etc/group', '/etc/shadow'):
-            persistent_volumes[v] = {
-                'bind': v, 'mode': 'ro'
-            }
-
         return persistent_volumes
 
     @staticmethod
