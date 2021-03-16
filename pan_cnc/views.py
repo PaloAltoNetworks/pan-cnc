@@ -1492,7 +1492,7 @@ class ProvisionSnippetView(CNCBaseFormView):
                 for k, v in results['outputs'].items():
                     self.save_value_to_workflow(k, v)
 
-            context['captured_outputs'] = captured_outputs
+            context['captured_output'] = captured_outputs
             context['base_html'] = self.base_html
 
             self.header = f"Results for {self.service['label']}"
@@ -1531,7 +1531,7 @@ class ProvisionSnippetView(CNCBaseFormView):
                     for k, v in results['outputs'].items():
                         self.save_value_to_workflow(k, v)
 
-            context['captured_outputs'] = captured_outputs
+            context['captured_output'] = captured_outputs
 
             if 'output_template' in results:
                 if not results['output_template'].startswith('<div'):
@@ -1661,7 +1661,7 @@ class ProvisionSnippetView(CNCBaseFormView):
             context['results'] = json.dumps(outputs, indent=2)
             context['view'] = self
             context['title'] = f'Successfully Executed {self.service.get("label")}'
-            context['captured_outputs'] = captured_outputs
+            context['captured_output'] = captured_outputs
 
             if 'output_template' in outputs:
                 context['title'] = 'PAN-OS Skillet Results'
@@ -2111,7 +2111,7 @@ class EditTargetView(CNCBaseAuth, FormView):
                         skillet_context.update(captured_outputs)
 
                         change['message'] = 'This snippet was executed to gather results'
-                        change['captured_outputs'] = captured_outputs
+                        change['captured_output'] = captured_outputs
                         change['captured_outputs_json'] = json.dumps(captured_outputs, indent=4)
 
                     except PanoplyException as pe:
@@ -2575,17 +2575,14 @@ class TaskLogsView(CNCBaseAuth, View):
                                 # create the object
                                 python_skillet = Python3Skillet(meta)
                                 # this is a temporary fix as skilletlib does not execute python skillets (yet)
-                                # execute will simply returrn the python3_output text through capture_outputs etc
+                                # execute will simply return the python3_output text through capture_outputs etc
                                 results = python_skillet.execute({'python3_output': out})
-                                captured_outputs = False
                                 if 'outputs' in results and type(results['outputs']) is dict:
                                     if len(results['outputs']) > 0:
-                                        captured_outputs = True
-                                        # outputs.update(results['outputs'])
-                                    for k, v in results['outputs'].items():
-                                        self.save_value_to_workflow(k, v)
+                                        for k, v in results['outputs'].items():
+                                            self.save_value_to_workflow(k, v)
 
-                                logs_output['captured_outputs'] = captured_outputs
+                                        logs_output['captured_output'] = json.dumps(results['outputs'], indent='  ')
 
                                 if 'output_template' in results:
                                     logs_output['output_template'] = results['output_template']

@@ -45,13 +45,15 @@
                         <pre class="pb-4">{{ output_template }}</pre>
                     {% endif %}
                 {% else %}
-                    {% if captured_outputs %}
+                    {% if captured_output %}
                         <div id="capture_msg">
                             Successfully captured Skillet output. Click 'Show Captured Values' to view raw output.
                         </div>
                         <pre class="pb-4"
                              id="results"
-                             style="display: none; white-space: pre; overflow-x: scroll">{{ results | safe | linebreaksbr }}</pre>
+                             style="display: none;
+                             white-space: pre;
+                             overflow-x: scroll">{{ results | safe | linebreaksbr }}</pre>
                     {% else %}
                         {% if '<?xml version="1.0"?>' in results or '<config urldb' in results %}
                             <pre class="pb-4" style="white-space: pre; overflow-x: scroll">{{ results }}</pre>
@@ -65,7 +67,7 @@
         </div>
         <div class="card-footer text-right">
             <p class="card-text">
-                {% if captured_outputs and not output_template %}
+                {% if captured_output and not output_template %}
                     <a href="#" onclick="show_captured_values()" class="btn btn-success">Show Captured Values</a>
                 {% endif %}
                 {% if request.session.next_step %}
