@@ -19,7 +19,7 @@ then
 fi
 
 # Issue #95 - use system-site-packages by default
-python3 -m virtualenv  --system-site-packages ./.venv || (echo "Could not create virtualenv!"; exit 1)
+python3 -m virtualenv --system-site-packages ./.venv || (echo "Could not create virtualenv!"; exit 1)
 
 if [ ! -f requirements.txt ];
 then
@@ -28,7 +28,7 @@ then
 fi
 
 echo "Installing requirements"
-./.venv/bin/pip3 install -r requirements.txt || (echo "Could not install requirements!"; exit 1)
+./.venv/bin/pip3 install --force -r requirements.txt || (echo "Could not install requirements!"; exit 1)
 
 touch .python3_init_done
 

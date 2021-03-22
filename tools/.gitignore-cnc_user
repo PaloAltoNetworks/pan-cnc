@@ -7,4 +7,6 @@ terraform.tfstate*
 .cnc_plan
 # uploaded files
 .cnc_tmp_*
+# ignore skilletlib dependancies
+.skilletlib
 

@@ -56,8 +56,8 @@ def perform_terraform_cmd(resource_def: dict, cmd: str, snippet_context: dict) -
     for k, v in tf_vars.items():
         env[f'TF_VAR_{k}'] = v
 
-    # fix for #100 - always set home to /home/cnc_user for terraform type docker containers
-    env['HOME'] = '/home/cnc_user'
+    # fix for #100, #149 - always set home to /home/cnc_user for terraform type docker containers
+    env['HOME'] = os.environ.get('HOME', '/home/cnc_user')
 
     # FIXME - skilletlib should have terraform type just extend docker where possible
     resource_def['type'] = 'docker'

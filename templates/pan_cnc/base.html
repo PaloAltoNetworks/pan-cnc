@@ -86,6 +86,16 @@
             });
         }
 
+        function show_cursor_busy(btn_object) {
+            let doc = $(document.documentElement);
+            doc.css('cursor', 'progress');
+
+            let btn = $(btn_object);
+            btn.addClass('disabled');
+            // wait for page reload
+
+        }
+
     </script>
 </head>
 <body class="bg-light">
@@ -140,7 +150,7 @@
                     <a class="dropdown-item" href="/list_envs">Environments</a>
                     <a class="dropdown-item" href="/create_env">Create Environment</a>
                     <a class="dropdown-item" href="/view_context">View Context</a>
-                    <a class="dropdown-item" href="/clear_cache">Clear Cache</a>
+                    <a class="dropdown-item" href="/clear_cache" onclick="show_cursor_busy(this)">Clear Cache</a>
                     <a class="dropdown-item" href="/ssh_key">View SSH Public Key</a>
                     <a class="dropdown-item" href="/logout">Logout</a>
                 </div>

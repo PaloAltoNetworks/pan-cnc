@@ -8,6 +8,7 @@ from skilletlib import SkilletLoader
 from cnc.models import RepositoryDetails
 from cnc.models import Skillet
 from pan_cnc.lib import cnc_utils
+from pan_cnc.lib.exceptions import DuplicateSkilletException
 
 
 def initialize_default_repositories(app_name) -> None:
@@ -20,10 +21,14 @@ def initialize_default_repositories(app_name) -> None:
     :return: None
     """
     app_config = cnc_utils.get_app_config(app_name)
-    if 'repositories' not in app_config:
+
+    if not app_config:
         return
 
-    for r in app_config['repositories']:
+    if 'repositories' not in app_config or not isinstance(app_config['repositories'], list):
+        return
+
+    for r in app_config.get('repositories', []):
         repo_details = dict()
         repo_details.update(r)
 
@@ -33,6 +38,7 @@ def initialize_default_repositories(app_name) -> None:
 def initialize_repo(repo_detail: dict) -> list:
     """
     Initialize a git repository object using the supplied repositories details dictionary object
+
     :param repo_detail:
     :return: list of Skillets found in that repository
     """
@@ -54,6 +60,7 @@ def initialize_repo(repo_detail: dict) -> list:
 def load_skillets_from_repo(repo_name: str) -> list:
     """
     returns a list of skillets from the repository as found in the db
+
     :param repo_name: name of the repository to search
     :return: list of skillet dictionary objects
     """
@@ -144,6 +151,10 @@ def refresh_skillets_from_repo(repo_name: str) -> list:
     snippets_dir = os.path.join(user_dir, app_name, 'repositories')
     repo_dir = os.path.join(snippets_dir, repo_name)
 
+    if not os.path.exists(repo_dir):
+        print(f'Repository {repo_dir} does not exist!')
+        return all_skillets
+
     try:
         repo_object = RepositoryDetails.objects.get(name=repo_name)
 
@@ -162,11 +173,17 @@ def refresh_skillets_from_repo(repo_name: str) -> list:
             )
 
             if not created:
-                # check if skillet contents have been updated
-                found_skillet_json = json.dumps(skillet_object.skillet_dict)
-                if skillet_record.skillet_json != found_skillet_json:
-                    skillet_record.skillet_json = found_skillet_json
-                    skillet_record.save()
+                if skillet_record.repository_id == repo_object.id:
+                    # check if skillet contents have been updated
+                    found_skillet_json = json.dumps(skillet_object.skillet_dict)
+                    if skillet_record.skillet_json != found_skillet_json:
+                        skillet_record.skillet_json = found_skillet_json
+                        skillet_record.save()
+                else:
+                    print(f'Found existing skillet from another repository: {skillet_name}!!')
+                    raise DuplicateSkilletException(
+                        f'Refusing to import duplicate Skillet: {skillet_name}'
+                    )
 
         for db_skillet in repo_object.skillet_set.all():
             found = False

@@ -78,6 +78,7 @@ from pan_cnc.lib import snippet_utils
 from pan_cnc.lib import task_utils
 from pan_cnc.lib import widgets
 from pan_cnc.lib.exceptions import CCFParserError
+from pan_cnc.lib.exceptions import DuplicateSkilletException
 from pan_cnc.lib.exceptions import SnippetRequiredException
 from pan_cnc.lib.validators import Cidr
 from pan_cnc.lib.validators import FqdnOrIp
@@ -134,15 +135,25 @@ class CNCBaseAuth(LoginRequiredMixin, View):
                     type(self.service['variables']) is list:
 
                 for variable in self.service['variables']:
+                    if not isinstance(variable, dict):
+                        continue
+
                     var_name = variable['name']
                     var_type = variable['type_hint']
 
-                    if var_type == 'hidden':
+                    if var_type == 'hidden' or var_type == 'disabled':
                         # fix for https://gitlab.com/panw-gse/as/panhandler/-/issues/45
                         # do not care about hidden values and adding back into workflow, for non-text hidden values
                         # such as list, this will cause the list to be inserted as a json string
                         # hidden values are only rendered to be used as a source for dynamic entries anyway
                         # per https://github.com/PaloAltoNetworks/panhandler/issues/192
+
+                        # additional fix for https://gitlab.com/panw-gse/as/panhandler/-/issues/135
+                        # add the default values to the context, but ignore what may arrive from the form
+                        # further, do not overwrite values that may already be there, i.e. from another captured_output
+                        if var_name not in current_workflow:
+                            current_workflow[var_name] = variable.get('default', '')
+
                         continue
 
                     elif var_type == 'file':
@@ -212,11 +223,13 @@ class CNCBaseAuth(LoginRequiredMixin, View):
             # ensure we always capture the current snippet if set on this class!
             if self.snippet != '':
                 current_workflow['snippet_name'] = self.snippet
+
         self.request.session[self.app_dir] = current_workflow
 
     def save_value_to_workflow(self, var_name, var_value) -> None:
         """
         Save a specific key value pair to the current workflow session cache
+
         :param var_name: variable name to use
         :param var_value: value of the variable to store
         :return: None
@@ -230,6 +243,7 @@ class CNCBaseAuth(LoginRequiredMixin, View):
     def save_dict_to_workflow(self, dict_to_save: dict) -> None:
         """
         Saves all values from a dict into the session_cache / workflow
+
         :param dict_to_save: a dict of key / value pairs to save
         :return: None
         """
@@ -240,10 +254,12 @@ class CNCBaseAuth(LoginRequiredMixin, View):
 
         # explicitly set this here
         self.request.session[self.app_dir] = workflow
+        self.request.session.modified = True
 
     def get_workflow(self) -> dict:
         """
         Return the workflow from the session cache
+
         :return:
         """
         if self.app_dir in self.request.session:
@@ -256,13 +272,17 @@ class CNCBaseAuth(LoginRequiredMixin, View):
         """
         Returns only the values from the context or the currently loaded environment
         for each variable in the skillet
+
         :param skillet: optional skillet dict to include
         :return: dict containing the variables defined in the skillet with values from the context or the env
         """
 
+        if skillet is None:
+            skillet = {}
         combined_workflow = self.get_snippet_context()
         snippet_vars = dict()
-        if skillet is None:
+
+        if skillet == {}:
             if hasattr(self, 'service'):
                 skillet = self.service
             elif hasattr(self, 'meta'):
@@ -289,19 +309,36 @@ class CNCBaseAuth(LoginRequiredMixin, View):
         """
         Convenience method to return the current workflow and env secrets in a single context
         useful for rendering snippets that require values from both
+
         :return: dict containing env secrets and workflow values
         """
-        # context = self.get_workflow()
-        # context.update(self.get_environment_secrets())
+
         context = dict()
         context.update(self.get_environment_secrets())
         context.update(self.get_workflow())
         return context
 
+    def get_terraform_context(self) -> dict:
+        """
+        Legacy terraform projects still expect to have access to the full context, so we need get_snippet_context
+        However, we also need any hidden or disabled variables from the skillet as well, so pull in
+        get_snippet_variables_from_workflow as well
+
+        :return: dict containing full context + skillet variables with default values
+        """
+        combined_vars = self.get_snippet_context()
+
+        snippet_vars = self.get_snippet_variables_from_workflow()
+
+        combined_vars.update(snippet_vars)
+
+        return combined_vars
+
     def get_value_from_workflow(self, var_name: str, default=None) -> Any:
         """
         Return the variable value either from the workflow (if it's already been saved there)
         or from the environment, if it happens to be configured there
+
         :param var_name: name of variable to find and return
         :param default: default value if nothing has been saved to the workflow or configured in the environment
         :return: value of variable
@@ -309,10 +346,12 @@ class CNCBaseAuth(LoginRequiredMixin, View):
         session_cache = self.get_workflow()
         secrets = self.get_environment_secrets()
 
-        if var_name in secrets:
-            return secrets[var_name]
-        elif var_name in session_cache:
+        # per issue #151, we should prefer the session_cache over the environment secrets
+        # this allows workflows and/or captures to set values that might be defaulted in an env
+        if var_name in session_cache:
             return session_cache[var_name]
+        elif var_name in secrets:
+            return secrets[var_name]
         else:
             return default
 
@@ -320,6 +359,7 @@ class CNCBaseAuth(LoginRequiredMixin, View):
         """
         Return the variable value either from the workflow (if it's already been saved there)
         or the default. If found, go ahead and remove it,
+
         :param var_name: name of variable to find and return
         :param default: default value if nothing has been saved to the workflow or configured in the environment
         :return: value of variable
@@ -330,6 +370,7 @@ class CNCBaseAuth(LoginRequiredMixin, View):
     def get_environment_secrets(self) -> dict:
         """
         Returns a dict containing the currently loaded environment secrets
+
         :return: dict with key value pairs of secrets
         """
         default = dict()
@@ -354,6 +395,7 @@ class CNCBaseAuth(LoginRequiredMixin, View):
     def get_value_from_environment(self, var_name, default) -> Any:
         """
         Return the specified value from the environment secrets dict
+
         :param var_name: name of the key to lookup
         :param default: what to return if the key was not found
         :return: value of the specified secret key
@@ -434,6 +476,7 @@ class CNCBaseAuth(LoginRequiredMixin, View):
         self.request.session.pop('next_url', None)
         self.request.session.pop('workflow_ui_step', None)
         self.request.session.pop('workflow_name', None)
+        self.request.session.pop('workflow_skillet', None)
 
     def error_out(self, message: str) -> str:
         messages.add_message(self.request, messages.ERROR, message)
@@ -447,9 +490,18 @@ class CNCBaseAuth(LoginRequiredMixin, View):
         """
         Default method to load a skillet by name, child applications can override how skillets are found, stored, and
         cached, so we will let them override this method to provide their own functionality
+
         :param skillet_name: name of the skillet to load (from the name attribute in the metadata file)
         :return: skillet metadata dict if not found
         """
+
+        # if a workflow skillet is found on the session, check if the name matches and return if so. This
+        # ensures skillets required for a workflow that may be from a submodule are preferred over other
+        # skillets that may have the same name
+        workflow_skillet = self.request.session.get('workflow_skillet', {})
+        if skillet_name == workflow_skillet.get('name', ''):
+            return workflow_skillet
+
         return snippet_utils.load_snippet_with_name(skillet_name, self.app_dir)
 
 
@@ -1357,9 +1409,24 @@ class ProvisionSnippetView(CNCBaseFormView):
             elif self.service['type'] == 'panorama':
                 self.header = 'Panorama Configuration'
                 self.title = f"Customize Panorama Skillet: {self.service['label']}"
+            elif self.service['type'] == 'terraform':
+                self.header = 'Deploy with Terraform'
+                self.title = self.service.get('label', '')
+            elif self.service['type'] == 'pan_validation':
+                self.header = 'Validate Configuration'
+                self.title = self.service.get('label', '')
+            elif self.service['type'] == 'rest':
+                self.header = 'REST API'
+                self.title = self.service.get('label', '')
             elif self.service['type'] == 'workflow':
                 self.header = 'Workflow'
                 self.title = self.service['label']
+
+                # Make it a fresh start when doing a new workflow for #147
+                # if self.app_dir in self.request.session:
+                #     print('Clearing context for new workflow')
+                #     self.request.session[self.app_dir] = dict()
+
             else:
                 # May need to add additional types here
                 t = self.service['type']
@@ -1393,39 +1460,55 @@ class ProvisionSnippetView(CNCBaseFormView):
             sl = SkilletLoader()
             template_skillet = sl.create_skillet(self.service)
 
-            output = template_skillet.execute(self.get_snippet_variables_from_workflow())
-            template = output.get('template', '')
+            # make all variables available as top-level and also under the 'context' attribute for compatibility
+            # with output_templates
+            template_snippet_context = self.get_snippet_variables_from_workflow()
+            template_context = dict()
+            template_context['context'] = template_snippet_context
+            template_context.update(template_snippet_context)
 
-            if len(self.service['snippets']) == 0:
-                template = 'Could not find a valid template to load!'
-                snippet = dict()
-            else:
-                snippet = self.service['snippets'][0]
-                # check for and handle outputs
-                # FIXME - use captured outputs from the skillet.execute method instead of this...
-                if 'outputs' in snippet:
-                    # template type only has 1 snippet defined, which is the template to render
-                    outputs = output_utils.parse_outputs(self.service, snippet, template)
-                    self.save_dict_to_workflow(outputs)
+            try:
+                results = template_skillet.execute(template_context)
+            except BaseException as be:
+                print(be)
+                return HttpResponseRedirect(self.error_out(str(be)))
+
+            output_template = results.get('template', '')
+
+            snippet = template_skillet.snippet_stack[0]
 
             context = dict()
+            context['output_template'] = output_template
+
+            if not output_template.startswith('<div'):
+                context['output_template_markup'] = False
+            else:
+                context['output_template_markup'] = True
+
+            captured_outputs = False
+            if 'outputs' in results and type(results['outputs']) is dict:
+                if len(results['outputs']) > 0:
+                    captured_outputs = True
+                for k, v in results['outputs'].items():
+                    self.save_value_to_workflow(k, v)
+
+            context['captured_output'] = captured_outputs
             context['base_html'] = self.base_html
-            # context['header'] = f"Results for {self.service['label']}"
+
             self.header = f"Results for {self.service['label']}"
             if 'template_title' in snippet:
                 context['title'] = snippet['template_title']
             else:
                 context['title'] = "Rendered Output"
 
-            context['results'] = template
+            context['results'] = output_template
             context['view'] = self
             return render(self.request, 'pan_cnc/results.html', context)
+
         elif self.service['type'] == 'rest':
             # Found a skillet type of 'rest'
             rest_skillet = RestSkillet(self.service)
             results = rest_skillet.execute(self.get_snippet_variables_from_workflow())
-
-            # results = rest_utils.execute_all(self.service, self.app_dir, self.get_workflow())
 
             context = dict()
             context['base_html'] = self.base_html
@@ -1434,13 +1517,6 @@ class ProvisionSnippetView(CNCBaseFormView):
             context['view'] = self
             skillet_label = self.service.get('label', 'Skillet')
             context['title'] = f'Successfully Executed {skillet_label}'
-
-            # Most REST actions will only have a single action/path taken. If so, we can simplify the results
-            # shown to the user by default
-            # if len(results['snippets']) == 1:
-            #     first_key = list(results['snippets'].keys())[0]
-            #     if type(results['snippets'][first_key]) is dict and 'results' in results['snippets'][first_key]:
-            #         context['results'] = results['snippets'][first_key]['results']
 
             if 'snippets' not in results:
                 print('Result from rest_utils is malformed')
@@ -1455,9 +1531,14 @@ class ProvisionSnippetView(CNCBaseFormView):
                     for k, v in results['outputs'].items():
                         self.save_value_to_workflow(k, v)
 
-            context['captured_outputs'] = captured_outputs
+            context['captured_output'] = captured_outputs
 
             if 'output_template' in results:
+                if not results['output_template'].startswith('<div'):
+                    context['output_template_markup'] = False
+                else:
+                    context['output_template_markup'] = True
+
                 context['output_template'] = results['output_template']
 
             return render(self.request, 'pan_cnc/results.html', context)
@@ -1520,7 +1601,7 @@ class ProvisionSnippetView(CNCBaseFormView):
                 # if we are NOT in a workflow, then we will always show the UI
                 require_ui = True
             else:
-                # we are in a workflow, so let's check if this is only going to do some op commands and sucn
+                # we are in a workflow, so let's check if this is only going to do some op commands and such
                 # any set or edit type commands will require a commit or backup option
 
                 for snippet in panos_skillet.get_snippets():
@@ -1580,10 +1661,17 @@ class ProvisionSnippetView(CNCBaseFormView):
             context['results'] = json.dumps(outputs, indent=2)
             context['view'] = self
             context['title'] = f'Successfully Executed {self.service.get("label")}'
-            context['captured_outputs'] = captured_outputs
+            context['captured_output'] = captured_outputs
 
             if 'output_template' in outputs:
-                context['output_template'] = outputs['output_template']
+                context['title'] = 'PAN-OS Skillet Results'
+                output_template = outputs['output_template']
+                context['output_template'] = output_template
+
+                if not output_template.startswith('<div'):
+                    context['output_template_markup'] = False
+                else:
+                    context['output_template_markup'] = True
 
             return render(self.request, 'pan_cnc/results.html', context)
 
@@ -2023,7 +2111,7 @@ class EditTargetView(CNCBaseAuth, FormView):
                         skillet_context.update(captured_outputs)
 
                         change['message'] = 'This snippet was executed to gather results'
-                        change['captured_outputs'] = captured_outputs
+                        change['captured_output'] = captured_outputs
                         change['captured_outputs_json'] = json.dumps(captured_outputs, indent=4)
 
                     except PanoplyException as pe:
@@ -2138,6 +2226,7 @@ class EditTerraformView(CNCBaseAuth, FormView):
         elif terraform_action == 'validate':
             print('Launching terraform init')
             context['title'] = 'Executing Task: Terraform Init'
+            context['auto_continue'] = True
             r = task_utils.perform_init(meta, self.get_snippet_variables_from_workflow())
             self.request.session['task_next'] = 'terraform_validate'
         elif terraform_action == 'refresh':
@@ -2212,6 +2301,9 @@ class CancelTaskView(CNCBaseAuth, RedirectView):
                 pass
             except ValueError as ve:
                 print(ve)
+                pass
+            except ProcessLookupError as pe:
+                print(pe)
                 pass
 
             task.revoke(terminate=True)
@@ -2360,16 +2452,19 @@ class NextTaskView(CNCView):
         # terraform tasks
         #
         if task_next == 'terraform_validate':
-            r = task_utils.perform_validate(skillet, self.get_snippet_context())
+            r = task_utils.perform_validate(skillet, self.get_snippet_variables_from_workflow(skillet=skillet))
             new_next = 'terraform_plan'
             title = 'Executing Task: Validate'
+
+            # skip right over the results if all is well
+            context['auto_continue'] = True
         elif task_next == 'terraform_plan':
-            r = task_utils.perform_plan(skillet, self.get_snippet_context())
+            r = task_utils.perform_plan(skillet, self.get_snippet_variables_from_workflow(skillet=skillet))
             new_next = 'terraform_apply'
             title = 'Executing Task: Plan'
 
         elif task_next == 'terraform_apply':
-            r = task_utils.perform_apply(skillet, self.get_snippet_context())
+            r = task_utils.perform_apply(skillet, self.get_snippet_variables_from_workflow(skillet=skillet))
             new_next = 'terraform_output'
             title = 'Executing Task: Apply'
         elif task_next == 'terraform_output':
@@ -2480,17 +2575,14 @@ class TaskLogsView(CNCBaseAuth, View):
                                 # create the object
                                 python_skillet = Python3Skillet(meta)
                                 # this is a temporary fix as skilletlib does not execute python skillets (yet)
-                                # execute will simply returrn the python3_output text through capture_outputs etc
+                                # execute will simply return the python3_output text through capture_outputs etc
                                 results = python_skillet.execute({'python3_output': out})
-                                captured_outputs = False
                                 if 'outputs' in results and type(results['outputs']) is dict:
                                     if len(results['outputs']) > 0:
-                                        captured_outputs = True
-                                        # outputs.update(results['outputs'])
-                                    for k, v in results['outputs'].items():
-                                        self.save_value_to_workflow(k, v)
+                                        for k, v in results['outputs'].items():
+                                            self.save_value_to_workflow(k, v)
 
-                                logs_output['captured_outputs'] = captured_outputs
+                                        logs_output['captured_output'] = json.dumps(results['outputs'], indent='  ')
 
                                 if 'output_template' in results:
                                     logs_output['output_template'] = results['output_template']
@@ -2596,6 +2688,7 @@ class WorkflowView(CNCBaseAuth, RedirectView):
             skillet_name = self.get_value_from_workflow('snippet_name', '')
             # let's save this for later when we are on step #2 or later
             self.request.session['workflow_name'] = skillet_name
+
         else:
             previous_ui_step = self.request.session.get('workflow_ui_step', 1)
             ui_step = previous_ui_step + 1
@@ -2609,6 +2702,7 @@ class WorkflowView(CNCBaseAuth, RedirectView):
 
         print(f"found workflow skillet name {skillet_name}")
         self.meta = self.load_skillet_by_name(skillet_name)
+
         if self.meta is None:
             return self.error_out('Process Error - No skillet could be loaded')
 
@@ -2640,14 +2734,30 @@ class WorkflowView(CNCBaseAuth, RedirectView):
         # find which step we should execute
         context = self.get_workflow()
         index = current_step
+
+        sl = SkilletLoader(self.meta['snippet_path'])
+
         for snippet_def in self.meta['snippets'][index:]:
             # instantiate a snippet class so we can evaluate the context to determine if we should execute this one
             # or another skillet later in the list
             snippet = WorkflowSnippet(self.meta['snippets'][current_step], skillet=None, skillet_loader=None)
             if snippet.should_execute(context):
                 current_skillet_name = snippet.name
-                # find and load hhe next skillet here soo we can gather it's type
+                # find and load the next skillet here so we can gather it's type
+                private_skillet = sl.get_skillet_with_name(current_skillet_name, include_resolved_skillets=True)
+                if private_skillet:
+                    self.request.session['workflow_skillet'] = private_skillet.skillet_dict
+                else:
+                    # we we do not have a private / resolved submodule skillet, then the
+                    # normal load_skillet_by_name call will find it
+                    self.request.session.pop('workflow_skillet', None)
+
                 skillet = self.load_skillet_by_name(snippet.name)
+
+                # ensure we perform the workflow transforms here before we continue
+                skillet_context = snippet.transform_context(context)
+                self.save_dict_to_workflow(skillet_context)
+
                 if skillet is not None:
                     current_skillet_type = skillet.get('type', None)
                 break
@@ -3112,8 +3222,6 @@ class DebugMetadataView(CNCView):
 
     def get_context_data(self, **kwargs):
         # snippet_data = snippet_utils.get_snippet_metadata(self.snippet_name, self.app_dir)
-        skillet = db_utils.load_skillet_by_name(self.snippet_name)
-        snippet_data = snippet_utils.read_skillet_metadata(skillet)
         snippet = self.load_skillet_by_name(self.snippet_name)
         context = super().get_context_data()
         context['header'] = 'Debug Metadata'
@@ -3123,6 +3231,7 @@ class DebugMetadataView(CNCView):
             messages.add_message(self.request, messages.ERROR, f'Could not load skillet with name {self.snippet_name}')
             return context
 
+        snippet_data = snippet_utils.read_skillet_metadata(snippet)
         print(f"loaded snippet from {snippet['snippet_path']}")
         context['skillet'] = snippet_data
         context['meta'] = snippet
@@ -3175,12 +3284,17 @@ class DebugContextView(CNCView):
         context = super().get_context_data()
         context['header'] = self.header
         context['title'] = 'Workflow Context'
-        context['workflow'] = json.dumps(w, indent=2)
+
+        try:
+            context['workflow'] = json.dumps(w, indent=2)
+
+        except ValueError as ve:
+            context['workflow'] = f'Error getting context {ve}'
+
         return context
 
 
 class ViewLogsView(CNCView):
-
     template_name = 'pan_cnc/debug_logs.html'
     help_text = 'This is the raw debug logs from this application. This can be useful to find various errors and ' \
                 'trouble shoot issues. Please provide this output when opening an issue or requesting help.'
@@ -3208,6 +3322,7 @@ class ClearContextView(CNCBaseAuth, RedirectView):
     """
      Clear Context class, allows user to remove all items in the context
     """
+
     def get_redirect_url(self, *args, **kwargs):
 
         self.app_dir = db_utils.get_default_app_name()
@@ -3233,7 +3348,7 @@ class ReinitPythonVenv(CNCView):
         pass
 
     def get_context_data(self, **kwargs):
-        self.clean_up_workflow()
+
         app_dir = self.kwargs.get('app_dir', '')
         if app_dir != '':
             self.app_dir = app_dir
@@ -3242,10 +3357,12 @@ class ReinitPythonVenv(CNCView):
         skillet = self.load_skillet_by_name(skillet_name)
         context = super().get_context_data()
         context['base_html'] = self.base_html
-        context['title'] = f"Upgrading Environment for: {skillet['label']}"
-        context['auto_continue'] = True
-        r = task_utils.python3_init(skillet)
-        self.request.session['task_id'] = r.id
+        if skillet is not None:
+            context['title'] = f"Upgrading Environment for: {skillet['label']}"
+            context['auto_continue'] = True
+            self.clean_up_workflow()
+            r = task_utils.python3_init(skillet)
+            self.request.session['task_id'] = r.id
         return context
 
 
@@ -3260,4 +3377,30 @@ class DefaultSSHKeyView(CNCView):
 
         pub_key = git_utils.get_default_ssh_pub_key()
         context['public_key'] = pub_key
+        return context
+
+
+class AppWelcomeView(CNCView):
+    """
+    Simple Welcome View Class to initialize the database for custom CNC Apps.
+
+    This is used by appetizer and should be the default for any CNC Skeleton based apps as well.
+
+    """
+
+    template_name = "pan_cnc/welcome.html"
+
+    def get_context_data(self, **kwargs):
+
+        this_app = os.environ.get('CNC_APP', None)
+
+        context = super().get_context_data(**kwargs)
+        if this_app:
+            try:
+                db_utils.initialize_default_repositories(this_app)
+            except DuplicateSkilletException as dse:
+                pass
+
+            self.request.session['app_dir'] = this_app
+
         return context
