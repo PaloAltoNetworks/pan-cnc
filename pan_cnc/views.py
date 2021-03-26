@@ -3399,6 +3399,7 @@ class AppWelcomeView(CNCView):
             try:
                 db_utils.initialize_default_repositories(this_app)
             except DuplicateSkilletException as dse:
+                print(dse)
                 pass
 
             self.request.session['app_dir'] = this_app
