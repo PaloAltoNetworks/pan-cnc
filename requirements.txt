@@ -1,7 +1,7 @@
 GitPython
 PyYAML
 celery
-django==3.1.6
+django~=3.1.7
 django-widget-tweaks
 docker
 cryptography
@@ -19,5 +19,5 @@ urllib3
 virtualenv
 xmldiff
 xmltodict
-skilletlib
+skilletlib~=1.0.0
 panforge
