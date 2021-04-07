@@ -1906,6 +1906,7 @@ class EditTargetView(CNCBaseAuth, FormView):
         self.save_value_to_workflow('TARGET_IP', target_ip)
         self.save_value_to_workflow('TARGET_PORT', target_port)
         self.save_value_to_workflow('TARGET_USERNAME', target_username)
+        self.save_value_to_workflow('TARGET_PASSWORD', target_password)
 
         if debug == 'True' or debug is True:
             return self.debug_skillet(target_ip, target_username, target_password, meta, form)
