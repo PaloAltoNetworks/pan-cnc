@@ -3282,12 +3282,22 @@ class DebugContextView(CNCView):
         self.clean_up_workflow()
         workflow = self.get_workflow()
         w = dict(sorted(workflow.items()))
+
+        wc = copy.deepcopy(w)
+
+        for k, v in wc.items():
+            if 'PASSWORD' in k:
+                wc[k] = '********'
+            elif 'password' in k:
+                wc[k] = '********'
+
         context = super().get_context_data()
         context['header'] = self.header
         context['title'] = 'Workflow Context'
 
         try:
-            context['workflow'] = json.dumps(w, indent=2)
+            # hide 'PASSWORD' and 'password' by default for panhandler#167
+            context['workflow'] = json.dumps(wc, indent=2)
 
         except ValueError as ve:
             context['workflow'] = f'Error getting context {ve}'
