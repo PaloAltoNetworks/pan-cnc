@@ -303,7 +303,7 @@ def load_snippet_with_name(snippet_name, app_dir) -> (dict, None):
         if service['name'] == snippet_name:
             return service
 
-    print('Could not find service with name: %s' % snippet_name)
+    print('Could not find Skillet with name: %s' % snippet_name)
     return None
 
 

@@ -55,6 +55,7 @@ from django.http import JsonResponse
 from django.shortcuts import HttpResponse
 from django.shortcuts import HttpResponseRedirect
 from django.shortcuts import render
+from django.utils.safestring import mark_safe
 from django.views.generic import RedirectView
 from django.views.generic import TemplateView
 from django.views.generic import View
@@ -1809,7 +1810,7 @@ class EditTargetView(CNCBaseAuth, FormView):
                                                  label=target_password_label,
                                                  initial=target_password)
 
-        debug_field = fields.CharField(initial='False', widget=HiddenInput())
+        debug_field = fields.CharField(initial='False', widget=HiddenInput(), required=False)
 
         form.fields['TARGET_IP'] = target_ip_field
         form.fields['TARGET_PORT'] = target_port_field
@@ -3255,7 +3256,17 @@ class ClearCacheView(CNCBaseAuth, RedirectView):
                                              'imported_git_repos')
 
         # fix for panhandler#118
-        db_utils.refresh_skillets_from_all_repos()
+        try:
+            db_utils.refresh_skillets_from_all_repos()
+        except DuplicateSkilletException as dse:
+            messages.add_message(self.request, messages.INFO,
+                                 mark_safe('Duplicate Skillet names detected! '
+                                           'Not all repositories could be updated. '
+                                           "Check <a href='/app_logs'>Logs</a> for details."
+                                           ))
+
+            print(dse)
+
         messages.add_message(self.request, messages.INFO, 'Long term cache cleared')
         return '/'
 
