@@ -24,6 +24,7 @@ from pathlib import Path
 from time import time
 
 import pyAesCrypt
+import yaml
 from django.conf import settings
 from django.core.cache import cache
 
@@ -40,6 +41,17 @@ def check_user_secret(user_id):
         return False
 
     return True
+
+
+def load_user_defaults() -> dict:
+    secret_dir = os.path.expanduser('~/.pan_cnc')
+    file_path = os.path.join(secret_dir, 'env.yaml')
+    if os.path.exists(file_path):
+        with open(file_path, 'r') as defaults:
+            data = yaml.safe_load(defaults)
+            return data
+
+    return dict()
 
 
 def create_environment(name, description, secrets):
@@ -390,7 +402,6 @@ def evict_cache_items_of_type(app_name, cache_type):
 
 
 def init_app(app_cnc_config):
-
     # do not init app if we are testing...
     if is_testing():
         print('skipping due to testing')
