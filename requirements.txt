@@ -19,5 +19,5 @@ urllib3
 virtualenv
 xmldiff
 xmltodict
-skilletlib~=1.0.0
+skilletlib~=1.0.1
 panforge

@@ -2083,41 +2083,58 @@ class EditTargetView(CNCBaseAuth, FormView):
                 return self.form_invalid(form)
 
             for snippet in panos_skillet.get_snippets():
-                change = dict()
+                snippet.update_context(skillet_context)
 
-                snippet.render_metadata(skillet_context)
-                changes[snippet.name] = change
-                change['metadata'] = snippet.metadata
-                change['json'] = json.dumps(snippet.metadata, indent=4)
-                change['when'] = True
+                loop_vars = snippet.get_loop_parameter()
+                index = 0
 
-                if not snippet.should_execute(skillet_context):
-                    change['message'] = 'This snippet would be skipped due to when conditional'
-                    change['when'] = False
-                    continue
+                for item in loop_vars:
+                    change = dict()
 
-                if 'cmd' in snippet.metadata and \
-                        snippet.metadata['cmd'] in ('op', 'set', 'edit', 'override', 'move', 'rename',
-                                                    'clone', 'delete'):
+                    skillet_context['loop'] = item
+                    skillet_context['loop_index'] = index
 
-                    change['message'] = 'This destructive snippet would be executed'
+                    snippet.render_metadata(skillet_context)
 
-                else:
-                    try:
-                        (output, status) = snippet.execute(skillet_context)
-                        # capture all outputs
-                        snippet_outputs = snippet.get_default_output(output, status)
-                        captured_outputs = snippet.capture_outputs(output, status)
+                    if snippet.name in changes:
+                        changes[f"{snippet.name}_{index}"] = change
+                    else:
+                        changes[snippet.name] = change
 
-                        skillet_context.update(snippet_outputs)
-                        skillet_context.update(captured_outputs)
+                    change['metadata'] = snippet.metadata
+                    change['json'] = json.dumps(snippet.metadata, indent=4)
+                    change['when'] = True
 
-                        change['message'] = 'This snippet was executed to gather results'
-                        change['captured_output'] = captured_outputs
-                        change['captured_outputs_json'] = json.dumps(captured_outputs, indent=4)
+                    if not snippet.should_execute(skillet_context):
+                        change['message'] = 'This snippet would be skipped due to when conditional'
+                        change['when'] = False
+                        continue
 
-                    except PanoplyException as pe:
-                        change['message'] = str(pe)
+                    if 'cmd' in snippet.metadata and \
+                            snippet.metadata['cmd'] in ('op', 'set', 'edit', 'override', 'move', 'rename',
+                                                        'clone', 'delete'):
+
+                        change['message'] = 'This destructive snippet would be executed'
+
+                    else:
+                        try:
+                            (output, status) = snippet.execute(skillet_context)
+                            # capture all outputs
+                            snippet_outputs = snippet.get_default_output(output, status)
+                            captured_outputs = snippet.capture_outputs(output, status)
+
+                            skillet_context.update(snippet_outputs)
+                            skillet_context.update(captured_outputs)
+
+                            change['message'] = 'This snippet was executed to gather results'
+                            change['captured_output'] = captured_outputs
+                            change['captured_outputs_json'] = json.dumps(captured_outputs, indent=4)
+
+                        except PanoplyException as pe:
+                            change['message'] = str(pe)
+
+                    index = index + 1
+                    snippet.reset_metadata()
 
         except CCFParserError as cpe:
             label = meta['label']
@@ -3425,5 +3442,10 @@ class AppWelcomeView(CNCView):
                 pass
 
             self.request.session['app_dir'] = this_app
+
+        defaults = cnc_utils.load_user_defaults()
+        if 'default' in defaults and isinstance(defaults["default"], dict):
+            for k, v in defaults["default"].items():
+                self.save_value_to_workflow(k, v)
 
         return context

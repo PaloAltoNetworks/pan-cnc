@@ -42,7 +42,7 @@
                     {% if output_template_markup %}
                     <div class="pb-4">{{ output_template | safe }}</div>
                     {% else %}
-                        <pre class="pb-4">{{ output_template }}</pre>
+                        <pre class="pb-4">{{ output_template | safe }}</pre>
                     {% endif %}
                 {% else %}
                     {% if captured_output %}

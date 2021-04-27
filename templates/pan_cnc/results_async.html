@@ -207,7 +207,7 @@
             <div class="card-text">
                 <p>{{ view_message }}</p>
                 <textarea id="results" class="text-monospace small pb-4 border-0"
-                          style="width: 100%; overflow: scroll">{{ results }}</textarea>
+                          style="width: 100%; overflow: scroll">{{ results | safe }}</textarea>
                 <pre id="countdown"></pre>
             </div>
 
