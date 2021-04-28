@@ -93,7 +93,7 @@ def clone_repo(repo_dir, repo_name, repo_url, branch='master'):
     :return: bool
     """
     try:
-        message = clone_repository(repo_dir, repo_name, repo_url)
+        message = clone_repository(repo_dir, repo_name, repo_url, branch)
         print(message)
         return True
     except ImportRepositoryException as ire:
@@ -101,7 +101,7 @@ def clone_repo(repo_dir, repo_name, repo_url, branch='master'):
         return False
 
 
-def clone_repository(repo_dir, repo_name, repo_url, branch='master'):
+def clone_repository(repo_dir, repo_name, repo_url, branch=None):
     """
     Clone the given repository into the given directory name
     :param repo_dir:
@@ -122,6 +122,11 @@ def clone_repository(repo_dir, repo_name, repo_url, branch='master'):
 
         # remove depth option to allow us to query remote branches
         repo = Repo.clone_from(repo_url, repo_dir, env=env, config='http.sslVerify=false')
+
+        if branch:
+            print(f'Checking out branch {branch}')
+            repo.git.checkout(branch)
+
         # ensure we init and grab all submodules as well for #121
         repo.submodule_update(recursive=True, init=True)
 
