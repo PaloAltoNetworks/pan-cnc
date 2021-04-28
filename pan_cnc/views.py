@@ -503,7 +503,11 @@ class CNCBaseAuth(LoginRequiredMixin, View):
         if skillet_name == workflow_skillet.get('name', ''):
             return workflow_skillet
 
-        return snippet_utils.load_snippet_with_name(skillet_name, self.app_dir)
+        db_skillet = db_utils.load_skillet_by_name(skillet_name)
+        return db_skillet
+
+        # begin to remove long term cache for skillets
+        # return snippet_utils.load_snippet_with_name(skillet_name, self.app_dir)
 
 
 class CNCView(CNCBaseAuth, TemplateView):
