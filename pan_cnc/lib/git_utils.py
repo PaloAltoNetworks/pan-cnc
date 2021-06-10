@@ -128,6 +128,7 @@ def clone_repository(repo_dir, repo_name, repo_url, branch=None):
             repo.git.checkout(branch)
 
         # ensure we init and grab all submodules as well for #121
+        repo.git.submodule('update', '--init')
         repo.submodule_update(recursive=True, init=True)
 
     except (GitCommandError, GitError) as gce:
