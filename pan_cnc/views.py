@@ -3297,7 +3297,7 @@ class DebugContextView(CNCView):
     Debug Context class, allows user to see all the variables currently set inside the workflow
     """
     template_name = 'pan_cnc/debug_context.html'
-    header = 'Panhandler Context'
+    header = 'Application Context'
     help_text = 'This view shows all the values captured into the context. These values will be used to ' \
                 'pre-populate fields when rendering Skillet input forms. The output from one skillet can ' \
                 'be used as the input to another Skillet allowing more complex workflows.'
