@@ -6,8 +6,13 @@ register = template.Library()
 
 
 @register.simple_tag
-def build_menu():
-    menu = cache.get('pan_cnc_menu', None)
+def build_menu() -> dict:
+    """
+    Builds the menu dictionary from the pan_cnc.yaml configuration
+
+    :return dict: dict of all menu items
+    """
+    menu: dict = cache.get('pan_cnc_menu', None)
     if menu is not None:
         return menu
 
