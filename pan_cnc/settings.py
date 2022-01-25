@@ -67,10 +67,9 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'widget_tweaks',
     'django.contrib.staticfiles',
-    'cnc'
-    #   'django.contrib.admin',
+    'cnc',
+    'django.contrib.admin',
 ]
-
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -150,7 +149,7 @@ SESSION_ENGINE = 'django.contrib.sessions.backends.cache'
 
 STATIC_URL = '/static/'
 STATICFILES_DIRS = [
-   os.path.join(BASE_DIR, 'assets')
+    os.path.join(BASE_DIR, 'assets')
 ]
 
 # STATIC_ROOT = os.path.join(BASE_DIR, 'assets/')

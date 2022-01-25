@@ -31,6 +31,7 @@ import sys
 from django.conf import settings
 from django.contrib.auth import views as auth_views
 from django.urls import path
+from django.contrib import admin
 
 from pan_cnc import views as pan_cnc_views
 from pan_cnc.lib import cnc_utils
@@ -69,7 +70,8 @@ urlpatterns = [
     path('clear_context', pan_cnc_views.ClearContextView.as_view()),
     path('ssh_key', pan_cnc_views.DefaultSSHKeyView.as_view()),
     path('reinit/<app_dir>/<skillet>', pan_cnc_views.ReinitPythonVenv.as_view()),
-    path('cancel', pan_cnc_views.ErrorView.as_view())
+    path('cancel', pan_cnc_views.ErrorView.as_view()),
+    path('admin/', admin.site.urls),
 ]
 
 print('Configuring URLs for installed apps')
