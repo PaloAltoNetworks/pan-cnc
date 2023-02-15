@@ -90,8 +90,9 @@ for app_name in settings.INSTALLED_APPS_CONFIG:
     # ensure we import the views module here for all apps
     try:
         app_view_module = importlib.import_module('%s.views' % app_name)
-    except ModuleNotFoundError:
+    except ModuleNotFoundError as mne:
         print('No view module found for this app!')
+        print(mne) # hint as to why this won't load? Missing dep usually, but show it here
         print(sys.path)
         app_view_module = object()
 
