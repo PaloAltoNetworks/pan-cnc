@@ -187,6 +187,9 @@ for app in os.listdir(SRC_PATH):
                         #     'ENGINE': 'django.db.backends.sqlite3',
                         #     'NAME': os.path.join(app_persistent_dir, 'db.sqlite3'),
                         # }
+                        assets_dir = os.path.join(app_dir, 'assets')
+                        if os.path.exists(assets_dir):
+                            STATICFILES_DIRS.append(assets_dir)
 
                 except OSError:
                     print('Could not open .pan-cnc.yaml for app: %s' % app)
